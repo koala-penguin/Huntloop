@@ -40,6 +40,15 @@ a PDF. Huntloop:
 Answering a Yes/No question or your work rights for that country re-tiers the job instantly, without another AI call.
 Results are cached, so reopening a job costs nothing.
 
+Each job also has:
+
+- **Ask AI** — a conversation with Claude about that job. It knows your profile, the posting and the analysis, can
+  search the web, save notes and update the job's status. It can *propose* adding a fact to your profile or going ahead
+  with the application; those only happen when you click to confirm.
+- **Employer** — deep research on the company (what it does, recent activity, growth, leadership changes, hiring,
+  culture, red flags) with a source link and date for every claim, open-role counts from the employer's own job board
+  where available, and advice for your application. Reports are kept for 30 days and shared with the chat.
+
 ## Models and cost
 
 Every AI task uses **Claude Opus 5.5** by default. In **Settings → AI models** you can pick a different default model and
@@ -80,7 +89,7 @@ tests/            unit/ (Vitest), e2e/ (Playwright)
 1. **Foundation** — app shell, English/Korean, settings for models/effort/budget, Claude client, background tasks. ✅
 2. **Profile** — CV upload → structured profile, work rights per country, preferences. ✅
 3. **Bring your own job** — add postings by URL, long pasted text, screenshots or PDF; "Interview Chance" tier with
-   evidence ✅; per-job AI chat; employer deep research.
+   evidence; per-job AI chat; employer deep research. ✅
 4. **AI search** — Adzuna, a Claude web-search agent, SEEK and LinkedIn through a visible (headed) browser, and Chrome
    DevTools MCP for AI-driven browsing.
 5. **Proceed → CV tailoring** — once you and the AI agree to go for a job, a tailored CV (DOCX/PDF) where every claim is

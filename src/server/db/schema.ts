@@ -323,3 +323,20 @@ export const chatActions = sqliteTable("chat_actions", {
   resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
 });
 export type ChatActionRow = typeof chatActions.$inferSelect;
+
+/** Employer research, shared by every job at the company and reused until it expires (30 days). */
+export const companyReports = sqliteTable(
+  "company_reports",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    language: text("language").notNull(),
+    model: text("model").notNull(),
+    data: text("data", { mode: "json" }).notNull(),
+    createdAt: createdAt(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("company_reports_company").on(t.companyId)],
+);

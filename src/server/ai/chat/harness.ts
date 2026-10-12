@@ -90,7 +90,7 @@ export function createJobConversation(ctx: AiContext, job: JobRow, now = new Dat
     })
     .returning()
     .get();
-  const context = jobChatContext(job, fit, getCurrentProfile(ctx.db, ctx.userId), getPreferences(ctx.db, ctx.userId));
+  const context = jobChatContext(job, fit, getCurrentProfile(ctx.db, ctx.userId), getPreferences(ctx.db, ctx.userId), companyResearchHooks.summaryFor(ctx, job));
   ctx.db.insert(chatMessages).values({ conversationId: conversation.id, seq: 0, role: "user", kind: "context", content: context }).run();
   return conversation;
 }

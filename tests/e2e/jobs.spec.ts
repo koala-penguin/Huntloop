@@ -118,6 +118,19 @@ test("chat about a job: streamed answer, profile-fact card, proceed card", async
   await expect(page.locator('[data-role="user"]')).toHaveCount(3);
 });
 
+test("employer research: sourced claims, hiring activity, advice", async ({ page }) => {
+  await page.goto("/jobs?ineligible=1");
+  await page.getByRole("link", { name: /Data Engineer/ }).first().click();
+  await page.getByRole("tab", { name: "Employer" }).click();
+  await expect(page.getByRole("heading", { name: "Research Lion City Logistics" })).toBeVisible();
+  await page.getByRole("button", { name: "Research this employer" }).click();
+  await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[data-section="activities"]').getByRole("link", { name: /example\.com · 2026-08-14/ })).toBeVisible();
+  await expect(page.getByText(/1 claim was left out/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What this means for you" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh research" })).toBeVisible();
+});
+
 test("the report reads in Korean", async ({ page }) => {
   await page.goto("/jobs");
   await page.getByRole("link", { name: /Senior Frontend Engineer/ }).first().click();

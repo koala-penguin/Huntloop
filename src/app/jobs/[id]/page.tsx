@@ -21,6 +21,9 @@ import { DeleteJobButton, PostingTextEditor, ReassessButton, StatusSelect, Trans
 import { ChatPanel } from "@/components/jobs/chat-panel";
 import { getJobConversation, listChatActions, listChatMessages } from "@/server/ai/chat/harness";
 import { transcript } from "@/server/ai/chat/render";
+import { EmployerReport } from "@/components/jobs/employer-report";
+import { ResearchControls } from "@/components/jobs/research-controls";
+import { activeResearchTask, getLatestReport } from "@/server/research/company";
 
 const KNOWN_ERRORS = ["not_a_job_posting", "url_blocked", "missing_posting", "refusal", "budget", "invalid_output", "max_tokens"];
 
@@ -36,6 +39,8 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
   if (!job) notFound();
   const conversation = getJobConversation({ db, userId: user.id }, job.id);
   const chatItems = conversation ? transcript(listChatMessages({ db }, conversation.id), listChatActions({ db }, conversation.id)) : [];
+  const report = job.companyId ? getLatestReport(db, job.companyId) : null;
+  const researchTask = job.companyId ? activeResearchTask(db, user.id, job.companyId) : null;
 
   const taskId = activeJobTask(db, user.id, job);
   const fit = loadJobFit(db, user.id, job);
@@ -224,6 +229,29 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
                   ]
                 : []),
               { value: "posting", label: t("tabPosting"), content: postingTab },
+              {
+                value: "employer",
+                label: t("tabEmployer"),
+                content: (
+                  <div className="flex flex-col gap-4">
+                    {!report && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>{t("employerTitle", { company: job.companyName ?? t("untitled") })}</CardTitle>
+                          <CardDescription>{t("employerDescription")}</CardDescription>
+                        </CardHeader>
+                        <ResearchControls jobId={job.id} runningTaskId={researchTask} hasReport={false} />
+                      </Card>
+                    )}
+                    {report && (
+                      <>
+                        <EmployerReport report={report.report} companyName={job.companyName ?? ""} stale={report.stale} />
+                        <ResearchControls key={report.id} jobId={job.id} runningTaskId={researchTask} hasReport />
+                      </>
+                    )}
+                  </div>
+                ),
+              },
               {
                 value: "chat",
                 label: t("tabChat"),

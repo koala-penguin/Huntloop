@@ -83,7 +83,13 @@ export function fitSummary(fit: JobFit, job: JobRow) {
 }
 
 /** messages[0]: the candidate, the posting and the fit analysis. Frozen once the conversation starts. */
-export function jobChatContext(job: JobRow, fit: JobFit | null, profile: ProfileVersion | null, preferences: Preferences): Anthropic.Beta.Messages.BetaContentBlockParam[] {
+export function jobChatContext(
+  job: JobRow,
+  fit: JobFit | null,
+  profile: ProfileVersion | null,
+  preferences: Preferences,
+  research: string | null = null,
+): Anthropic.Beta.Messages.BetaContentBlockParam[] {
   const candidate = profile
     ? {
         ...assessmentProfileView(profile.cvText, profile.data),
@@ -100,6 +106,7 @@ export function jobChatContext(job: JobRow, fit: JobFit | null, profile: Profile
       source: { type: "text", media_type: "text/plain", data: job.description ?? job.rawText ?? "" },
       title: "Job posting (untrusted content)",
     },
+    ...(research ? [{ type: "text" as const, text: `<employer_research>\n${research}\n</employer_research>` }] : []),
     {
       type: "text",
       text: `<fit_analysis>\n${fit ? stableStringify(fitSummary(fit, job), 1) : "Not analysed yet."}\n</fit_analysis>`,

@@ -457,7 +457,10 @@
     "saveText": "Save and re-analyse",
     "tabChat": "Ask AI",
     "chatTitle": "Talk it through",
-    "chatDescription": "Ask anything about this job: what it really involves, whether you're a fit, how to improve your chances. Claude knows your profile, the posting and the analysis."
+    "chatDescription": "Ask anything about this job: what it really involves, whether you're a fit, how to improve your chances. Claude knows your profile, the posting and the analysis.",
+    "tabEmployer": "Employer",
+    "employerTitle": "Research {company}",
+    "employerDescription": "Claude searches the web for what the company does, its recent activity, growth, leadership changes, hiring and culture — every claim with its source and date — plus advice for this application. Runs in the background; the report is kept for 30 days and shared with the chat."
   },
   "jobStatus": {
     "new": "New",
@@ -721,5 +724,61 @@
       "proceeded": "Moving ahead: status set to Applying",
       "dismissed": "Dismissed"
     }
+  },
+  "employer": {
+    "start": "Research this employer",
+    "refresh": "Refresh research",
+    "costHint": "Usually takes a few minutes and costs about $0.50–1.50 with Opus.",
+    "researching": "Researching the employer…",
+    "noCompany": "The employer's name isn't known for this job, so it can't be researched.",
+    "asOf": "Research as of {date}",
+    "stale": "This report is over 30 days old. Refresh it for current information.",
+    "fact": {
+      "website": "Website",
+      "headquarters": "Headquarters",
+      "founded": "Founded",
+      "size": "Size",
+      "ownership": "Ownership",
+      "industry": "Industry"
+    },
+    "ownership": {
+      "public": "Listed company",
+      "private": "Private company",
+      "startup": "Startup",
+      "subsidiary": "Subsidiary",
+      "government": "Government",
+      "nonprofit": "Non-profit",
+      "unknown": "Unknown"
+    },
+    "hiringTitle": "Hiring activity",
+    "hiringDescription": "Counted from the employer's own job board where Huntloop can read it.",
+    "atsOpenRoles": "{count, plural, one {# open role} other {# open roles}} on their {board} job board.",
+    "noAts": "Huntloop couldn't read this employer's job board, so there are no exact counts.",
+    "trackedJobs": "{count, plural, one {# job at this employer is} other {# jobs at this employer are}} in your Huntloop list.",
+    "section": {
+      "business": "What they do",
+      "activities": "Recent activity",
+      "growth": "Growth",
+      "leadership": "Leadership changes",
+      "hiring": "Hiring",
+      "culture": "Culture and reputation",
+      "tech": "Technology",
+      "sponsorship": "Visa sponsorship",
+      "red_flags": "Red flags"
+    },
+    "confidence": {
+      "high": "High confidence",
+      "medium": "Medium confidence",
+      "low": "Low confidence"
+    },
+    "forYouTitle": "What this means for you",
+    "forYou": {
+      "talkingPoints": "Talking points",
+      "cvAngles": "How to angle your CV",
+      "questionsToAsk": "Questions to ask",
+      "referralAngles": "Referral and networking angles"
+    },
+    "sourcesNote": "Based on {count, plural, one {# source} other {# sources}} Claude read.",
+    "droppedClaims": "{count, plural, one {# claim was} other {# claims were}} left out because their source couldn't be confirmed."
   }
 }

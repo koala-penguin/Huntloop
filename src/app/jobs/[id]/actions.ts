@@ -15,6 +15,7 @@ import { errorCodeOf } from "@/server/errors";
 import { resolveChatAction } from "@/server/ai/chat/actions";
 import { createJobConversation, getJobConversation, isConversationBusy } from "@/server/ai/chat/harness";
 import { getJob } from "@/server/repo/jobs";
+import { startCompanyResearch } from "@/server/research/company";
 import type { ActionResult } from "@/app/profile/actions";
 
 function fail(error: unknown): { ok: false; error: string } {
@@ -109,4 +110,14 @@ export async function newConversationAction(jobId: number): Promise<ActionResult
   createJobConversation(ai, job);
   revalidatePath(`/jobs/${jobId}`);
   return { ok: true, value: null };
+}
+
+export async function startResearchAction(jobId: number, force: boolean): Promise<ActionResult<{ taskId: number | null }>> {
+  const { db, user } = appContext();
+  const job = getJob(db, user.id, jobId);
+  if (!job) return { ok: false, error: "not_found" };
+  const result = startCompanyResearch(db, user.id, job, { force: !!force });
+  if (!result.ok) return { ok: false, error: result.reason };
+  revalidatePath(`/jobs/${jobId}`);
+  return { ok: true, value: { taskId: result.taskId } };
 }
