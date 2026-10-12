@@ -8,7 +8,12 @@ import net from "node:net";
  */
 
 export class FetchBlockedError extends Error {
-  constructor(public readonly reason: "invalid_url" | "private_address" | "too_many_redirects" | "too_large" | "http_error" | "timeout", message?: string) {
+  constructor(
+    public readonly reason: "invalid_url" | "private_address" | "restricted" | "too_many_redirects" | "too_large" | "http_error" | "timeout",
+    message?: string,
+    /** The URL that was refused (for "restricted": a site Huntloop may not read). */
+    public readonly url?: string,
+  ) {
     super(message ?? reason);
     this.name = "FetchBlockedError";
   }
@@ -61,6 +66,8 @@ export interface SafeFetchOptions {
   timeoutMs?: number;
   maxRedirects?: number;
   accept?: string;
+  /** Checked on the first URL and every redirect target, e.g. the site policy. */
+  allow?: (url: URL) => boolean;
 }
 
 export interface SafeFetchResult {
@@ -82,6 +89,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
   }
 
   for (let hop = 0; hop <= (options.maxRedirects ?? 3); hop++) {
+    if (options.allow && !options.allow(url)) throw new FetchBlockedError("restricted", `Not allowed to read ${url.hostname}`, url.toString());
     await assertPublic(url, resolve);
     let res: Response;
     try {

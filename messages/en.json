@@ -23,7 +23,8 @@
     "dashboard": "Dashboard",
     "settings": "Settings",
     "profile": "Profile",
-    "jobs": "Jobs"
+    "jobs": "Jobs",
+    "search": "Search"
   },
   "dashboard": {
     "title": "Welcome to Huntloop",
@@ -88,7 +89,13 @@
     "keyAnthropic": "Anthropic (Claude)",
     "keyAdzuna": "Adzuna job search",
     "keyJsearch": "JSearch job search",
-    "saveError": "Could not save: {message}"
+    "saveError": "Could not save: {message}",
+    "searchTitle": "Search limits",
+    "searchDescription": "How much AI work each search run may do. Higher numbers find more but cost more.",
+    "screenTopN": "Jobs to assess per run",
+    "screenTopNHint": "The most relevant new jobs get a quick Interview Chance check (about $0.02–0.05 each with Opus).",
+    "deepTopN": "Best matches to read in full",
+    "deepTopNHint": "The top results are re-read from the full posting and analysed in depth (about $0.15–0.30 each)."
   },
   "effort": {
     "low": "Low",
@@ -460,7 +467,11 @@
     "chatDescription": "Ask anything about this job: what it really involves, whether you're a fit, how to improve your chances. Claude knows your profile, the posting and the analysis.",
     "tabEmployer": "Employer",
     "employerTitle": "Research {company}",
-    "employerDescription": "Claude searches the web for what the company does, its recent activity, growth, leadership changes, hiring and culture — every claim with its source and date — plus advice for this application. Runs in the background; the report is kept for 30 days and shared with the chat."
+    "employerDescription": "Claude searches the web for what the company does, its recent activity, growth, leadership changes, hiring and culture — every claim with its source and date — plus advice for this application. Runs in the background; the report is kept for 30 days and shared with the chat.",
+    "provisionalTitle": "Provisional assessment",
+    "provisionalDescription": "Found through {source}, so this is based on a short excerpt of the posting. Read the full posting for a complete assessment.",
+    "readFullPosting": "Read the full posting",
+    "pasteFullPosting": "Or paste the full posting yourself"
   },
   "jobStatus": {
     "new": "New",
@@ -780,5 +791,93 @@
     },
     "sourcesNote": "Based on {count, plural, one {# source} other {# sources}} Claude read.",
     "droppedClaims": "{count, plural, one {# claim was} other {# claims were}} left out because their source couldn't be confirmed."
+  },
+  "search": {
+    "title": "Find jobs",
+    "subtitle": "Describe what you're looking for. Huntloop searches, then ranks what it finds by your chance of getting an interview.",
+    "queryLabel": "What are you looking for?",
+    "queryPlaceholder": "e.g. senior frontend roles in Sydney, hybrid, posted this week",
+    "queryHint": "Any language is fine. Leave it empty to search with your job preferences.",
+    "submit": "Search",
+    "adzunaMissing": "Only the AI web search is available. Add free Adzuna API keys (ADZUNA_APP_ID and ADZUNA_APP_KEY in .env.local) for many more Australian, New Zealand, Singapore and US jobs.",
+    "recentTitle": "Your searches",
+    "recentDescription": "Run a search again to see what's new since last time.",
+    "recentEmpty": "No searches yet.",
+    "fromPreferences": "Jobs matching my preferences",
+    "lastRun": "Last run {date}",
+    "notRunYet": "Running…",
+    "back": "All searches",
+    "detailSubtitle": "Results are grouped by Interview Chance. Open a job for the full report.",
+    "filtersTitle": "Search filters",
+    "filtersDescription": "What Huntloop understood from your request. Edit them and run the search again.",
+    "runAgain": "Run again",
+    "summaryTitle": "Last run",
+    "sourceLeads": "{source}: {count, plural, one {# job found} other {# jobs found}}",
+    "sourceError": "{source}: {error}",
+    "sourceErrorReason": {
+      "quota": "the daily or monthly limit has been reached; try again later",
+      "budget": "stopped because your AI spending cap was reached",
+      "refusal": "Claude declined this search",
+      "other": "couldn't be reached this time"
+    },
+    "summaryCounts": "{unique} unique · {known} already in your list · {screened} newly assessed · {deep} with the full posting",
+    "filteredOut": "Left out before any AI call:",
+    "filteredReason": "{count} {reason}",
+    "filterReason": {
+      "excluded_company": "from companies you excluded",
+      "excluded_keyword": "with words you excluded",
+      "too_old": "posted too long ago",
+      "outside_markets": "outside your countries",
+      "title_mismatch": "with unrelated titles"
+    },
+    "stoppedByBudget": "The run stopped early because your AI spending cap was reached. Raise it in Settings to assess more.",
+    "noResults": "No jobs yet. Try broader filters, or run the search again later.",
+    "tierCount": "{count, plural, one {# job} other {# jobs}}",
+    "unscored": "Not assessed yet",
+    "ineligible": "{count, plural, one {# job you're not eligible for} other {# jobs you're not eligible for}}",
+    "adzunaAttribution": "Jobs by Adzuna",
+    "untitled": "Untitled job",
+    "new": "New",
+    "provisional": "Provisional",
+    "failed": "Couldn't assess",
+    "source": {
+      "adzuna": "Adzuna",
+      "web_agent": "Web search"
+    },
+    "progress": {
+      "stage": {
+        "planning": "Understanding your search…",
+        "sourcing": "Searching for jobs…",
+        "filtering": "Removing duplicates and clear mismatches…",
+        "screening": "Assessing your chances for each job…",
+        "deep": "Reading the full postings of the best matches…",
+        "done": "Done"
+      },
+      "found": "{leads} found · {unique} unique",
+      "screening": "{done} of {total} assessed",
+      "deep": "{done} of {total} read in full"
+    },
+    "filters": {
+      "label": "Search filters",
+      "edit": "Edit filters",
+      "salaryChip": "From {amount} a year",
+      "postedChip": "Posted in the last {days} days",
+      "titles": "Job titles",
+      "keywords": "Must mention",
+      "remove": "Remove {item}",
+      "locations": "Where",
+      "country": "Country",
+      "city": "City",
+      "anyCity": "Any city",
+      "addLocation": "Add a place",
+      "workplace": "Workplace",
+      "employmentTypes": "Work type",
+      "seniority": "Level",
+      "salaryMin": "Minimum salary (yearly, local currency)",
+      "postedWithinDays": "Posted within (days)",
+      "excludeKeywords": "Leave out jobs that mention",
+      "saveAndRun": "Save and run",
+      "cancel": "Cancel"
+    }
   }
 }

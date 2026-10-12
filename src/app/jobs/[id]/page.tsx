@@ -17,7 +17,7 @@ import { PostingInput } from "@/components/jobs/posting-input";
 import { JobProgress } from "@/components/jobs/job-progress";
 import { FitReport } from "@/components/jobs/fit-report";
 import { PostingOverview } from "@/components/jobs/posting-overview";
-import { DeleteJobButton, PostingTextEditor, ReassessButton, StatusSelect, TranslateReport } from "@/components/jobs/job-controls";
+import { DeleteJobButton, PostingTextEditor, ReadFullPostingButton, ReassessButton, StatusSelect, TranslateReport } from "@/components/jobs/job-controls";
 import { ChatPanel } from "@/components/jobs/chat-panel";
 import { getJobConversation, listChatActions, listChatMessages } from "@/server/ai/chat/harness";
 import { transcript } from "@/server/ai/chat/render";
@@ -191,7 +191,33 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
         </Card>
       )}
 
-      {!processing && job.intakeStatus === "ready" && errorText && <Alert tone="danger">{t("rerunFailed", { error: errorText })}</Alert>}
+      {!processing && job.intakeStatus === "ready" && errorText && error.code !== "full_posting_unavailable" && <Alert tone="danger">{t("rerunFailed", { error: errorText })}</Alert>}
+
+      {!processing && job.intakeStatus === "ready" && job.intake?.partial && (
+        <Card data-provisional>
+          <CardHeader>
+            <CardTitle>{t("provisionalTitle")}</CardTitle>
+            <CardDescription>
+              {error.code === "full_posting_unavailable"
+                ? t(`needsContent.${job.intake?.reason ?? "fetch_failed"}`, { site: tEnum(`site.${job.intake?.site ?? "other"}`) })
+                : t("provisionalDescription", { source: tEnum(`source.${job.source}`) })}
+            </CardDescription>
+          </CardHeader>
+          <div className="flex flex-col gap-3">
+            {job.sourceUrl && error.code !== "full_posting_unavailable" && (
+              <div>
+                <ReadFullPostingButton jobId={job.id} />
+              </div>
+            )}
+            <details open={error.code === "full_posting_unavailable"}>
+              <summary className="cursor-pointer text-sm text-muted">{t("pasteFullPosting")}</summary>
+              <div className="mt-3">
+                <PostingInput jobId={job.id} />
+              </div>
+            </details>
+          </div>
+        </Card>
+      )}
 
       {!processing && job.intakeStatus === "ready" && fit && (
         <>

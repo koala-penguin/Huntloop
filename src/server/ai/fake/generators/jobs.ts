@@ -1,4 +1,4 @@
-import { registerFakeGenerator, type FakeRequest } from "../transport";
+import { getFakeGenerator, registerFakeGenerator, type FakeRequest } from "../transport";
 import { KNOWN_SKILLS, mentions } from "./extract-profile";
 
 /**
@@ -203,7 +203,9 @@ registerFakeGenerator("analyzePosting", (req) => {
     }
   })();
   const today = /Today's date: (\d{4}-\d{2}-\d{2})/.exec(extra)?.[1] ?? new Date().toISOString().slice(0, 10);
-  return json(fakePostingAnalysis(text, hints, today));
+  const analysis = fakePostingAnalysis(text, hints, today);
+  if (extra.includes("only a short excerpt of a job advertisement")) analysis.isJobPosting = true;
+  return json(analysis);
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -301,4 +303,12 @@ registerFakeGenerator("translate", (req) => {
   const language = /Target language: [^(]*\((\w+)\)/.exec(text)?.[1] ?? "en";
   const items = JSON.parse(between(text, "items") ?? "[]") as Array<{ id: string; text: string }>;
   return json({ items: items.map((i) => ({ id: i.id, text: `[${language}] ${i.text}` })) });
+});
+
+// ---------------------------------------------------------------------------------------------
+// screen: the same analysis and assessment, run with the screening model/effort.
+
+registerFakeGenerator("screen", (req) => {
+  const isAssessment = textOf(req).includes("<candidate_profile>");
+  return getFakeGenerator(isAssessment ? "assess" : "analyzePosting")!(req);
 });

@@ -221,6 +221,40 @@ export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
         </div>
         {saveBar}
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("searchTitle")}</CardTitle>
+          <CardDescription>{t("searchDescription")}</CardDescription>
+        </CardHeader>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="screen-top-n">{t("screenTopN")}</Label>
+            <Input
+              id="screen-top-n"
+              type="number"
+              min={0}
+              max={200}
+              value={settings.search.screenTopN}
+              onChange={(e) => update((s) => ({ ...s, search: { ...s.search, screenTopN: Math.min(200, Math.max(0, Math.round(Number(e.target.value) || 0))) } }))}
+            />
+            <FieldHint>{t("screenTopNHint")}</FieldHint>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="deep-top-n">{t("deepTopN")}</Label>
+            <Input
+              id="deep-top-n"
+              type="number"
+              min={0}
+              max={50}
+              value={settings.search.deepTopN}
+              onChange={(e) => update((s) => ({ ...s, search: { ...s.search, deepTopN: Math.min(50, Math.max(0, Math.round(Number(e.target.value) || 0))) } }))}
+            />
+            <FieldHint>{t("deepTopNHint")}</FieldHint>
+          </div>
+        </div>
+        {saveBar}
+      </Card>
     </>
   );
 }

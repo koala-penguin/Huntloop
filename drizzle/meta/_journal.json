@@ -36,6 +36,13 @@
       "when": 1791837237724,
       "tag": "0004_company_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791839722459,
+      "tag": "0005_search",
+      "breakpoints": true
     }
   ]
 }

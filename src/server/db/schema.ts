@@ -124,6 +124,8 @@ export interface JobIntake {
   reason?: string;
   site?: string | null;
   illegible?: string[];
+  /** The text is only a snippet (e.g. from a search API), so the analysis is provisional. */
+  partial?: boolean;
 }
 
 export const jobs = sqliteTable(
@@ -339,4 +341,50 @@ export const companyReports = sqliteTable(
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   },
   (t) => [index("company_reports_company").on(t.companyId)],
+);
+
+/** A job search: the user's words, the filters used, and when it last ran. */
+export const searches = sqliteTable("searches", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  query: text("query").notNull(),
+  /** null until parse-search has turned the query into filters. */
+  filters: text("filters", { mode: "json" }),
+  sources: text("sources", { mode: "json" }).$type<string[]>().notNull(),
+  lastRunAt: integer("last_run_at", { mode: "timestamp_ms" }),
+  lastSummary: text("last_summary", { mode: "json" }),
+  createdAt: createdAt(),
+});
+export type SearchRow = typeof searches.$inferSelect;
+
+/** Each time a source showed a job (per search run), for "new since last run" and attribution. */
+export const jobSightings = sqliteTable(
+  "job_sightings",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    jobId: integer("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    searchId: integer("search_id").references(() => searches.id, { onDelete: "cascade" }),
+    taskId: integer("task_id"),
+    source: text("source").notNull(),
+    sourceId: text("source_id"),
+    url: text("url"),
+    rank: integer("rank"),
+    seenAt: createdAt(),
+  },
+  (t) => [index("job_sightings_search").on(t.searchId, t.taskId), index("job_sightings_job").on(t.jobId)],
+);
+
+/** Calls to rate-limited job APIs (Adzuna: 25/min, 250/day, 2,500/month). */
+export const sourceCalls = sqliteTable(
+  "source_calls",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    source: text("source").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("source_calls_source").on(t.source, t.createdAt)],
 );

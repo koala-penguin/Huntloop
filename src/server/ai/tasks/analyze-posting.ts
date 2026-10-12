@@ -39,6 +39,8 @@ export interface AnalyzeInput {
   /** True when the text may contain page noise (pastes, readable-text extraction). */
   noisy: boolean;
   sourceUrl: string | null;
+  /** Only a short excerpt (e.g. from search results): analyse what's there; it is still a posting. */
+  excerpt?: boolean;
 }
 
 export function buildAnalysisMessages(input: AnalyzeInput, today: string): Anthropic.Beta.Messages.BetaMessageParam[] {
@@ -54,6 +56,9 @@ export function buildAnalysisMessages(input: AnalyzeInput, today: string): Anthr
             Object.keys(hints).length ? `Structured data published with the posting (may be incomplete): ${JSON.stringify(hints)}` : null,
             input.sourceUrl ? `Source URL: ${input.sourceUrl}` : null,
             input.noisy ? "The text was pasted or extracted from a web page and may include page noise around the advertisement." : null,
+            input.excerpt
+              ? "This is only a short excerpt of a job advertisement from search results. Treat it as a job posting and extract what it states; don't guess missing requirements."
+              : null,
             `Today's date: ${today}`,
             "Analyse this job posting.",
           ]
@@ -92,13 +97,22 @@ export function finalizeAnalysis(output: PostingAnalysisOutput, text: string, no
   };
 }
 
-export async function analyzePosting(ctx: AiContext, input: AnalyzeInput, now = new Date()): Promise<AnalyzedPosting> {
-  const { model, effort } = resolveTaskModel(settingsFor(ctx), "analyzePosting");
-  const textHash = hashJson({ text: input.text, hints: input.hints, noisy: input.noisy });
+/** `screen` runs the same analysis with the (cheaper) screening model and effort from Settings. */
+export async function analyzePosting(ctx: AiContext, input: AnalyzeInput, now = new Date(), options: { screen?: boolean } = {}): Promise<AnalyzedPosting> {
+  const task = options.screen ? "screen" : "analyzePosting";
+  const { model, effort } = resolveTaskModel(settingsFor(ctx), task);
+  const textHash = hashJson({ text: input.text, hints: input.hints, noisy: input.noisy, excerpt: !!input.excerpt });
   const cached = ctx.db
     .select()
     .from(postingAnalyses)
-    .where(and(eq(postingAnalyses.textHash, textHash), eq(postingAnalyses.promptVersion, ANALYZE_POSTING_PROMPT_VERSION), eq(postingAnalyses.model, model)))
+    .where(
+      and(
+        eq(postingAnalyses.textHash, textHash),
+        eq(postingAnalyses.promptVersion, ANALYZE_POSTING_PROMPT_VERSION),
+        eq(postingAnalyses.model, model),
+        eq(postingAnalyses.effort, effort),
+      ),
+    )
     .orderBy(desc(postingAnalyses.id))
     .get();
   if (cached) {
@@ -108,7 +122,7 @@ export async function analyzePosting(ctx: AiContext, input: AnalyzeInput, now = 
 
   const { data } = await callStructured(
     ctx,
-    "analyzePosting",
+    task,
     { schema: postingAnalysisSchema, system: SYSTEM, messages: buildAnalysisMessages(input, now.toISOString().slice(0, 10)) },
     { model, effort, enforceBudget: true },
   );

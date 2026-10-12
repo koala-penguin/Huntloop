@@ -7,3 +7,4 @@ import "./generators/extract-profile";
 import "./generators/jobs";
 import "./generators/chat";
 import "./generators/company-research";
+import "./generators/search";

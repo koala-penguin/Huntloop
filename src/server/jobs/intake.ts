@@ -109,7 +109,7 @@ export async function addJobContent(db: Db, userId: number, jobId: number, input
   validate(text, files);
   if (text && !files.length && text.length < 200) throw new UserFacingError("posting_too_short");
   await storeFiles(db, job.id, files);
-  updateJob(db, job.id, { rawText: text || null, intakeStatus: "processing", intakeError: null, intake: { ...(job.intake ?? {}), noisy: true, reason: undefined } });
+  updateJob(db, job.id, { rawText: text || null, intakeStatus: "processing", intakeError: null, intake: { ...(job.intake ?? {}), noisy: true, partial: false, reason: undefined } });
   return enqueue(db, userId, { jobId: job.id, transcribe: files.length > 0 });
 }
 
@@ -120,7 +120,7 @@ export function saveJobText(db: Db, userId: number, jobId: number, text: string)
   const trimmed = text.trim();
   if (trimmed.length < 200) throw new UserFacingError("posting_too_short");
   if (trimmed.length > MAX_TEXT) throw new UserFacingError("text_too_long");
-  updateJob(db, job.id, { rawText: trimmed, intakeStatus: "processing", intakeError: null, intake: { ...(job.intake ?? {}), noisy: false } });
+  updateJob(db, job.id, { rawText: trimmed, intakeStatus: "processing", intakeError: null, intake: { ...(job.intake ?? {}), noisy: false, partial: false } });
   return enqueue(db, userId, { jobId: job.id });
 }
 
@@ -139,4 +139,12 @@ export function activeJobTask(db: Db, userId: number, job: JobRow): number | nul
     .orderBy(desc(tasks.id))
     .get();
   return row && ["queued", "running"].includes(row.status) ? row.id : null;
+}
+
+/** Replace a search snippet with the full posting from the job's link (falls back to asking the user). */
+export function readFullPosting(db: Db, userId: number, jobId: number): number {
+  const job = getJob(db, userId, jobId);
+  if (!job?.sourceUrl) throw new UserFacingError("not_found");
+  updateJob(db, job.id, { intakeStatus: "processing", intakeError: null });
+  return enqueue(db, userId, { jobId: job.id, preferUrl: true });
 }

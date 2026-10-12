@@ -11,6 +11,7 @@ import { JOB_STATUSES } from "@/shared/schemas/job";
 import {
   answerRequirementAction,
   deleteJobAction,
+  readFullPostingAction,
   reassessJobAction,
   saveJobTextAction,
   setJobStatusAction,
@@ -281,5 +282,28 @@ export function TranslateReport({ jobId }: { jobId: number }) {
         </>
       )}
     </p>
+  );
+}
+
+/** For jobs found by search: fetch the full posting from its link and analyse it properly. */
+export function ReadFullPostingButton({ jobId }: { jobId: number }) {
+  const t = useTranslations("job");
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <Button
+      type="button"
+      size="sm"
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          await readFullPostingAction(jobId);
+          router.refresh();
+        })
+      }
+    >
+      {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <RefreshCw className="size-3.5" aria-hidden />}
+      {t("readFullPosting")}
+    </Button>
   );
 }

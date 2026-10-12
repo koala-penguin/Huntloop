@@ -1,26 +1,15 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { z } from "zod";
 import { companyReportSchema, type CompanyReportInput } from "@/shared/schemas/company";
 import { resolveTaskModel } from "@/shared/ai-settings";
 import { marketPack } from "@/shared/markets";
-import { AiError, callModel, settingsFor, type AiContext } from "../client";
+import { settingsFor, type AiContext } from "../client";
+import { normalizeUrl, runSubmitLoop, seenSources, sourceSet } from "../agent-loop";
 import { webTools } from "../request";
 import { restrictedDomains } from "../../ingest/domain-policy";
 
 export const COMPANY_RESEARCH_PROMPT_VERSION = 1;
-const MAX_STEPS = 8;
 
 const LANGUAGE_NAMES: Record<string, string> = { en: "English", ko: "Korean" };
-
-/** JSON Schema for the strict submit tool (the `$schema` keyword left out). */
-const REPORT_INPUT_SCHEMA = Object.fromEntries(Object.entries(z.toJSONSchema(companyReportSchema)).filter(([key]) => key !== "$schema"));
-
-const SUBMIT_TOOL = {
-  name: "submit_company_report",
-  description: "Submit the finished employer report. Call it exactly once, when your research is done.",
-  strict: true,
-  input_schema: REPORT_INPUT_SCHEMA,
-} as unknown as Anthropic.Beta.Messages.BetaTool;
 
 const SYSTEM = `You research an employer for a job seeker using web search and web fetch, then submit a report with the submit_company_report tool. The job seeker wants to understand the company before applying and to improve their chance of an interview.
 
@@ -78,47 +67,16 @@ export function buildResearchMessages(input: ResearchInput, today: string): Anth
   ];
 }
 
-export function normalizeUrl(raw: string): string | null {
-  try {
-    const url = new URL(raw.trim());
-    url.hash = "";
-    for (const key of [...url.searchParams.keys()]) if (/^(utm_|gclid|fbclid)/i.test(key)) url.searchParams.delete(key);
-    const s = `${url.protocol}//${url.hostname.toLowerCase().replace(/^www\./, "")}${url.pathname.replace(/\/+$/, "")}${url.search}`;
-    return s;
-  } catch {
-    return null;
-  }
-}
-
-type Block = Record<string, unknown> & { type: string };
-
-/** URLs the model actually saw: web search results and fetched pages. */
-export function seenSources(content: Block[]): Array<{ url: string; title: string | null; pageAge: string | null }> {
-  const out: Array<{ url: string; title: string | null; pageAge: string | null }> = [];
-  for (const block of content) {
-    if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
-      for (const r of block.content as Block[]) {
-        if (r.type === "web_search_result" && typeof r.url === "string") out.push({ url: r.url, title: (r.title as string) ?? null, pageAge: (r.page_age as string) ?? null });
-      }
-    } else if (block.type === "web_fetch_tool_result" && block.content && typeof block.content === "object") {
-      const r = block.content as Block;
-      if (r.type === "web_fetch_result" && typeof r.url === "string") {
-        const title = ((r.content as Block | undefined)?.title as string | undefined) ?? null;
-        out.push({ url: r.url, title, pageAge: (r.retrieved_at as string) ?? null });
-      }
-    }
-  }
-  return out;
-}
+export { normalizeUrl, seenSources };
 
 /** Drops claims whose source wasn't in the tool results, and empty sections. */
 export function verifyReport(report: CompanyReportInput, sources: Array<{ url: string }>): { report: CompanyReportInput; dropped: number } {
-  const seen = new Set(sources.map((s) => normalizeUrl(s.url)).filter(Boolean));
+  const seen = sourceSet(sources);
   let dropped = 0;
   const sections = report.sections
     .map((section) => {
       const claims = section.claims.filter((c) => {
-        const ok = seen.has(normalizeUrl(c.sourceUrl));
+        const ok = seen.has(normalizeUrl(c.sourceUrl) ?? "");
         if (!ok) dropped++;
         return ok;
       });
@@ -140,43 +98,14 @@ export interface ResearchResult {
  * through a strict tool. Progress notes are passed to `onProgress` for the task view.
  */
 export async function researchCompany(ctx: AiContext, input: ResearchInput, onProgress?: (note: string) => void, now = new Date()): Promise<ResearchResult> {
-  const { model, effort } = resolveTaskModel(settingsFor(ctx), "companyResearch");
-  const tools = [
-    ...webTools(model, { searchMaxUses: 8, fetchMaxUses: 6, blockedDomains: restrictedDomains(), userLocation: input.job?.country ? { country: input.job.country } : undefined }),
-    SUBMIT_TOOL,
-  ];
-  const messages = buildResearchMessages(input, now.toISOString().slice(0, 10));
-  const seen: Block[] = [];
-  let nudged = false;
-
-  for (let step = 0; step < MAX_STEPS; step++) {
-    const { message } = await callModel(ctx, "companyResearch", { system: SYSTEM, messages, tools }, {
-      model,
-      effort,
-      maxTokens: 32_000,
-      progressUpdates: true,
-      enforceBudget: true,
-      onEvent: (event) => {
-        if (event.type === "content_block_delta" && event.delta.type === "thinking_delta" && event.delta.thinking.trim()) onProgress?.(event.delta.thinking.trim());
-      },
-    });
-    if (message.stop_reason === "refusal") throw new AiError("refusal", "Claude declined to research this employer");
-    seen.push(...(message.content as unknown as Block[]));
-    messages.push({ role: "assistant", content: message.content as Anthropic.Beta.Messages.BetaContentBlockParam[] });
-
-    const submit = message.content.find((b): b is Anthropic.Beta.Messages.BetaToolUseBlock => b.type === "tool_use" && b.name === "submit_company_report");
-    if (submit) {
-      const parsed = companyReportSchema.safeParse(submit.input);
-      if (!parsed.success) throw new AiError("invalid_output", "The employer report didn't match the expected format", parsed.error.issues);
-      const sources = seenSources(seen);
-      const { report, dropped } = verifyReport(parsed.data, sources);
-      return { report, dropped, sources, model };
-    }
-    if (message.stop_reason === "pause_turn") continue;
-    if (nudged) break;
-    // No forced tool_choice: if Claude ended without submitting, ask once.
-    nudged = true;
-    messages.push({ role: "user", content: [{ type: "text", text: "Please submit your findings now with submit_company_report." }] });
-  }
-  throw new AiError("invalid_output", "Claude finished without submitting an employer report");
+  const { model } = resolveTaskModel(settingsFor(ctx), "companyResearch");
+  const result = await runSubmitLoop(ctx, "companyResearch", {
+    system: SYSTEM,
+    messages: buildResearchMessages(input, now.toISOString().slice(0, 10)),
+    tools: webTools(model, { searchMaxUses: 8, fetchMaxUses: 6, blockedDomains: restrictedDomains(), userLocation: input.job?.country ? { country: input.job.country } : undefined }),
+    submit: { name: "submit_company_report", description: "Submit the finished employer report. Call it exactly once, when your research is done.", schema: companyReportSchema },
+    onProgress,
+  });
+  const { report, dropped } = verifyReport(result.data, result.sources);
+  return { report, dropped, sources: result.sources, model: result.model };
 }

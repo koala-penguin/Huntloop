@@ -10,6 +10,7 @@ const payloadSchema = z.object({
   jobId: z.number().int(),
   transcribe: z.boolean().optional(),
   assessOnly: z.boolean().optional(),
+  preferUrl: z.boolean().optional(),
 });
 export type ProcessJobPayload = z.infer<typeof payloadSchema>;
 
@@ -21,6 +22,7 @@ export async function runProcessJob(ctx: TaskContext): Promise<{ jobId: number; 
     const result = await processJob({ db: ctx.db, userId: ctx.userId, signal: ctx.signal }, job, {
       transcribe: payload.transcribe,
       assessOnly: payload.assessOnly,
+      preferUrl: payload.preferUrl,
       onStage: (stage) => ctx.progress({ stage }),
     });
     return { jobId: result.id, intakeStatus: result.intakeStatus };

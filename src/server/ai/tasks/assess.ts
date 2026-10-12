@@ -133,8 +133,11 @@ export interface AssessResult {
   cached: boolean;
 }
 
-export async function assessJob(ctx: AiContext, analysisId: number, input: AssessInput, now = new Date()): Promise<AssessResult> {
-  const { model, effort } = resolveTaskModel(settingsFor(ctx), "assess");
+/** `screen` uses the screening model/effort and is cached separately from deep assessments. */
+export async function assessJob(ctx: AiContext, analysisId: number, input: AssessInput, now = new Date(), options: { screen?: boolean } = {}): Promise<AssessResult> {
+  const task = options.screen ? "screen" : "assess";
+  const kind = options.screen ? "screen" : "deep";
+  const { model, effort } = resolveTaskModel(settingsFor(ctx), task);
   const hash = profileHash(input.profile.cvText, input.profile.data);
   const cached = ctx.db
     .select()
@@ -146,7 +149,7 @@ export async function assessJob(ctx: AiContext, analysisId: number, input: Asses
         eq(assessments.promptVersion, ASSESS_PROMPT_VERSION),
         eq(assessments.model, model),
         eq(assessments.effort, effort),
-        eq(assessments.kind, "deep"),
+        eq(assessments.kind, kind),
       ),
     )
     .orderBy(desc(assessments.id))
@@ -157,7 +160,7 @@ export async function assessJob(ctx: AiContext, analysisId: number, input: Asses
   }
 
   const { system, messages } = buildAssessmentMessages(input, now.toISOString().slice(0, 10));
-  const { data } = await callStructured(ctx, "assess", { schema: assessmentSchema, system, messages }, { model, effort, enforceBudget: true });
+  const { data } = await callStructured(ctx, task, { schema: assessmentSchema, system, messages }, { model, effort, enforceBudget: true });
   const row = ctx.db
     .insert(assessments)
     .values({
@@ -167,7 +170,7 @@ export async function assessJob(ctx: AiContext, analysisId: number, input: Asses
       promptVersion: ASSESS_PROMPT_VERSION,
       model,
       effort,
-      kind: "deep",
+      kind,
       language: input.language,
       data,
     })

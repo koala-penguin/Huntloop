@@ -2,3 +2,4 @@
 import "./extract-profile";
 import "./process-job";
 import "./company-research";
+import "./search";

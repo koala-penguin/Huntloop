@@ -51,6 +51,13 @@ describe("safe fetch", () => {
     await expect(safeFetch("https://jobs.example/", { fetchImpl: redirectTo("https://jobs.example/next"), resolve })).rejects.toMatchObject({ reason: "too_many_redirects" });
   });
 
+  it("applies the site rule to every redirect target", async () => {
+    const resolve = async () => ["93.184.216.34"];
+    const redirect = (async () => new Response(null, { status: 302, headers: { location: "https://www.seek.com.au/job/1" } })) as unknown as typeof fetch;
+    const allow = (u: URL) => domainPolicy(u).mode === "fetch";
+    await expect(safeFetch("https://jobs.example/land/1", { fetchImpl: redirect, resolve, allow })).rejects.toMatchObject({ reason: "restricted", url: "https://www.seek.com.au/job/1" });
+  });
+
   it("enforces the size cap and reports HTTP errors", async () => {
     const resolve = async () => ["93.184.216.34"];
     await expect(safeFetch("https://jobs.example/", { fetchImpl: okFetch("x".repeat(5000)), resolve, maxBytes: 1000 })).rejects.toMatchObject({ reason: "too_large" });

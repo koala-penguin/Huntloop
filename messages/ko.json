@@ -23,7 +23,8 @@
     "dashboard": "대시보드",
     "settings": "설정",
     "profile": "프로필",
-    "jobs": "채용 공고"
+    "jobs": "채용 공고",
+    "search": "검색"
   },
   "dashboard": {
     "title": "Huntloop에 오신 것을 환영합니다",
@@ -88,7 +89,13 @@
     "keyAnthropic": "Anthropic (Claude)",
     "keyAdzuna": "Adzuna 채용 검색",
     "keyJsearch": "JSearch 채용 검색",
-    "saveError": "저장하지 못했습니다: {message}"
+    "saveError": "저장하지 못했습니다: {message}",
+    "searchTitle": "검색 한도",
+    "searchDescription": "검색 한 번에 AI가 할 수 있는 작업량입니다. 숫자가 클수록 더 많이 찾지만 비용도 늘어납니다.",
+    "screenTopN": "실행당 평가할 공고 수",
+    "screenTopNHint": "관련성이 가장 높은 새 공고를 빠르게 평가합니다 (Opus 기준 공고당 약 $0.02–0.05).",
+    "deepTopN": "전체 공고를 읽을 상위 공고 수",
+    "deepTopNHint": "상위 결과는 전체 공고를 다시 읽고 자세히 분석합니다 (공고당 약 $0.15–0.30)."
   },
   "effort": {
     "low": "낮음",
@@ -460,7 +467,11 @@
     "chatDescription": "이 공고에 대해 무엇이든 물어보세요. 실제로 어떤 일인지, 나와 맞는지, 가능성을 어떻게 높일지. Claude는 내 프로필, 공고, 분석 결과를 알고 있습니다.",
     "tabEmployer": "회사",
     "employerTitle": "{company} 조사",
-    "employerDescription": "Claude가 웹에서 회사가 하는 일, 최근 활동, 성장세, 경영진 변화, 채용, 문화를 조사하고, 모든 내용에 출처와 날짜를 붙여 이번 지원에 대한 조언과 함께 정리합니다. 백그라운드에서 진행되며, 리포트는 30일간 보관되고 채팅에서도 사용됩니다."
+    "employerDescription": "Claude가 웹에서 회사가 하는 일, 최근 활동, 성장세, 경영진 변화, 채용, 문화를 조사하고, 모든 내용에 출처와 날짜를 붙여 이번 지원에 대한 조언과 함께 정리합니다. 백그라운드에서 진행되며, 리포트는 30일간 보관되고 채팅에서도 사용됩니다.",
+    "provisionalTitle": "잠정 평가",
+    "provisionalDescription": "{source}에서 찾은 공고라 공고의 짧은 발췌만 보고 평가했습니다. 전체 공고를 읽으면 완전한 평가를 볼 수 있습니다.",
+    "readFullPosting": "전체 공고 읽기",
+    "pasteFullPosting": "또는 전체 공고를 직접 붙여넣기"
   },
   "jobStatus": {
     "new": "새 공고",
@@ -780,5 +791,93 @@
     },
     "sourcesNote": "Claude가 읽은 출처 {count}개를 바탕으로 작성했습니다.",
     "droppedClaims": "출처를 확인할 수 없는 내용 {count}개는 제외했습니다."
+  },
+  "search": {
+    "title": "공고 찾기",
+    "subtitle": "원하는 일자리를 설명해 주세요. Huntloop가 검색한 뒤 인터뷰 가능성 순으로 정리합니다.",
+    "queryLabel": "어떤 일자리를 찾고 있나요?",
+    "queryPlaceholder": "예: 시드니 시니어 프론트엔드, 하이브리드, 이번 주 게시",
+    "queryHint": "어떤 언어로 써도 괜찮습니다. 비워 두면 내 희망 조건으로 검색합니다.",
+    "submit": "검색",
+    "adzunaMissing": "지금은 AI 웹 검색만 사용할 수 있습니다. 무료 Adzuna API 키(.env.local의 ADZUNA_APP_ID와 ADZUNA_APP_KEY)를 추가하면 호주, 뉴질랜드, 싱가포르, 미국 공고를 훨씬 많이 찾을 수 있습니다.",
+    "recentTitle": "내 검색",
+    "recentDescription": "검색을 다시 실행하면 지난번 이후 새로 올라온 공고를 볼 수 있습니다.",
+    "recentEmpty": "아직 검색 기록이 없습니다.",
+    "fromPreferences": "내 희망 조건에 맞는 공고",
+    "lastRun": "{date} 실행",
+    "notRunYet": "실행 중…",
+    "back": "전체 검색",
+    "detailSubtitle": "결과는 인터뷰 가능성별로 묶여 있습니다. 공고를 열면 전체 리포트를 볼 수 있습니다.",
+    "filtersTitle": "검색 조건",
+    "filtersDescription": "Huntloop가 요청을 이렇게 이해했습니다. 고친 뒤 다시 검색할 수 있습니다.",
+    "runAgain": "다시 검색",
+    "summaryTitle": "마지막 실행",
+    "sourceLeads": "{source}: 공고 {count}개 발견",
+    "sourceError": "{source}: {error}",
+    "sourceErrorReason": {
+      "quota": "일일 또는 월간 한도에 도달했습니다. 나중에 다시 시도하세요",
+      "budget": "AI 지출 한도에 도달해서 중단했습니다",
+      "refusal": "Claude가 이 검색을 거절했습니다",
+      "other": "이번에는 연결할 수 없었습니다"
+    },
+    "summaryCounts": "중복 제외 {unique}개 · 이미 목록에 있음 {known}개 · 새로 평가 {screened}개 · 전체 공고 확인 {deep}개",
+    "filteredOut": "AI 호출 전에 제외:",
+    "filteredReason": "{reason} {count}개",
+    "filterReason": {
+      "excluded_company": "제외한 회사",
+      "excluded_keyword": "제외한 단어 포함",
+      "too_old": "오래된 공고",
+      "outside_markets": "구직 국가 밖",
+      "title_mismatch": "관련 없는 직무"
+    },
+    "stoppedByBudget": "AI 지출 한도에 도달해 일찍 멈췄습니다. 더 평가하려면 설정에서 한도를 올리세요.",
+    "noResults": "아직 공고가 없습니다. 조건을 넓히거나 나중에 다시 검색해 보세요.",
+    "tierCount": "공고 {count}개",
+    "unscored": "아직 평가하지 않음",
+    "ineligible": "지원 자격이 없는 공고 {count}개",
+    "adzunaAttribution": "Jobs by Adzuna",
+    "untitled": "제목 없는 공고",
+    "new": "새 공고",
+    "provisional": "잠정",
+    "failed": "평가 실패",
+    "source": {
+      "adzuna": "Adzuna",
+      "web_agent": "웹 검색"
+    },
+    "progress": {
+      "stage": {
+        "planning": "검색 요청을 이해하는 중…",
+        "sourcing": "공고를 찾는 중…",
+        "filtering": "중복과 명백히 맞지 않는 공고를 거르는 중…",
+        "screening": "공고별 가능성을 평가하는 중…",
+        "deep": "가장 잘 맞는 공고의 전체 내용을 읽는 중…",
+        "done": "완료"
+      },
+      "found": "{leads}개 발견 · 중복 제외 {unique}개",
+      "screening": "{total}개 중 {done}개 평가",
+      "deep": "{total}개 중 {done}개 전체 확인"
+    },
+    "filters": {
+      "label": "검색 조건",
+      "edit": "조건 수정",
+      "salaryChip": "연 {amount} 이상",
+      "postedChip": "최근 {days}일 내 게시",
+      "titles": "직무명",
+      "keywords": "포함할 단어",
+      "remove": "{item} 삭제",
+      "locations": "지역",
+      "country": "국가",
+      "city": "도시",
+      "anyCity": "모든 도시",
+      "addLocation": "지역 추가",
+      "workplace": "근무 형태",
+      "employmentTypes": "고용 형태",
+      "seniority": "레벨",
+      "salaryMin": "최소 연봉 (현지 통화)",
+      "postedWithinDays": "게시 기간 (일)",
+      "excludeKeywords": "이 단어가 있는 공고 제외",
+      "saveAndRun": "저장하고 검색",
+      "cancel": "취소"
+    }
   }
 }

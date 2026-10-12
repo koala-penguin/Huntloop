@@ -49,6 +49,23 @@ Each job also has:
   culture, red flags) with a source link and date for every claim, open-role counts from the employer's own job board
   where available, and advice for your application. Reports are kept for 30 days and shared with the chat.
 
+## Searching for jobs
+
+On **Search**, describe what you want in your own words (any language), or leave it empty to use your job
+preferences. Huntloop turns the request into filters you can edit, then:
+
+1. gathers jobs from the **Adzuna** job API (free key — add `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` to `.env.local`;
+   AU, NZ, SG, US and more) and a **Claude web-search agent** that looks for postings on employers' own career and
+   applicant-tracking pages (only links it actually saw in search results are kept);
+2. removes duplicates and jobs already in your list, and rules out clear mismatches in code (excluded companies or
+   words, too old, outside your countries, unrelated titles) before any AI call;
+3. gives the most relevant ones a quick Interview Chance check (marked **Provisional**, since search results are
+   short excerpts), and reads the full posting of the best few for a complete assessment.
+
+Results are grouped by tier, with what's **new since the last run**. Adzuna's limits (25 calls a minute, 250 a day,
+2,500 a month) are enforced. How many jobs each run assesses is set in **Settings → Search limits**. SEEK and LinkedIn
+come next, through a visible browser window on your computer.
+
 ## Models and cost
 
 Every AI task uses **Claude Opus 5.5** by default. In **Settings → AI models** you can pick a different default model and
@@ -90,8 +107,8 @@ tests/            unit/ (Vitest), e2e/ (Playwright)
 2. **Profile** — CV upload → structured profile, work rights per country, preferences. ✅
 3. **Bring your own job** — add postings by URL, long pasted text, screenshots or PDF; "Interview Chance" tier with
    evidence; per-job AI chat; employer deep research. ✅
-4. **AI search** — Adzuna, a Claude web-search agent, SEEK and LinkedIn through a visible (headed) browser, and Chrome
-   DevTools MCP for AI-driven browsing.
+4. **AI search** — Adzuna and a Claude web-search agent ✅; SEEK and LinkedIn through a visible (headed) browser, and
+   Chrome DevTools MCP for AI-driven browsing.
 5. **Proceed → CV tailoring** — once you and the AI agree to go for a job, a tailored CV (DOCX/PDF) where every claim is
    traceable to your real experience.
 
