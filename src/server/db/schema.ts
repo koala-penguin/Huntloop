@@ -70,3 +70,30 @@ export const tasks = sqliteTable(
 );
 
 export type TaskRow = typeof tasks.$inferSelect;
+
+/** Append-only: every edit or new CV creates a new version, so analyses stay tied to what they saw. */
+export const profileVersions = sqliteTable(
+  "profile_versions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    version: integer("version").notNull(),
+    cvFileName: text("cv_file_name"),
+    cvFilePath: text("cv_file_path"),
+    /** Canonical CV text — every evidence quote is checked against it. */
+    cvText: text("cv_text").notNull(),
+    data: text("data", { mode: "json" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("profile_versions_user_version").on(t.userId, t.version)],
+);
+
+export const preferences = sqliteTable("preferences", {
+  userId: integer("user_id")
+    .primaryKey()
+    .references(() => users.id),
+  data: text("data", { mode: "json" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});

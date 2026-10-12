@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, lt } from "drizzle-orm";
 import type { Db } from "../db/database";
 import { tasks, type TaskRow } from "../db/schema";
+import { formatTaskError } from "../errors";
 
 export type TaskStatus = "queued" | "running" | "needs_user_action" | "succeeded" | "failed" | "cancelled";
 
@@ -177,7 +178,7 @@ export class TaskRunner {
       if (pendingProgress !== undefined) writeProgress();
       const cancelled = getTask(this.db, task.id)?.status === "cancelled";
       if (!cancelled) {
-        this.finish(task.id, { status: "failed", error: error instanceof Error ? error.message : String(error) });
+        this.finish(task.id, { status: "failed", error: formatTaskError(error) });
       }
     } finally {
       clearInterval(heartbeat);

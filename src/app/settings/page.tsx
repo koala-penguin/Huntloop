@@ -1,4 +1,5 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
+import { formatUsd } from "@/lib/format";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LanguageForm } from "@/components/settings/language-form";
@@ -10,6 +11,7 @@ import { readEnv } from "@/server/config/env";
 export default async function SettingsPage() {
   const t = await getTranslations("settings");
   const tCommon = await getTranslations("common");
+  const locale = await getLocale();
   const { db, user, settings } = appContext();
   const spend = spendSummary(db, user.id);
   const env = readEnv();
@@ -34,7 +36,7 @@ export default async function SettingsPage() {
         <LanguageForm />
       </Card>
 
-      <AiSettingsForm initial={settings} spentTodayUsd={spend.todayUsd} spentMonthUsd={spend.monthUsd} />
+      <AiSettingsForm initial={settings} spentToday={formatUsd(spend.todayUsd, locale)} spentMonth={formatUsd(spend.monthUsd, locale)} />
 
       <Card>
         <CardHeader>

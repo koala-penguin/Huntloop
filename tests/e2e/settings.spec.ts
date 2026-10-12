@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("change a task model, save, and see it persist; switch the app to Korean", async ({ page }) => {
   await page.goto("/settings");

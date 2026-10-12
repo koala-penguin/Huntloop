@@ -7,6 +7,8 @@ import { appContext } from "@/server/context";
 import { budgetStatus, currentAiMode } from "@/server/ai/client";
 import { MODELS } from "@/shared/models";
 import { formatUsd } from "@/lib/format";
+import { getCurrentProfile } from "@/server/repo/profile";
+import { experienceYears } from "@/shared/experience";
 
 function Step({ done, title, body }: { done: boolean; title: string; body: string }) {
   const Icon = done ? CheckCircle2 : Circle;
@@ -24,7 +26,8 @@ function Step({ done, title, body }: { done: boolean; title: string; body: strin
 export default async function DashboardPage() {
   const t = await getTranslations("dashboard");
   const locale = await getLocale();
-  const { ai, settings } = appContext();
+  const { ai, settings, db, user } = appContext();
+  const profile = getCurrentProfile(db, user.id);
   const live = currentAiMode() === "live";
   const budget = budgetStatus(ai);
 
@@ -43,9 +46,16 @@ export default async function DashboardPage() {
           <ol className="flex flex-col gap-4">
             <Step done={live} title={t("stepKey")} body={live ? t("stepKeyDone") : t("stepKeyTodo")} />
             <Step done={live} title={t("stepModels")} body={t("stepModelsBody", { model: MODELS[settings.defaultModel].label })} />
-            <Step done={false} title={t("stepProfile")} body={t("stepProfileBody")} />
+            <Step
+              done={!!profile}
+              title={t("stepProfile")}
+              body={profile ? t("stepProfileDone", { version: profile.version, years: experienceYears(profile.data.experience) }) : t("stepProfileBody")}
+            />
           </ol>
-          <div className="mt-5">
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button asChild size="sm">
+              <Link href="/profile">{t("openProfile")}</Link>
+            </Button>
             <Button asChild variant="secondary" size="sm">
               <Link href="/settings">{t("openSettings")}</Link>
             </Button>

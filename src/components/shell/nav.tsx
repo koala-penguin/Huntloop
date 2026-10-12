@@ -4,17 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { LayoutDashboard, Menu, Settings, X, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Menu, Settings, UserRound, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 interface NavItem {
   href: string;
-  key: "dashboard" | "settings";
+  key: "dashboard" | "profile" | "settings";
   icon: LucideIcon;
 }
 
 const ITEMS: NavItem[] = [
   { href: "/", key: "dashboard", icon: LayoutDashboard },
+  { href: "/profile", key: "profile", icon: UserRound },
   { href: "/settings", key: "settings", icon: Settings },
 ];
 

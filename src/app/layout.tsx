@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/shell/app-shell";
+import { CountryNamesProvider } from "@/components/i18n/country-names";
+import { countryOptions } from "@/shared/countries";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -15,7 +17,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang={locale} className="h-full antialiased">
       <body className="min-h-full">
         <NextIntlClientProvider>
-          <AppShell>{children}</AppShell>
+          <CountryNamesProvider options={countryOptions(locale)}>
+            <AppShell>{children}</AppShell>
+          </CountryNamesProvider>
         </NextIntlClientProvider>
       </body>
     </html>

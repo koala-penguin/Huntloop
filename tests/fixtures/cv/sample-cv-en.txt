@@ -1,0 +1,30 @@
+Jamie Park
+Senior Frontend Engineer
+Sydney, NSW, Australia · jamie.park@example.com · +61 400 000 000
+https://github.com/jamiepark-example
+
+SUMMARY
+Frontend engineer with 7 years of experience building React and TypeScript products for fintech and e-commerce.
+Permanent resident of Australia with full working rights.
+
+EXPERIENCE
+Senior Frontend Engineer at Harbour Payments — Mar 2021 - Present
+- Led the rebuild of the merchant dashboard in React and TypeScript, cutting page load time by 40%.
+- Mentored 4 engineers and introduced component testing with Jest and Playwright.
+- Worked with GraphQL APIs and AWS Lambda to ship payment reporting features.
+
+Frontend Engineer at Koala Commerce — Jan 2018 - Feb 2021
+- Built checkout flows in React used by 2 million monthly customers.
+- Migrated the design system to TypeScript and Storybook.
+
+Web Developer at Seoul Digital Agency — Jul 2016 - Dec 2017
+- Developed marketing sites with JavaScript and Vue for Korean retail brands.
+
+EDUCATION
+Bachelor of Computer Science, Korea University, 2016
+
+SKILLS
+React, TypeScript, JavaScript, Next.js, GraphQL, Node.js, AWS, Jest, Playwright, Storybook, Agile
+
+LANGUAGES
+Korean (native), English (professional)

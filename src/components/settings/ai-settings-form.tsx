@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AI_TASKS, type AiSettings, type AiTask } from "@/shared/ai-settings";
@@ -10,22 +10,21 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { FieldHint, Input, Label, Select } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { saveAiSettingsAction, checkModelAccessAction, type ModelAccessResult } from "@/app/settings/actions";
-import { formatUsd } from "@/lib/format";
 
 interface Props {
   initial: AiSettings;
-  spentTodayUsd: number;
-  spentMonthUsd: number;
+  /** Pre-formatted on the server (Intl output can differ between Node and the browser). */
+  spentToday: string;
+  spentMonth: string;
 }
 
 type Status = { kind: "idle" } | { kind: "saved" } | { kind: "error"; message: string };
 
-export function AiSettingsForm({ initial, spentTodayUsd, spentMonthUsd }: Props) {
+export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
   const t = useTranslations("settings");
   const tTasks = useTranslations("aiTasks");
   const tEffort = useTranslations("effort");
   const tCommon = useTranslations("common");
-  const locale = useLocale();
   const router = useRouter();
   const [settings, setSettings] = useState<AiSettings>(initial);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -188,7 +187,7 @@ export function AiSettingsForm({ initial, spentTodayUsd, spentMonthUsd }: Props)
               value={settings.budget.dailyUsd}
               onChange={(e) => update((s) => ({ ...s, budget: { ...s.budget, dailyUsd: Number(e.target.value) || 0 } }))}
             />
-            <FieldHint>{t("spentToday", { amount: formatUsd(spentTodayUsd, locale) })}</FieldHint>
+            <FieldHint>{t("spentToday", { amount: spentToday })}</FieldHint>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="monthly-cap">{t("monthlyCap")}</Label>
@@ -203,7 +202,7 @@ export function AiSettingsForm({ initial, spentTodayUsd, spentMonthUsd }: Props)
               }
             />
             <FieldHint>
-              {t("monthlyCapHint")} {t("spentMonth", { amount: formatUsd(spentMonthUsd, locale) })}
+              {t("monthlyCapHint")} {t("spentMonth", { amount: spentMonth })}
             </FieldHint>
           </div>
           <div className="flex flex-col gap-2">
