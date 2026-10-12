@@ -1,2 +1,75 @@
 # Huntloop
-Land a new job with your personal AI Agent
+
+Land a new job with your personal AI Agent.
+
+Huntloop is a local, single-user web app that works with you through the whole job hunt. The first module is **job search**:
+find the postings where you have the best chance of getting an interview, understand them, research the employer, and
+— once you decide to go for one — tailor your CV to it. It's built for Australia first (also NZ, Singapore, the US, and any
+other country you configure), with the UI fully in **English and Korean**.
+
+## Quick start
+
+Requirements: Node.js 20.9 or newer.
+
+```bash
+npm install
+cp .env.example .env.local   # then add your ANTHROPIC_API_KEY
+npm run build && npm start   # http://127.0.0.1:3000
+```
+
+- Without `ANTHROPIC_API_KEY` the app runs in **demo mode**: every AI feature works with simulated responses, so you can
+  click through everything without spending anything.
+- `npm run dev` is fine for development, but use `npm run build && npm start` for real use: long background tasks
+  (searches, research) restart when the dev server hot-reloads.
+- The server binds to `127.0.0.1` only. Huntloop has no login and stores your CV and job data locally in `./data`
+  (change with `HUNTLOOP_DATA_DIR`). CVs, postings and screenshots are sent only to the Anthropic API.
+
+## Models and cost
+
+Every AI task uses **Claude Opus 5.5** by default. In **Settings → AI models** you can pick a different default model and
+override the model and effort level per task (CV reading, posting analysis, interview-chance assessment, screening, chat,
+search agent, employer research, CV tailoring, …). Settings also has daily/monthly spending caps; background work pauses
+when a cap is reached. Spend is computed from the API's usage data (including refusal-fallback attempts and web searches)
+and shown on the dashboard.
+
+Refusal fallbacks (`fallbacks: "default"`) are enabled on models that support them, so a false-positive safety decline is
+retried on another model instead of failing.
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Development server on 127.0.0.1:3000 |
+| `npm run build` / `npm start` | Production build / server |
+| `npm run lint` | ESLint (includes a rule that every UI string comes from `messages/*.json`) |
+| `npm run typecheck` | Route type generation + `tsc` |
+| `npm test` | Unit tests (Vitest, demo-mode AI) |
+| `npm run test:e2e` | Browser tests (Playwright) against a production build with simulated AI |
+| `npm run db:generate` | Generate a migration after changing `src/server/db/schema.ts` |
+
+## Project layout
+
+```
+src/app/          pages, route handlers, server actions (Next.js App Router)
+src/components/   UI (ui/ primitives, feature components)
+src/shared/       code used by both server and browser (model registry, AI settings schema, Zod schemas)
+src/server/       server-only: database, repositories, Claude client, AI tasks, background task runner
+messages/         en.json and ko.json — every user-visible string
+drizzle/          SQL migrations (applied automatically at startup)
+tests/            unit/ (Vitest), e2e/ (Playwright)
+```
+
+## Roadmap
+
+1. **Foundation** — app shell, English/Korean, settings for models/effort/budget, Claude client, background tasks. ✅
+2. **Profile** — CV upload → structured profile, work rights per country, preferences.
+3. **Bring your own job** — add postings by URL, long pasted text, screenshots or PDF; "Interview Chance" tier with
+   evidence; per-job AI chat; employer deep research.
+4. **AI search** — Adzuna, a Claude web-search agent, SEEK and LinkedIn through a visible (headed) browser, and Chrome
+   DevTools MCP for AI-driven browsing.
+5. **Proceed → CV tailoring** — once you and the AI agree to go for a job, a tailored CV (DOCX/PDF) where every claim is
+   traceable to your real experience.
+
+## License
+
+MIT

@@ -1,0 +1,138 @@
+{
+  "common": {
+    "appName": "Huntloop",
+    "tagline": "Your AI companion for landing the next job",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "cancel": "Cancel",
+    "retry": "Try again",
+    "loading": "Loading…",
+    "configured": "Configured",
+    "missing": "Missing",
+    "optional": "Optional",
+    "demoBanner": "Demo mode: AI responses are simulated. Add ANTHROPIC_API_KEY to .env.local and restart to use Claude.",
+    "budgetWarning": "AI spend today is {today} of your {cap} daily cap.",
+    "budgetExceeded": "Daily AI budget reached ({cap}). Background work is paused until tomorrow or until you raise the cap in Settings.",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "nav": {
+    "main": "Main navigation",
+    "dashboard": "Dashboard",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Welcome to Huntloop",
+    "subtitle": "Find the jobs where you have the best chance of getting an interview, then go after them together with your AI companion.",
+    "setupTitle": "Getting started",
+    "stepKey": "Connect Claude",
+    "stepKeyDone": "Claude is connected.",
+    "stepKeyTodo": "Add your Anthropic API key to .env.local. Until then everything runs in demo mode.",
+    "stepModels": "Choose your AI models",
+    "stepModelsBody": "Every task uses {model} by default. You can change models and effort per task in Settings.",
+    "stepProfile": "Add your CV",
+    "stepProfileBody": "Coming next: upload your CV so Huntloop can judge your chances for each job.",
+    "openSettings": "Open settings",
+    "spendTitle": "AI spend",
+    "spendToday": "Today",
+    "spendMonth": "This month",
+    "spendCap": "Daily cap {cap}"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Language, AI models and spending limits.",
+    "languageTitle": "Language",
+    "languageDescription": "Language of the app. The AI replies in the language you write to it.",
+    "languageLabel": "App language",
+    "localeName": {
+      "en": "English",
+      "ko": "한국어"
+    },
+    "modelsTitle": "AI models",
+    "modelsDescription": "Pick the default Claude model and, if you like, a different model or effort level for individual tasks. Higher effort means more careful answers, more time and higher cost.",
+    "defaultModel": "Default model",
+    "task": "Task",
+    "model": "Model",
+    "effort": "Effort",
+    "useDefault": "Default ({model})",
+    "pricePerMillion": "${input} in / ${output} out per million tokens",
+    "checkAccess": "Check model access",
+    "checking": "Checking…",
+    "accessAvailable": "Available",
+    "accessUnavailable": "Not available for this API key",
+    "accessDemo": "Demo mode: all models appear available.",
+    "accessError": "Could not reach the Anthropic API: {message}",
+    "budgetTitle": "Spending limits",
+    "budgetDescription": "Background work (bulk analysis, searches, research) pauses when a cap is reached. Chats keep working but show a warning.",
+    "dailyCap": "Daily cap (USD)",
+    "monthlyCap": "Monthly cap (USD)",
+    "monthlyCapHint": "Leave empty for no monthly cap.",
+    "warnAt": "Warn at (% of cap)",
+    "spentToday": "Spent today: {amount}",
+    "spentMonth": "Spent this month: {amount}",
+    "keysTitle": "API keys",
+    "keysDescription": "Keys are read from .env.local in the project folder and never stored in the database. Restart the app after changing them.",
+    "keyAnthropic": "Anthropic (Claude)",
+    "keyAdzuna": "Adzuna job search",
+    "keyJsearch": "JSearch job search",
+    "saveError": "Could not save: {message}"
+  },
+  "effort": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "xhigh": "Extra high",
+    "max": "Max"
+  },
+  "aiTasks": {
+    "extractProfile": {
+      "name": "Read your CV",
+      "description": "Turns your CV into a structured profile (runs once per CV)."
+    },
+    "transcribePosting": {
+      "name": "Read screenshots",
+      "description": "Transcribes job posting screenshots and PDFs."
+    },
+    "analyzePosting": {
+      "name": "Analyze postings",
+      "description": "Breaks a job posting into requirements, location and work-rights rules."
+    },
+    "assess": {
+      "name": "Interview chance",
+      "description": "Checks each requirement against your profile, with evidence."
+    },
+    "screen": {
+      "name": "Quick screening",
+      "description": "First pass over many search results."
+    },
+    "chat": {
+      "name": "Chat",
+      "description": "Conversations about a job or your search."
+    },
+    "searchAgent": {
+      "name": "Search agent",
+      "description": "Finds postings on the web and job sites."
+    },
+    "companyResearch": {
+      "name": "Employer research",
+      "description": "Researches what a company does, how it is growing and who it hires."
+    },
+    "planTailoring": {
+      "name": "CV tailoring plan",
+      "description": "Plans how to tailor your CV for a job."
+    },
+    "tailorCv": {
+      "name": "Write tailored CV",
+      "description": "Writes the tailored CV draft."
+    },
+    "parseSearch": {
+      "name": "Understand search requests",
+      "description": "Turns a search request into filters."
+    },
+    "translate": {
+      "name": "Translate",
+      "description": "Translates AI explanations when you switch language."
+    }
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "common": {
+    "appName": "Huntloop",
+    "tagline": "다음 직장을 함께 찾는 AI 동반자",
+    "save": "저장",
+    "saving": "저장 중…",
+    "saved": "저장됨",
+    "cancel": "취소",
+    "retry": "다시 시도",
+    "loading": "불러오는 중…",
+    "configured": "설정됨",
+    "missing": "없음",
+    "optional": "선택",
+    "demoBanner": "데모 모드: AI 응답이 시뮬레이션됩니다. Claude를 사용하려면 .env.local에 ANTHROPIC_API_KEY를 추가하고 앱을 다시 시작하세요.",
+    "budgetWarning": "오늘 AI 사용액이 일일 한도 {cap} 중 {today}입니다.",
+    "budgetExceeded": "일일 AI 예산({cap})에 도달했습니다. 백그라운드 작업은 내일 또는 설정에서 한도를 올릴 때까지 멈춥니다.",
+    "openMenu": "메뉴 열기",
+    "closeMenu": "메뉴 닫기"
+  },
+  "nav": {
+    "main": "주 메뉴",
+    "dashboard": "대시보드",
+    "settings": "설정"
+  },
+  "dashboard": {
+    "title": "Huntloop에 오신 것을 환영합니다",
+    "subtitle": "인터뷰 가능성이 가장 높은 공고를 찾고, AI 동반자와 함께 도전해 보세요.",
+    "setupTitle": "시작하기",
+    "stepKey": "Claude 연결",
+    "stepKeyDone": "Claude가 연결되었습니다.",
+    "stepKeyTodo": ".env.local에 Anthropic API 키를 추가하세요. 그 전까지는 모든 기능이 데모 모드로 동작합니다.",
+    "stepModels": "AI 모델 선택",
+    "stepModelsBody": "모든 작업은 기본적으로 {model}을(를) 사용합니다. 설정에서 작업별로 모델과 노력 수준을 바꿀 수 있습니다.",
+    "stepProfile": "CV 등록",
+    "stepProfileBody": "다음 단계: CV를 올리면 공고마다 내 승산을 판단할 수 있습니다.",
+    "openSettings": "설정 열기",
+    "spendTitle": "AI 사용액",
+    "spendToday": "오늘",
+    "spendMonth": "이번 달",
+    "spendCap": "일일 한도 {cap}"
+  },
+  "settings": {
+    "title": "설정",
+    "subtitle": "언어, AI 모델, 지출 한도를 관리합니다.",
+    "languageTitle": "언어",
+    "languageDescription": "앱 화면의 언어입니다. AI는 내가 쓰는 언어로 답합니다.",
+    "languageLabel": "앱 언어",
+    "localeName": {
+      "en": "English",
+      "ko": "한국어"
+    },
+    "modelsTitle": "AI 모델",
+    "modelsDescription": "기본 Claude 모델을 고르고, 원하면 작업별로 다른 모델이나 노력 수준을 지정하세요. 노력 수준이 높을수록 더 꼼꼼하게 답하지만 시간과 비용이 늘어납니다.",
+    "defaultModel": "기본 모델",
+    "task": "작업",
+    "model": "모델",
+    "effort": "노력 수준",
+    "useDefault": "기본값 ({model})",
+    "pricePerMillion": "100만 토큰당 입력 ${input} / 출력 ${output}",
+    "checkAccess": "모델 사용 가능 여부 확인",
+    "checking": "확인 중…",
+    "accessAvailable": "사용 가능",
+    "accessUnavailable": "이 API 키로는 사용할 수 없음",
+    "accessDemo": "데모 모드: 모든 모델이 사용 가능한 것으로 표시됩니다.",
+    "accessError": "Anthropic API에 연결할 수 없습니다: {message}",
+    "budgetTitle": "지출 한도",
+    "budgetDescription": "한도에 도달하면 백그라운드 작업(대량 분석, 검색, 리서치)이 멈춥니다. 대화는 계속되지만 경고가 표시됩니다.",
+    "dailyCap": "일일 한도 (USD)",
+    "monthlyCap": "월간 한도 (USD)",
+    "monthlyCapHint": "비워 두면 월간 한도가 없습니다.",
+    "warnAt": "경고 시점 (한도의 %)",
+    "spentToday": "오늘 사용액: {amount}",
+    "spentMonth": "이번 달 사용액: {amount}",
+    "keysTitle": "API 키",
+    "keysDescription": "키는 프로젝트 폴더의 .env.local에서 읽으며 데이터베이스에 저장하지 않습니다. 키를 바꾼 뒤에는 앱을 다시 시작하세요.",
+    "keyAnthropic": "Anthropic (Claude)",
+    "keyAdzuna": "Adzuna 채용 검색",
+    "keyJsearch": "JSearch 채용 검색",
+    "saveError": "저장하지 못했습니다: {message}"
+  },
+  "effort": {
+    "low": "낮음",
+    "medium": "보통",
+    "high": "높음",
+    "xhigh": "매우 높음",
+    "max": "최대"
+  },
+  "aiTasks": {
+    "extractProfile": {
+      "name": "CV 읽기",
+      "description": "CV를 구조화된 프로필로 바꿉니다 (CV당 한 번 실행)."
+    },
+    "transcribePosting": {
+      "name": "스크린샷 읽기",
+      "description": "채용공고 스크린샷과 PDF의 글자를 옮겨 적습니다."
+    },
+    "analyzePosting": {
+      "name": "공고 분석",
+      "description": "채용공고를 요구사항, 근무지, 취업 자격 조건으로 나눕니다."
+    },
+    "assess": {
+      "name": "인터뷰 가능성",
+      "description": "요구사항 하나하나를 내 프로필과 근거를 들어 비교합니다."
+    },
+    "screen": {
+      "name": "빠른 1차 선별",
+      "description": "많은 검색 결과를 빠르게 훑어봅니다."
+    },
+    "chat": {
+      "name": "대화",
+      "description": "공고나 구직 활동에 대한 대화."
+    },
+    "searchAgent": {
+      "name": "검색 에이전트",
+      "description": "웹과 채용 사이트에서 공고를 찾습니다."
+    },
+    "companyResearch": {
+      "name": "회사 리서치",
+      "description": "회사가 하는 일, 성장 추세, 채용 동향을 조사합니다."
+    },
+    "planTailoring": {
+      "name": "CV 맞춤 계획",
+      "description": "공고에 맞춰 CV를 어떻게 다듬을지 계획합니다."
+    },
+    "tailorCv": {
+      "name": "맞춤 CV 작성",
+      "description": "맞춤 CV 초안을 작성합니다."
+    },
+    "parseSearch": {
+      "name": "검색 요청 이해",
+      "description": "검색 요청을 필터로 바꿉니다."
+    },
+    "translate": {
+      "name": "번역",
+      "description": "언어를 바꿀 때 AI 설명을 번역합니다."
+    }
+  }
+}
