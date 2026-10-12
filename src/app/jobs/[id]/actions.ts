@@ -12,6 +12,9 @@ import { getCurrentProfile, saveProfileVersion } from "@/server/repo/profile";
 import { rescoreAllJobs } from "@/server/jobs/fit";
 import { reassessJob, saveJobText } from "@/server/jobs/intake";
 import { errorCodeOf } from "@/server/errors";
+import { resolveChatAction } from "@/server/ai/chat/actions";
+import { createJobConversation, getJobConversation, isConversationBusy } from "@/server/ai/chat/harness";
+import { getJob } from "@/server/repo/jobs";
 import type { ActionResult } from "@/app/profile/actions";
 
 function fail(error: unknown): { ok: false; error: string } {
@@ -81,5 +84,29 @@ export async function deleteJobAction(jobId: number): Promise<ActionResult<null>
   const { db, user } = appContext();
   deleteJob(db, user.id, jobId);
   revalidatePath("/", "layout");
+  return { ok: true, value: null };
+}
+
+export async function resolveChatActionAction(actionId: number, decision: "accept" | "dismiss"): Promise<ActionResult<null>> {
+  if (!["accept", "dismiss"].includes(decision)) return { ok: false, error: "invalid" };
+  const { ai } = appContext();
+  try {
+    resolveChatAction(ai, actionId, decision);
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/", "layout");
+  return { ok: true, value: null };
+}
+
+/** Starts a fresh conversation (e.g. after the posting was re-analysed). The old one is kept. */
+export async function newConversationAction(jobId: number): Promise<ActionResult<null>> {
+  const { db, user, ai } = appContext();
+  const job = getJob(db, user.id, jobId);
+  if (!job) return { ok: false, error: "not_found" };
+  const current = getJobConversation(ai, jobId);
+  if (current && isConversationBusy(current.id)) return { ok: false, error: "chat_busy" };
+  createJobConversation(ai, job);
+  revalidatePath(`/jobs/${jobId}`);
   return { ok: true, value: null };
 }

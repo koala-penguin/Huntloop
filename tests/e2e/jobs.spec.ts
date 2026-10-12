@@ -89,6 +89,35 @@ test("Singapore job → work-rights question → re-tiered", async ({ page }) =>
   await expect(gate).toHaveAttribute("data-status", "pass");
 });
 
+test("chat about a job: streamed answer, profile-fact card, proceed card", async ({ page }) => {
+  await page.goto("/jobs");
+  await page.getByRole("link", { name: /Senior Frontend Engineer/ }).first().click();
+  await page.getByRole("tab", { name: "Ask AI" }).click();
+  await page.getByRole("button", { name: "Am I a good fit for this job?" }).click();
+  await expect(page.locator('[data-role="assistant"]').filter({ hasText: "Interview Chance:" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-role="user"]').filter({ hasText: "Am I a good fit for this job?" })).toHaveCount(1);
+
+  const input = page.getByRole("textbox", { name: "Your message" });
+  await input.fill("I have run accessibility audits against WCAG 2.2 for two years");
+  await input.press("Enter");
+  const fact = page.locator('[data-action="profile_fact"]');
+  await expect(fact.getByText("Add this to your profile?")).toBeVisible({ timeout: 15_000 });
+  await fact.getByRole("button", { name: "Add to profile" }).click();
+  await expect(fact.getByText("Added to your profile")).toBeVisible();
+
+  await input.fill("Let's apply for this one");
+  await page.getByRole("button", { name: "Send" }).click();
+  const proceed = page.locator('[data-action="proceed"]');
+  await expect(proceed.getByText("Go ahead with this job?")).toBeVisible({ timeout: 15_000 });
+  await proceed.getByRole("button", { name: "Proceed" }).click();
+  await expect(page.getByRole("combobox", { name: "Status" })).toHaveValue("applying");
+
+  // The conversation is saved: it's still there after a reload.
+  await page.reload();
+  await page.getByRole("tab", { name: "Ask AI" }).click();
+  await expect(page.locator('[data-role="user"]')).toHaveCount(3);
+});
+
 test("the report reads in Korean", async ({ page }) => {
   await page.goto("/jobs");
   await page.getByRole("link", { name: /Senior Frontend Engineer/ }).first().click();

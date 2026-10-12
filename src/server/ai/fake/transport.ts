@@ -31,6 +31,10 @@ export function registerFakeGenerator(task: string, generator: FakeGenerator): v
   generators.set(task, generator);
 }
 
+export function getFakeGenerator(task: string): FakeGenerator | undefined {
+  return generators.get(task);
+}
+
 /** Text of the most recent user message (string content or text blocks). */
 export function lastUserText(body: FakeRequest["body"]): string {
   for (let i = body.messages.length - 1; i >= 0; i--) {

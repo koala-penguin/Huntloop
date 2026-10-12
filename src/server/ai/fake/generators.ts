@@ -5,3 +5,4 @@
  */
 import "./generators/extract-profile";
 import "./generators/jobs";
+import "./generators/chat";

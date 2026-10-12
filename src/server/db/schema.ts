@@ -254,3 +254,72 @@ export const aiTexts = sqliteTable(
   },
   (t) => [index("ai_texts_owner").on(t.ownerType, t.ownerId, t.lang)],
 );
+
+/**
+ * A chat about one job. Its system prompt, tools, model and effort are frozen at creation so every
+ * request is a strict extension of the previous one (prompt caching, preserved thinking).
+ */
+export const conversations = sqliteTable(
+  "conversations",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    jobId: integer("job_id").references(() => jobs.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull().default("job"),
+    model: text("model").notNull(),
+    effort: text("effort").notNull(),
+    toolsetVersion: integer("toolset_version").notNull(),
+    system: text("system").notNull(),
+    /** Tool definitions as first sent (part of the cached prefix). */
+    tools: text("tools", { mode: "json" }).notNull(),
+    /** Snapshot of the job state last told to the model; a change is sent as a context update. */
+    stateDigest: text("state_digest"),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("conversations_job").on(t.userId, t.jobId)],
+);
+export type ConversationRow = typeof conversations.$inferSelect;
+
+/** Messages exactly as sent to / received from the API (content blocks verbatim, in order). */
+export const chatMessages = sqliteTable(
+  "chat_messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    conversationId: integer("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    role: text("role").notNull(),
+    /** context | user | tool_results | assistant */
+    kind: text("kind").notNull(),
+    content: text("content", { mode: "json" }).notNull(),
+    /** What the user typed (user rows), for display. */
+    text: text("text"),
+    stopReason: text("stop_reason"),
+    servedModel: text("served_model"),
+    usage: text("usage", { mode: "json" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("chat_messages_conversation").on(t.conversationId, t.seq)],
+);
+export type ChatMessageRow = typeof chatMessages.$inferSelect;
+
+/** Things the AI proposed that only the user's click can apply (profile facts, proceeding). */
+export const chatActions = sqliteTable("chat_actions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  conversationId: integer("conversation_id")
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  messageId: integer("message_id"),
+  toolUseId: text("tool_use_id").notNull(),
+  kind: text("kind").notNull(),
+  payload: text("payload", { mode: "json" }).notNull(),
+  /** pending | accepted | dismissed */
+  status: text("status").notNull().default("pending"),
+  createdAt: createdAt(),
+  resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
+});
+export type ChatActionRow = typeof chatActions.$inferSelect;

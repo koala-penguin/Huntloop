@@ -18,6 +18,9 @@ import { JobProgress } from "@/components/jobs/job-progress";
 import { FitReport } from "@/components/jobs/fit-report";
 import { PostingOverview } from "@/components/jobs/posting-overview";
 import { DeleteJobButton, PostingTextEditor, ReassessButton, StatusSelect, TranslateReport } from "@/components/jobs/job-controls";
+import { ChatPanel } from "@/components/jobs/chat-panel";
+import { getJobConversation, listChatActions, listChatMessages } from "@/server/ai/chat/harness";
+import { transcript } from "@/server/ai/chat/render";
 
 const KNOWN_ERRORS = ["not_a_job_posting", "url_blocked", "missing_posting", "refusal", "budget", "invalid_output", "max_tokens"];
 
@@ -31,6 +34,8 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
   const { db, user } = appContext();
   const job = getJob(db, user.id, Number(id));
   if (!job) notFound();
+  const conversation = getJobConversation({ db, userId: user.id }, job.id);
+  const chatItems = conversation ? transcript(listChatMessages({ db }, conversation.id), listChatActions({ db }, conversation.id)) : [];
 
   const taskId = activeJobTask(db, user.id, job);
   const fit = loadJobFit(db, user.id, job);
@@ -206,21 +211,34 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
             </Alert>
           )}
           {translating && <TranslateReport jobId={job.id} />}
-          {fit.score && assessment ? (
-            <SimpleTabs
-              defaultValue="fit"
-              tabs={[
-                {
-                  value: "fit",
-                  label: t("tabFit"),
-                  content: <FitReport jobId={job.id} locale={locale} analysis={fit.analysis} assessment={assessment} score={fit.score} answers={job.answers ?? {}} />,
-                },
-                { value: "posting", label: t("tabPosting"), content: postingTab },
-              ]}
-            />
-          ) : (
-            postingTab
-          )}
+          <SimpleTabs
+            defaultValue={fit.score && assessment ? "fit" : "posting"}
+            tabs={[
+              ...(fit.score && assessment
+                ? [
+                    {
+                      value: "fit",
+                      label: t("tabFit"),
+                      content: <FitReport jobId={job.id} locale={locale} analysis={fit.analysis} assessment={assessment} score={fit.score} answers={job.answers ?? {}} />,
+                    },
+                  ]
+                : []),
+              { value: "posting", label: t("tabPosting"), content: postingTab },
+              {
+                value: "chat",
+                label: t("tabChat"),
+                content: (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>{t("chatTitle")}</CardTitle>
+                      <CardDescription>{t("chatDescription")}</CardDescription>
+                    </CardHeader>
+                    <ChatPanel jobId={job.id} items={chatItems} hasConversation={!!conversation} />
+                  </Card>
+                ),
+              },
+            ]}
+          />
         </>
       )}
     </>

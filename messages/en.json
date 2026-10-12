@@ -165,7 +165,8 @@
     "unsupported_posting_file": "Use screenshots (PNG, JPEG, WebP, GIF) or a PDF.",
     "not_found": "This job no longer exists.",
     "url_blocked": "Huntloop doesn't open links to local or private network addresses.",
-    "not_a_job_posting": "This doesn't look like a job posting. Check the text or screenshots and try again."
+    "not_a_job_posting": "This doesn't look like a job posting. Check the text or screenshots and try again.",
+    "chat_busy": "Claude is still answering your last message."
   },
   "profile": {
     "title": "Your profile",
@@ -453,7 +454,10 @@
     "editText": "Edit text",
     "editTextLabel": "Posting text",
     "editTextHint": "Saving runs the analysis again with your text.",
-    "saveText": "Save and re-analyse"
+    "saveText": "Save and re-analyse",
+    "tabChat": "Ask AI",
+    "chatTitle": "Talk it through",
+    "chatDescription": "Ask anything about this job: what it really involves, whether you're a fit, how to improve your chances. Claude knows your profile, the posting and the analysis."
   },
   "jobStatus": {
     "new": "New",
@@ -676,5 +680,46 @@
     "translating": "Translating the report…",
     "translateFailed": "The report couldn't be translated right now; showing the original.",
     "unknownCountry": "this country"
+  },
+  "chat": {
+    "intro": "Start with one of these, or ask your own question.",
+    "thinking": "Thinking…",
+    "sources": "{count, plural, one {# source} other {# sources}}",
+    "inputLabel": "Your message",
+    "placeholder": "Ask about this job… (Enter to send, Shift+Enter for a new line)",
+    "hint": "Huntloop only changes your profile or this job when you confirm.",
+    "newConversation": "New conversation",
+    "send": "Send",
+    "suggestion": {
+      "explain": "Explain this posting in plain words",
+      "fit": "Am I a good fit for this job?",
+      "improve": "How can I improve my chances?",
+      "research": "Research this employer"
+    },
+    "error": {
+      "refusal": "Claude declined to answer that. Try rephrasing your message.",
+      "budget": "Your AI spending cap has been reached. Raise it in Settings to continue.",
+      "max_tokens": "The answer was cut off. Ask Claude to continue or to be shorter.",
+      "chat_busy": "Claude is still answering your last message.",
+      "job_not_ready": "Wait until the posting has been analysed.",
+      "api": "Claude couldn't be reached. Try again in a moment."
+    },
+    "activity": {
+      "web_search": "Searched the web: {detail}",
+      "web_fetch": "Read a page: {detail}",
+      "save_job_note": "Saved a note: {detail}",
+      "set_job_status": "Changed the job status: {detail}",
+      "start_company_research": "Started researching the employer{detail}"
+    },
+    "card": {
+      "factTitle": "Add this to your profile?",
+      "proceedTitle": "Go ahead with this job?",
+      "addFact": "Add to profile",
+      "proceed": "Proceed",
+      "notNow": "Not now",
+      "factAdded": "Added to your profile",
+      "proceeded": "Moving ahead: status set to Applying",
+      "dismissed": "Dismissed"
+    }
   }
 }
