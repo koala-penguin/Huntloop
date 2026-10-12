@@ -1,0 +1,11 @@
+{
+  "id": 4012345,
+  "title": "Senior Frontend Engineer",
+  "company_name": "Canva",
+  "absolute_url": "https://job-boards.greenhouse.io/canva/jobs/4012345",
+  "updated_at": "2026-10-01T09:00:00-04:00",
+  "first_published": "2026-09-28T09:00:00-04:00",
+  "location": { "name": "Sydney, Australia" },
+  "content": "&lt;p&gt;&lt;strong&gt;About the role&lt;/strong&gt;&lt;/p&gt;&lt;p&gt;Join our design tools team in Sydney and build editing experiences used by millions of people every day across web and mobile.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;5+ years building web applications with React and TypeScript&lt;/li&gt;&lt;li&gt;Experience with performance profiling&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;You must have full working rights in Australia.&lt;/p&gt;",
+  "pay_input_ranges": [{ "min_cents": 18000000, "max_cents": 22000000, "currency_type": "AUD", "title": "Base + super" }]
+}

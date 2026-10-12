@@ -4,7 +4,7 @@ import { getCurrentProfile, getPreferences } from "@/server/repo/profile";
 import { CvUpload } from "@/components/profile/cv-upload";
 import { ProfileEditor } from "@/components/profile/profile-editor";
 import { PreferencesEditor } from "@/components/profile/preferences-editor";
-import { ProfileTabs } from "@/components/profile/profile-tabs";
+import { SimpleTabs } from "@/components/ui/tabs";
 
 export default async function ProfilePage() {
   const t = await getTranslations("profile");
@@ -20,7 +20,7 @@ export default async function ProfilePage() {
       </header>
 
       {profile ? (
-        <ProfileTabs
+        <SimpleTabs
           defaultValue="profile"
           tabs={[
             {

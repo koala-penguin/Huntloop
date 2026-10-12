@@ -24,6 +24,22 @@ npm run build && npm start   # http://127.0.0.1:3000
 - The server binds to `127.0.0.1` only. Huntloop has no login and stores your CV and job data locally in `./data`
   (change with `HUNTLOOP_DATA_DIR`). CVs, postings and screenshots are sent only to the Anthropic API.
 
+## Adding a job
+
+On **Jobs**, paste a job link or the posting's text, or drop in screenshots (several parts of one long posting are fine) or
+a PDF. Huntloop:
+
+- reads the posting — Greenhouse, Lever and Ashby links through their public job APIs; other links through a guarded fetch
+  (structured page data first, then the readable text). SEEK, LinkedIn, Indeed and similar sites aren't read automatically;
+  Huntloop asks for the text or screenshots instead. Screenshots are transcribed by Claude, and you can correct the text;
+- lists every requirement with a verbatim quote from the posting (quotes that can't be found are dropped);
+- compares each requirement with your profile, quoting your CV as evidence (also checked word for word);
+- works out your **Interview Chance** in code: hard requirements first (work rights, citizenship, clearance, location,
+  posting age), then a tier — **Strong, Good, Stretch or Long shot** — with what would move you up a tier.
+
+Answering a Yes/No question or your work rights for that country re-tiers the job instantly, without another AI call.
+Results are cached, so reopening a job costs nothing.
+
 ## Models and cost
 
 Every AI task uses **Claude Opus 5.5** by default. In **Settings → AI models** you can pick a different default model and
@@ -62,9 +78,9 @@ tests/            unit/ (Vitest), e2e/ (Playwright)
 ## Roadmap
 
 1. **Foundation** — app shell, English/Korean, settings for models/effort/budget, Claude client, background tasks. ✅
-2. **Profile** — CV upload → structured profile, work rights per country, preferences.
+2. **Profile** — CV upload → structured profile, work rights per country, preferences. ✅
 3. **Bring your own job** — add postings by URL, long pasted text, screenshots or PDF; "Interview Chance" tier with
-   evidence; per-job AI chat; employer deep research.
+   evidence ✅; per-job AI chat; employer deep research.
 4. **AI search** — Adzuna, a Claude web-search agent, SEEK and LinkedIn through a visible (headed) browser, and Chrome
    DevTools MCP for AI-driven browsing.
 5. **Proceed → CV tailoring** — once you and the AI agree to go for a job, a tailored CV (DOCX/PDF) where every claim is

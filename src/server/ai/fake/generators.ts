@@ -4,3 +4,4 @@
  * Tasks without a generator get a generic demo reply (chat) or an error (structured output).
  */
 import "./generators/extract-profile";
+import "./generators/jobs";

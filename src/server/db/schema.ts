@@ -97,3 +97,160 @@ export const preferences = sqliteTable("preferences", {
   data: text("data", { mode: "json" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+export const companies = sqliteTable(
+  "companies",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    name: text("name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    domain: text("domain"),
+    atsType: text("ats_type"),
+    atsSlug: text("ats_slug"),
+    country: text("country"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("companies_user_name").on(t.userId, t.normalizedName)],
+);
+
+export interface JobIntake {
+  hints?: Record<string, string | null>;
+  /** The text may contain page noise around the posting (pastes, readable-text extraction). */
+  noisy?: boolean;
+  /** Why the app couldn't read the posting itself (needs_content). */
+  reason?: string;
+  site?: string | null;
+  illegible?: string[];
+}
+
+export const jobs = sqliteTable(
+  "jobs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    companyId: integer("company_id").references(() => companies.id),
+    source: text("source").notNull(),
+    sourceUrl: text("source_url"),
+    applyUrl: text("apply_url"),
+    title: text("title"),
+    companyName: text("company_name"),
+    locationText: text("location_text"),
+    city: text("city"),
+    country: text("country"),
+    workplace: text("workplace"),
+    employmentType: text("employment_type"),
+    postedAt: integer("posted_at", { mode: "timestamp_ms" }),
+    closesAt: integer("closes_at", { mode: "timestamp_ms" }),
+    /** Raw input before cleaning (paste, fetched page text). */
+    rawText: text("raw_text"),
+    /** Canonical posting text — every posting quote is checked against it. */
+    description: text("description"),
+    descriptionIsFull: integer("description_is_full", { mode: "boolean" }).notNull().default(true),
+    descriptionHash: text("description_hash"),
+    /** processing | needs_content | ready | failed */
+    intakeStatus: text("intake_status").notNull().default("processing"),
+    intakeError: text("intake_error"),
+    /** How the content was obtained: structured hints, noise flag, why more content is needed. */
+    intake: text("intake", { mode: "json" }).$type<JobIntake>(),
+    analysisId: integer("analysis_id"),
+    assessmentId: integer("assessment_id"),
+    /** User answers to Yes/No questions: { [requirementId]: "yes" | "no" } */
+    answers: text("answers", { mode: "json" }).$type<Record<string, "yes" | "no">>(),
+    status: text("status").notNull().default("new"),
+    score: real("score"),
+    tier: text("tier"),
+    eligibility: text("eligibility"),
+    confidence: text("confidence"),
+    scoreData: text("score_data", { mode: "json" }),
+    notes: text("notes"),
+    dedupeKey: text("dedupe_key"),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("jobs_user_status").on(t.userId, t.status), index("jobs_user_dedupe").on(t.userId, t.dedupeKey)],
+);
+export type JobRow = typeof jobs.$inferSelect;
+
+export const jobAttachments = sqliteTable("job_attachments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  jobId: integer("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  path: text("path").notNull(),
+  mime: text("mime").notNull(),
+  fileName: text("file_name"),
+  sort: integer("sort").notNull().default(0),
+  createdAt: createdAt(),
+});
+
+export const jobEvents = sqliteTable("job_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  jobId: integer("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  fromValue: text("from_value"),
+  toValue: text("to_value"),
+  note: text("note"),
+  createdAt: createdAt(),
+});
+
+/** Profile-independent posting analysis, cached by posting text hash + prompt version + model. */
+export const postingAnalyses = sqliteTable(
+  "posting_analyses",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    textHash: text("text_hash").notNull(),
+    promptVersion: integer("prompt_version").notNull(),
+    model: text("model").notNull(),
+    effort: text("effort").notNull(),
+    data: text("data", { mode: "json" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("posting_analyses_key").on(t.textHash, t.promptVersion, t.model)],
+);
+
+/**
+ * Profile × posting assessment, cached by analysis + profile content hash + prompt version + model + effort.
+ * The hash covers only what the assessment reads (CV text, experience, skills, facts…), so answering a
+ * work-rights question creates a new profile version without invalidating assessments.
+ */
+export const assessments = sqliteTable(
+  "assessments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    analysisId: integer("analysis_id")
+      .notNull()
+      .references(() => postingAnalyses.id),
+    profileVersion: integer("profile_version").notNull(),
+    profileHash: text("profile_hash").notNull(),
+    promptVersion: integer("prompt_version").notNull(),
+    model: text("model").notNull(),
+    effort: text("effort").notNull(),
+    kind: text("kind").notNull().default("deep"),
+    language: text("language").notNull(),
+    data: text("data", { mode: "json" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("assessments_key").on(t.analysisId, t.profileHash, t.promptVersion, t.model, t.effort, t.kind)],
+);
+
+/** AI-written prose translated into another language (owner = e.g. an assessment). */
+export const aiTexts = sqliteTable(
+  "ai_texts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    ownerType: text("owner_type").notNull(),
+    ownerId: integer("owner_id").notNull(),
+    lang: text("lang").notNull(),
+    data: text("data", { mode: "json" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("ai_texts_owner").on(t.ownerType, t.ownerId, t.lang)],
+);

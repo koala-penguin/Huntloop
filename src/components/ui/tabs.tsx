@@ -9,7 +9,7 @@ interface TabDef {
   content: ReactNode;
 }
 
-export function ProfileTabs({ tabs, defaultValue }: { tabs: TabDef[]; defaultValue: string }) {
+export function SimpleTabs({ tabs, defaultValue }: { tabs: TabDef[]; defaultValue: string }) {
   return (
     <Tabs.Root defaultValue={defaultValue} className="flex flex-col gap-4">
       <Tabs.List className="flex gap-1 border-b border-border">

@@ -9,6 +9,9 @@ import { MODELS } from "@/shared/models";
 import { formatUsd } from "@/lib/format";
 import { getCurrentProfile } from "@/server/repo/profile";
 import { experienceYears } from "@/shared/experience";
+import { listJobs } from "@/server/repo/jobs";
+import { TierBadge } from "@/components/jobs/tier-badge";
+import type { Tier } from "@/shared/schemas/job";
 
 function Step({ done, title, body }: { done: boolean; title: string; body: string }) {
   const Icon = done ? CheckCircle2 : Circle;
@@ -25,11 +28,14 @@ function Step({ done, title, body }: { done: boolean; title: string; body: strin
 
 export default async function DashboardPage() {
   const t = await getTranslations("dashboard");
+  const tFit = await getTranslations("fit");
   const locale = await getLocale();
   const { ai, settings, db, user } = appContext();
   const profile = getCurrentProfile(db, user.id);
   const live = currentAiMode() === "live";
   const budget = budgetStatus(ai);
+  const jobs = listJobs(db, user.id, { status: "active" });
+  const bestBets = jobs.filter((j) => j.tier && ["new", "shortlisted"].includes(j.status)).slice(0, 5);
 
   return (
     <>
@@ -51,9 +57,13 @@ export default async function DashboardPage() {
               title={t("stepProfile")}
               body={profile ? t("stepProfileDone", { version: profile.version, years: experienceYears(profile.data.experience) }) : t("stepProfileBody")}
             />
+            <Step done={jobs.length > 0} title={t("stepJob")} body={jobs.length > 0 ? t("stepJobDone", { count: jobs.length }) : t("stepJobBody")} />
           </ol>
           <div className="mt-5 flex flex-wrap gap-2">
             <Button asChild size="sm">
+              <Link href="/jobs">{t("addJob")}</Link>
+            </Button>
+            <Button asChild variant="secondary" size="sm">
               <Link href="/profile">{t("openProfile")}</Link>
             </Button>
             <Button asChild variant="secondary" size="sm">
@@ -79,6 +89,30 @@ export default async function DashboardPage() {
           </dl>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("bestBetsTitle")}</CardTitle>
+          <CardDescription>{t("bestBetsDescription")}</CardDescription>
+        </CardHeader>
+        {bestBets.length ? (
+          <ul className="flex flex-col divide-y divide-border">
+            {bestBets.map((job) => (
+              <li key={job.id}>
+                <Link href={`/jobs/${job.id}`} className="flex items-center justify-between gap-3 py-2 hover:text-accent">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{job.title}</span>
+                    <span className="block truncate text-xs text-muted">{[job.companyName, job.locationText].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  <TierBadge tier={job.tier as Tier} label={tFit(`tier.${job.tier}`)} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">{t("bestBetsEmpty")}</p>
+        )}
+      </Card>
     </>
   );
 }

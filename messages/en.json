@@ -22,7 +22,8 @@
     "main": "Main navigation",
     "dashboard": "Dashboard",
     "settings": "Settings",
-    "profile": "Profile"
+    "profile": "Profile",
+    "jobs": "Jobs"
   },
   "dashboard": {
     "title": "Welcome to Huntloop",
@@ -41,7 +42,14 @@
     "spendMonth": "This month",
     "spendCap": "Daily cap {cap}",
     "stepProfileDone": "Profile version {version} · {years} years of experience",
-    "openProfile": "Open profile"
+    "openProfile": "Open profile",
+    "stepJob": "Add a job",
+    "stepJobBody": "Paste a job link or the posting text, or drop in screenshots. Huntloop works out your chance of an interview.",
+    "stepJobDone": "{count, plural, one {# job added} other {# jobs added}}",
+    "addJob": "Add a job",
+    "bestBetsTitle": "Your best bets",
+    "bestBetsDescription": "Jobs you haven't applied to yet, with your strongest Interview Chance first.",
+    "bestBetsEmpty": "No jobs yet. Add one to see your chances."
   },
   "settings": {
     "title": "Settings",
@@ -149,7 +157,15 @@
     "refusal": "Claude declined this request. Try again or rephrase it.",
     "budget": "Your AI spending cap has been reached. Raise it in Settings to continue.",
     "invalid_output": "The AI answer came back in an unexpected format. Please try again.",
-    "max_tokens": "The AI answer was too long. Please try again."
+    "max_tokens": "The AI answer was too long. Please try again.",
+    "missing_posting": "Paste a job link or the posting text, or add screenshots first.",
+    "posting_too_short": "That's too short to be a job posting — paste the whole ad, or add screenshots.",
+    "invalid_url": "That link doesn't look right. Check it and try again.",
+    "too_many_files": "Add up to 12 files per job.",
+    "unsupported_posting_file": "Use screenshots (PNG, JPEG, WebP, GIF) or a PDF.",
+    "not_found": "This job no longer exists.",
+    "url_blocked": "Huntloop doesn't open links to local or private network addresses.",
+    "not_a_job_posting": "This doesn't look like a job posting. Check the text or screenshots and try again."
   },
   "profile": {
     "title": "Your profile",
@@ -353,5 +369,312 @@
       "us_h1b": "H-1B — needs a transfer or new petition",
       "us_needs_sponsorship": "I'd need visa sponsorship"
     }
+  },
+  "addJob": {
+    "label": "Job link or posting text",
+    "placeholder": "Paste a job link, or the full posting text. You can also drop or paste screenshots (Ctrl/⌘+V) or a PDF here.",
+    "contentLabel": "Posting text or screenshots",
+    "contentPlaceholder": "Paste the full posting text here, or drop or paste screenshots of the posting.",
+    "filesLabel": "Files to add",
+    "remove": "Remove {name}",
+    "hint": "Screenshots can be several parts of one long posting — add them in order. Your files stay on this computer and are only sent to Claude for reading.",
+    "chooseFiles": "Add screenshots or PDF",
+    "submit": "Add job",
+    "submitContent": "Read this posting"
+  },
+  "jobs": {
+    "title": "Jobs",
+    "subtitle": "Every job you've added, ranked by your chance of getting an interview.",
+    "addTitle": "Add a job",
+    "addDescription": "A link, the posting text, screenshots or a PDF — whatever you have.",
+    "listHeading": "Your jobs",
+    "filterStatus": "Filter by status",
+    "allStatuses": "All",
+    "activeStatuses": "Active",
+    "filterTier": "Filter by Interview Chance",
+    "allTiers": "Any chance",
+    "showIneligible": "Show ineligible",
+    "empty": "No jobs here yet.",
+    "untitled": "Untitled job",
+    "processing": "Reading…",
+    "needsContent": "Needs the posting text",
+    "failed": "Couldn't read",
+    "posted": "Posted {date}",
+    "hiddenIneligible": "{count, plural, one {# job you're not eligible for is hidden.} other {# jobs you're not eligible for are hidden.}}",
+    "showThem": "Show them"
+  },
+  "job": {
+    "back": "All jobs",
+    "untitled": "Untitled job",
+    "statusLabel": "Status",
+    "openOriginal": "Original posting",
+    "openApply": "Apply page",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this job and its analysis?",
+    "cancel": "Cancel",
+    "alreadyAdded": "You've already added this job, so here it is.",
+    "possibleDuplicate": "This looks like a job you've already added:",
+    "processingTitle": "Reading the posting",
+    "processingDescription": "Huntloop is reading the posting, analysing its requirements and comparing them with your profile. You can leave this page; it keeps going.",
+    "stage": {
+      "queued": "Waiting to start…",
+      "reading": "Reading the posting…",
+      "transcribing": "Reading your screenshots…",
+      "analyzing": "Analysing the requirements…",
+      "assessing": "Comparing with your profile…",
+      "scoring": "Working out your Interview Chance…",
+      "done": "Done"
+    },
+    "needsContentTitle": "Add the posting text",
+    "needsContent": {
+      "site_browser": "Huntloop can't open {site} pages by itself yet. Paste the posting text or add screenshots of it.",
+      "site_paste": "{site} doesn't allow apps to read its pages. Paste the posting text or add screenshots of it.",
+      "challenge": "The site asked for a human check, so Huntloop couldn't read it. Paste the posting text or add screenshots.",
+      "shell": "That page loads its content with scripts Huntloop can't run. Paste the posting text or add screenshots.",
+      "fetch_failed": "Huntloop couldn't open that link. Paste the posting text or add screenshots."
+    },
+    "failedTitle": "Huntloop couldn't read this posting",
+    "rerunFailed": "The last update didn't finish: {error}",
+    "needsProfile": "Add your CV to see your Interview Chance for this job.",
+    "needsProfileLink": "Go to your profile",
+    "notAssessed": "This job hasn't been compared with your profile yet.",
+    "assessNow": "Compare with my profile",
+    "profileChanged": "Your CV, skills or facts changed since this assessment. Update it to include them.",
+    "reassess": "Update assessment",
+    "tabFit": "Interview Chance",
+    "tabPosting": "Posting",
+    "attachmentsTitle": "Screenshots and files",
+    "attachmentsDescription": "What you added. Open one to see it full size.",
+    "screenshot": "Screenshot of the posting",
+    "illegible": "Some parts couldn't be read: {notes}",
+    "postingTextTitle": "Posting text",
+    "postingTextDescription": "The text Huntloop analysed. Requirement quotes are checked against it.",
+    "postingTextFromImages": "Read from your screenshots. If something was misread, correct it here and Huntloop will analyse it again.",
+    "editText": "Edit text",
+    "editTextLabel": "Posting text",
+    "editTextHint": "Saving runs the analysis again with your text.",
+    "saveText": "Save and re-analyse"
+  },
+  "jobStatus": {
+    "new": "New",
+    "shortlisted": "Shortlisted",
+    "applying": "Applying",
+    "applied": "Applied",
+    "interviewing": "Interviewing",
+    "offer": "Offer",
+    "rejected": "Rejected",
+    "archived": "Archived"
+  },
+  "jobEnums": {
+    "workplace": {
+      "onsite": "On site",
+      "hybrid": "Hybrid",
+      "remote": "Remote",
+      "unknown": "Workplace not stated"
+    },
+    "employment": {
+      "full_time": "Full time",
+      "part_time": "Part time",
+      "contract": "Contract",
+      "casual": "Casual",
+      "internship": "Internship",
+      "unknown": "Type not stated"
+    },
+    "seniority": {
+      "intern": "Intern",
+      "junior": "Junior",
+      "mid": "Mid-level",
+      "senior": "Senior",
+      "lead": "Lead",
+      "principal": "Principal",
+      "manager": "Manager",
+      "director": "Director",
+      "executive": "Executive"
+    },
+    "salaryBasis": {
+      "base": "base",
+      "base_plus_super": "plus super",
+      "package": "package incl. super"
+    },
+    "sponsorship": {
+      "offered": "Visa sponsorship offered",
+      "not_offered": "No visa sponsorship",
+      "unknown": "Not stated"
+    },
+    "source": {
+      "paste": "Pasted text",
+      "url": "Link",
+      "screenshot": "Screenshots",
+      "pdf": "PDF",
+      "greenhouse": "Greenhouse",
+      "lever": "Lever",
+      "ashby": "Ashby",
+      "adzuna": "Adzuna",
+      "web_agent": "Web search",
+      "seek": "SEEK",
+      "linkedin": "LinkedIn",
+      "jsearch": "JSearch"
+    },
+    "site": {
+      "seek": "SEEK",
+      "linkedin": "LinkedIn",
+      "indeed": "Indeed",
+      "glassdoor": "Glassdoor",
+      "jora": "Jora",
+      "jobstreet": "JobStreet",
+      "jobsdb": "JobsDB",
+      "ziprecruiter": "ZipRecruiter",
+      "wellfound": "Wellfound",
+      "monster": "Monster",
+      "greenhouse": "Greenhouse",
+      "lever": "Lever",
+      "ashby": "Ashby",
+      "other": "This site"
+    }
+  },
+  "posting": {
+    "title": "Posting at a glance",
+    "location": "Location",
+    "workplace": "Workplace",
+    "employmentType": "Work type",
+    "seniority": "Level",
+    "salary": "Salary",
+    "posted": "Posted",
+    "closes": "Closes",
+    "sponsorship": "Visa sponsorship"
+  },
+  "fit": {
+    "interviewChance": "Interview Chance",
+    "tier": {
+      "strong": "Strong",
+      "good": "Good",
+      "stretch": "Stretch",
+      "long_shot": "Long shot"
+    },
+    "eligibility": {
+      "eligible": "Eligible",
+      "verify": "Check eligibility",
+      "ineligible": "Not eligible"
+    },
+    "confidence": {
+      "high": "High confidence",
+      "medium": "Medium confidence",
+      "low": "Low confidence"
+    },
+    "tierExplainer": "Tiers compare your profile with what this employer asks for. They're a guide to where to spend your effort, not a probability.",
+    "howScored": "How this was worked out",
+    "component": {
+      "mustHaves": "Must-haves",
+      "seniority": "Level and years",
+      "relevance": "Recent roles",
+      "niceToHaves": "Nice-to-haves",
+      "keywords": "Keywords on your CV"
+    },
+    "adjustment": {
+      "fresh": "Posted in the last few days {points}",
+      "stale": "Posted over a week ago {points}",
+      "old": "Posted over three weeks ago {points}",
+      "remote_anywhere": "Remote from anywhere: more competition {points}",
+      "sponsorship_unknown": "Sponsorship not mentioned {points}",
+      "relocation": "Outside your cities {points}"
+    },
+    "cap": {
+      "unmet_must": "One must-have isn't met, so the tier is at most {tier}.",
+      "two_unmet_musts": "Two or more must-haves aren't met, so the tier is at most {tier}.",
+      "years_short": "You're more than two years short of the experience asked for, so the tier is at most {tier}.",
+      "seniority_gap": "The level is two or more steps from yours, so the tier is at most {tier}."
+    },
+    "gatesTitle": "Can they hire you?",
+    "gatesDescription": "Hard requirements that decide whether your application can be considered at all.",
+    "gateKind": {
+      "work_rights": "Work rights",
+      "citizenship": "Citizenship",
+      "clearance": "Security clearance",
+      "location": "Location",
+      "license": "Licence",
+      "language": "Language",
+      "stale": "Posting age"
+    },
+    "gateStatus": {
+      "pass": "OK",
+      "fail": "Not met",
+      "unclear": "Needs checking"
+    },
+    "gateReason": {
+      "country_unknown": "The posting doesn't say which country the job is in.",
+      "citizen_ok": "You're a citizen of {country}.",
+      "citizenship_required": "Only citizens of {country} can apply.",
+      "work_rights_unknown": "Your work rights in {country} aren't in your profile yet.",
+      "pr_ok": "You're a citizen or permanent resident of {country}.",
+      "pr_required": "Only citizens or permanent residents of {country} can apply.",
+      "sponsorship_needed": "You'd need visa sponsorship, and this employer doesn't offer it.",
+      "restricted_visa": "Your visa in {country} has conditions — check they allow this job.",
+      "rights_ok": "You have the right to work in {country}.",
+      "sponsorship_unstated": "You'd need sponsorship; the posting doesn't say whether it's offered.",
+      "clearance_held": "You hold the clearance this job needs.",
+      "clearance_obtainable": "You don't hold this clearance yet; check you can obtain it.",
+      "clearance_needs_citizenship": "This clearance is normally only granted to citizens of {country}.",
+      "license_pass": "You have the licence or registration needed.",
+      "license_fail": "You don't have the licence or registration needed.",
+      "license_unclear": "Your profile doesn't show this licence or registration.",
+      "language_pass": "You have the language skills needed.",
+      "language_fail": "You don't have the language skills needed.",
+      "language_unclear": "Your profile doesn't show this language level.",
+      "outside_markets": "{country} isn't one of your job-search countries, and you haven't said you'd relocate.",
+      "stale": "Posted {days} days ago — it has probably been filled.",
+      "aging": "Posted {days} days ago — check it's still open before applying."
+    },
+    "workRightsQuestion": "Do you have work rights in {country}?",
+    "workRightsPlaceholder": "Choose your status",
+    "workRightsSave": "Save to profile",
+    "workRightsHint": "Saved to your profile and used for every job in this country.",
+    "needsProfile": "Add your CV first.",
+    "requirementsTitle": "Requirement by requirement",
+    "requirementsDescription": "{count, plural, one {# requirement} other {# requirements}} found in the posting. Evidence is quoted from your CV and checked word for word.",
+    "group": {
+      "must": "Required",
+      "nice": "Nice to have"
+    },
+    "kind": {
+      "gate": "Hard requirement"
+    },
+    "status": {
+      "met": "Met",
+      "partial": "Partly met",
+      "unmet": "Not met",
+      "unknown": "Not shown on your CV"
+    },
+    "evidenceCv": "CV",
+    "evidenceFact": "Your fact",
+    "droppedEvidence": "{count, plural, one {# quote couldn't be found in your CV and was ignored.} other {# quotes couldn't be found in your CV and were ignored.}}",
+    "droppedRequirements": "{count, plural, one {# requirement was} other {# requirements were}} left out because the quote couldn't be found in the posting.",
+    "yes": "Yes",
+    "no": "No",
+    "answeredYes": "You said yes.",
+    "answeredNo": "You said no.",
+    "undoAnswer": "Undo",
+    "strengthsTitle": "Why you're a credible applicant",
+    "gapsTitle": "Gaps",
+    "gap": {
+      "not_on_cv": "Not on your CV yet",
+      "transferable": "Transferable",
+      "real_gap": "Real gaps"
+    },
+    "gapHint": {
+      "not_on_cv": "You may have these — say so on your CV if you do.",
+      "transferable": "Related experience you can frame to cover these.",
+      "real_gap": "Worth addressing honestly, or learning."
+    },
+    "noGaps": "No gaps found.",
+    "none": "Nothing here.",
+    "changeTitle": "What would lift your chances",
+    "changeDescription": "Meeting (or showing on your CV) one of these would move you up a tier.",
+    "changeItem": "Meet {requirement}",
+    "boostersTitle": "How to boost your chances",
+    "risksTitle": "Risks",
+    "ghostSignal": "Possible ghost job:",
+    "translating": "Translating the report…",
+    "translateFailed": "The report couldn't be translated right now; showing the original.",
+    "unknownCountry": "this country"
   }
 }

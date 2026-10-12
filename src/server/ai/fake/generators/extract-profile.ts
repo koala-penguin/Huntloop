@@ -9,7 +9,7 @@ const RANGE = new RegExp(
   "i",
 );
 
-const KNOWN_SKILLS: Array<[string, string]> = [
+export const KNOWN_SKILLS: Array<[string, string]> = [
   ["TypeScript", "language"], ["JavaScript", "language"], ["Python", "language"], ["Java", "language"], ["Go", "language"],
   ["Kotlin", "language"], ["Swift", "language"], ["SQL", "language"], ["C#", "language"], ["Rust", "language"],
   ["React", "framework"], ["Next.js", "framework"], ["Node.js", "platform"], ["Vue", "framework"], ["Angular", "framework"],
@@ -19,7 +19,7 @@ const KNOWN_SKILLS: Array<[string, string]> = [
   ["Agile", "method"], ["Scrum", "method"], ["CI/CD", "method"], ["Machine Learning", "domain"], ["Product Management", "domain"],
 ];
 
-function mentions(text: string, skill: string): boolean {
+export function mentions(text: string, skill: string): boolean {
   const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^A-Za-z0-9+#.])${escaped}(?![A-Za-z0-9+#])`, "i").test(text);
 }
