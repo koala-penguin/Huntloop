@@ -1,8 +1,9 @@
 import type { SearchSource } from "@/shared/schemas/search";
+import type { AtsType } from "./ats";
 
 /** A job found by a search source, before it becomes a Huntloop job. */
 export interface JobLead {
-  source: SearchSource;
+  source: SearchSource | AtsType;
   sourceId: string | null;
   url: string;
   title: string;

@@ -29,7 +29,9 @@ import { getJobConversation, listChatActions, listChatMessages } from "@/server/
 import { transcript } from "@/server/ai/chat/render";
 import { EmployerReport } from "@/components/jobs/employer-report";
 import { ResearchControls } from "@/components/jobs/research-controls";
-import { activeResearchTask, getLatestReport } from "@/server/research/company";
+import { activeResearchTask, getCompany, getLatestReport } from "@/server/research/company";
+import { watchForCompany } from "@/server/watchlist/watchlist";
+import { WatchEmployerButton } from "@/components/search/watchlist-controls";
 import { cvWorkspaceData } from "@/server/cv/view";
 import { CvWorkspace, ProceedButton } from "@/components/cv/cv-workspace";
 
@@ -71,6 +73,25 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
     }
   }
 
+  const company = job.companyId ? getCompany(db, user.id, job.companyId) : undefined;
+  const watching = company ? watchForCompany(db, user.id, company) : undefined;
+  const tWatch = await getTranslations("search.watch");
+  const watchCard =
+    company?.atsType && company.atsSlug ? (
+      <Card>
+        <CardHeader>
+          <CardTitle>{tWatch("jobCardTitle")}</CardTitle>
+          <CardDescription>{watching ? tWatch("jobCardWatching", { company: company.name }) : tWatch("jobCardDescription", { company: company.name })}</CardDescription>
+        </CardHeader>
+        {watching ? (
+          <Link href="/search/watchlist" className="text-sm underline">
+            {tWatch("manage")}
+          </Link>
+        ) : (
+          <WatchEmployerButton jobId={job.id} />
+        )}
+      </Card>
+    ) : null;
   const tCv = await getTranslations("cv");
   const selectedCv = typeof query.cv === "string" ? Number(query.cv) : undefined;
   const cv = cvWorkspaceData(db, user.id, job, fit, { selectedId: selectedCv, summaryLabel: tCv("where.summary") });
@@ -304,6 +325,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
                         <ResearchControls key={report.id} jobId={job.id} runningTaskId={researchTask} hasReport />
                       </>
                     )}
+                    {watchCard}
                   </div>
                 ),
               },

@@ -49,6 +49,9 @@ export default defineConfig({
         HUNTLOOP_BROWSER_PACING_MS: "0",
         HUNTLOOP_SEEK_BASE_URL: `http://127.0.0.1:${SITES_PORT}`,
         HUNTLOOP_LINKEDIN_BASE_URL: `http://127.0.0.1:${SITES_PORT}`,
+        // The employer watchlist reads a local Greenhouse-style board; no daily checks during tests.
+        HUNTLOOP_ATS_API_BASE: `http://127.0.0.1:${SITES_PORT}/ats`,
+        HUNTLOOP_SCHEDULER: "off",
         ...(chromium ? { HUNTLOOP_BROWSER_PATH: chromium } : {}),
       },
     },

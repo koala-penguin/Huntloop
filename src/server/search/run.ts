@@ -38,8 +38,13 @@ export interface SearchRunOptions {
   adzunaFetcher?: AdzunaFetcher;
   fetchImpl?: typeof fetch;
   fetchJson?: JsonFetcher;
+  /** Scheduled (daily) runs: only API sources — the browser never runs unattended. */
+  apiOnly?: boolean;
   now?: Date;
 }
+
+/** Sources a scheduled run may use. SEEK, LinkedIn and the browsing agent only run when the user starts them. */
+export const UNATTENDED_SOURCES: readonly SearchSource[] = ["adzuna", "web_agent"];
 
 export function getSearch(db: Db, userId: number, id: number): SearchRow | undefined {
   return db
@@ -180,7 +185,8 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
   const summary: SearchRunSummary = { sources: {}, unique: 0, known: 0, filtered: {}, screened: 0, deep: 0, stoppedBy: null };
   const leads: JobLead[] = [];
   const candidate = profile ? { recentTitles: profile.data.experience.slice(0, 3).map((e) => e.title), topSkills: profile.data.skills.slice(0, 12).map((s) => s.name) } : null;
-  for (const source of search.sources as SearchSource[]) {
+  const sources = (search.sources as SearchSource[]).filter((s) => !options.apiOnly || UNATTENDED_SOURCES.includes(s));
+  for (const source of sources) {
     try {
       const found =
         source === "adzuna"

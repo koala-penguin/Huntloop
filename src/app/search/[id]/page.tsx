@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TierBadge } from "@/components/jobs/tier-badge";
 import { FilterEditor } from "@/components/search/filter-editor";
+import { SavedSearchControls } from "@/components/search/saved-search-controls";
 
 function ResultRow({ result, locale, t, tFit }: { result: SearchResultJob; locale: string; t: Awaited<ReturnType<typeof getTranslations<"search">>>; tFit: Awaited<ReturnType<typeof getTranslations<"fit">>> }) {
   const { job } = result;
@@ -66,7 +67,7 @@ export default async function SearchDetailPage({ params }: PageProps<"/search/[i
         </Link>
       </div>
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{search.query || t("fromPreferences")}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{search.name ?? (search.query || t("fromPreferences"))}</h1>
         <p className="text-muted">{t("detailSubtitle")}</p>
       </header>
 
@@ -107,6 +108,21 @@ export default async function SearchDetailPage({ params }: PageProps<"/search/[i
           </ul>
         </Card>
       )}
+
+      <Card data-saved-search={search.saved ? "saved" : "unsaved"}>
+        <CardHeader>
+          <CardTitle>{search.saved ? t("saved.titleSaved") : t("saved.title")}</CardTitle>
+          <CardDescription>{t("saved.description")}</CardDescription>
+        </CardHeader>
+        <SavedSearchControls
+          key={`${search.saved}-${search.schedule}-${search.name ?? ""}`}
+          searchId={search.id}
+          saved={search.saved}
+          name={search.name ?? (search.query || t("fromPreferences"))}
+          daily={search.schedule === "daily"}
+          scheduleNote={search.scheduleNote}
+        />
+      </Card>
 
       {results.length === 0 && !running && <p className="rounded-lg border border-border bg-surface p-6 text-center text-sm text-muted">{t("noResults")}</p>}
 

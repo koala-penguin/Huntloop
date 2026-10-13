@@ -64,6 +64,13 @@
       "when": 1791861003642,
       "tag": "0008_pipeline",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791861554764,
+      "tag": "0009_watchlist",
+      "breakpoints": true
     }
   ]
 }

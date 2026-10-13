@@ -1,6 +1,6 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db/database";
-import { searches, tasks } from "../db/schema";
+import { jobSightings, searches, tasks } from "../db/schema";
 import { enqueueTask } from "../tasks/runner";
 import type { SearchFilters } from "@/shared/schemas/search";
 import { availableSources } from "./run";
@@ -38,4 +38,43 @@ export function rerunSearch(db: Db, userId: number, searchId: number, filters?: 
     .where(and(eq(searches.id, searchId), eq(searches.userId, userId)))
     .run();
   return enqueueTask(db, userId, SEARCH_TASK, { searchId }).id;
+}
+
+const DAY = 86_400_000;
+
+/** Keeps a search in the saved list, with a name and optionally a daily check. */
+export function saveSearch(db: Db, userId: number, searchId: number, input: { name: string; daily: boolean }, now = new Date()): void {
+  db.update(searches)
+    .set({ saved: true, name: input.name.trim().slice(0, 120) || null, schedule: input.daily ? "daily" : "off", nextRunAt: input.daily ? new Date(now.getTime() + DAY) : null, scheduleNote: null })
+    .where(and(eq(searches.id, searchId), eq(searches.userId, userId)))
+    .run();
+}
+
+export function unsaveSearch(db: Db, userId: number, searchId: number): void {
+  db.update(searches)
+    .set({ saved: false, schedule: "off", nextRunAt: null, scheduleNote: null })
+    .where(and(eq(searches.id, searchId), eq(searches.userId, userId)))
+    .run();
+}
+
+/** Deletes the search and its sightings; the jobs it found stay in the user's list. */
+export function deleteSearch(db: Db, userId: number, searchId: number): void {
+  db.delete(searches)
+    .where(and(eq(searches.id, searchId), eq(searches.userId, userId)))
+    .run();
+}
+
+/** Jobs a search found for the first time in its latest run. */
+export function newInLatestRun(db: Db, userId: number, searchId: number): number {
+  const latest = latestSearchTask(db, userId, searchId);
+  if (!latest) return 0;
+  const rows = db
+    .select({ jobId: jobSightings.jobId, taskId: jobSightings.taskId })
+    .from(jobSightings)
+    .where(eq(jobSightings.searchId, searchId))
+    .orderBy(asc(jobSightings.id))
+    .all();
+  const first = new Map<number, number | null>();
+  for (const r of rows) if (!first.has(r.jobId)) first.set(r.jobId, r.taskId);
+  return [...first.values()].filter((t) => t === latest).length;
 }

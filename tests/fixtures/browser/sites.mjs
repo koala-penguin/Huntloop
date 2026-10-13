@@ -73,6 +73,20 @@ const LINKEDIN_JOBS = {
     ),
 };
 
+const GREENHOUSE_JOBS = {
+  701: {
+    id: 701,
+    title: "Senior Frontend Engineer",
+    absolute_url: "https://acme.example/careers?gh_jid=701",
+    location: { name: "Sydney, Australia" },
+    updated_at: new Date().toISOString(),
+    content:
+      "&lt;p&gt;Acme Robotics builds warehouse robots. We are hiring a senior frontend engineer for our fleet dashboard in Sydney.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;5+ years of frontend development&lt;/li&gt;&lt;li&gt;React and TypeScript&lt;/li&gt;&lt;li&gt;Experience with data visualisation&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;You must have full working rights in Australia.&lt;/p&gt;",
+  },
+  702: { id: 702, title: "Frontend Engineer", absolute_url: "https://acme.example/careers?gh_jid=702", location: { name: "Austin, TX" }, updated_at: new Date().toISOString(), content: "" },
+  703: { id: 703, title: "Mechanical Engineer", absolute_url: "https://acme.example/careers?gh_jid=703", location: { name: "Sydney, Australia" }, updated_at: new Date().toISOString(), content: "" },
+};
+
 export function createState() {
   return { requests: [], captcha: false, solved: false, authwall: false, signedIn: false };
 }
@@ -180,6 +194,15 @@ export function handler(state) {
         ),
       );
     }
+
+    // A Greenhouse-style job board API (HUNTLOOP_ATS_API_BASE=<url>/ats), for the employer watchlist.
+    const json = (body) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(body));
+    };
+    if (url.pathname === "/ats/greenhouse/v1/boards/acme/jobs") return json({ jobs: Object.values(GREENHOUSE_JOBS).map((job) => ({ ...job, content: undefined })) });
+    const gh = /^\/ats\/greenhouse\/v1\/boards\/acme\/jobs\/(\d+)$/.exec(url.pathname);
+    if (gh && GREENHOUSE_JOBS[gh[1]]) return json({ ...GREENHOUSE_JOBS[gh[1]], company_name: "Acme Robotics" });
 
     send(404, page("Not found", "<p>Not found</p>"));
   };

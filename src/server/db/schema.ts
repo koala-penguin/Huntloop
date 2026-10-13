@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const createdAt = () =>
   integer("created_at", { mode: "timestamp_ms" })
@@ -367,6 +367,14 @@ export const searches = sqliteTable("searches", {
   sources: text("sources", { mode: "json" }).$type<string[]>().notNull(),
   lastRunAt: integer("last_run_at", { mode: "timestamp_ms" }),
   lastSummary: text("last_summary", { mode: "json" }),
+  /** Saved searches are kept in their own list, with a name and an optional daily check. */
+  saved: integer("saved", { mode: "boolean" }).notNull().default(false),
+  name: text("name"),
+  /** "off" | "daily" — daily checks use API sources only (never the browser). */
+  schedule: text("schedule").notNull().default("off"),
+  nextRunAt: integer("next_run_at", { mode: "timestamp_ms" }),
+  /** Why the last scheduled check didn't run, e.g. "budget". */
+  scheduleNote: text("schedule_note"),
   createdAt: createdAt(),
 });
 export type SearchRow = typeof searches.$inferSelect;
@@ -435,3 +443,57 @@ export const cvDocuments = sqliteTable(
   },
   (t) => [index("cv_documents_owner").on(t.userId, t.kind, t.jobId, t.version)],
 );
+
+/** Employers whose own job boards (Greenhouse, Lever, Ashby) the user watches for new openings. */
+export const watchedBoards = sqliteTable(
+  "watched_boards",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    companyId: integer("company_id").references(() => companies.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    /** greenhouse | lever | ashby */
+    atsType: text("ats_type").notNull(),
+    board: text("board").notNull(),
+    eu: integer("eu", { mode: "boolean" }).notNull().default(false),
+    /** Check once a day while Huntloop is running (free API calls; no AI). */
+    autoCheck: integer("auto_check", { mode: "boolean" }).notNull().default(true),
+    lastCheckedAt: integer("last_checked_at", { mode: "timestamp_ms" }),
+    nextCheckAt: integer("next_check_at", { mode: "timestamp_ms" }),
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("watched_boards_user").on(t.userId)],
+);
+export type WatchedBoardRow = typeof watchedBoards.$inferSelect;
+
+/** Roles seen on a watched board. Matching is code-only; importing one makes it a Huntloop job. */
+export const boardOpenings = sqliteTable(
+  "board_openings",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    watchId: integer("watch_id")
+      .notNull()
+      .references(() => watchedBoards.id, { onDelete: "cascade" }),
+    externalId: text("external_id").notNull(),
+    title: text("title").notNull(),
+    location: text("location"),
+    department: text("department"),
+    url: text("url").notNull(),
+    atsUrl: text("ats_url").notNull(),
+    postedAt: integer("posted_at", { mode: "timestamp_ms" }),
+    firstSeenAt: integer("first_seen_at", { mode: "timestamp_ms" }).notNull(),
+    lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }).notNull(),
+    /** Set when the role disappears from the board. */
+    closedAt: integer("closed_at", { mode: "timestamp_ms" }),
+    /** Passes the code checks against the user's preferences (title, place, age, exclusions). */
+    matched: integer("matched", { mode: "boolean" }).notNull().default(false),
+    matchScore: real("match_score"),
+    matchReason: text("match_reason"),
+    jobId: integer("job_id").references(() => jobs.id, { onDelete: "set null" }),
+  },
+  (t) => [uniqueIndex("board_openings_external").on(t.watchId, t.externalId)],
+);
+export type BoardOpeningRow = typeof boardOpenings.$inferSelect;
