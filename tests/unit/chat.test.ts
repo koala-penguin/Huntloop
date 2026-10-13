@@ -13,6 +13,9 @@ import { getFakeGenerator, registerFakeGenerator, type FakeGenerator, type FakeR
 import { DEMO_SCREENSHOT_POSTING } from "@/server/ai/fake/generators/jobs";
 import "@/server/ai/fake/generators/chat";
 import { defaultPreferences } from "@/shared/schemas/preferences";
+import { activeTaskForJob } from "@/server/jobs/intake";
+import { tailorCvForJob } from "@/server/cv/tailor";
+import { getTask } from "@/server/tasks/runner";
 import { testDb } from "../helpers/db";
 import { CV_TEXT, profile, right } from "../helpers/scoring";
 
@@ -124,8 +127,34 @@ describe("job chat", () => {
     expect(getJob(db, userId, job.id)!.status).toBe("new");
     resolveChatAction(ctx, card.actionId, "accept");
     expect(getJob(db, userId, job.id)!.status).toBe("applying");
+    // Accepting also starts the tailored CV draft.
+    expect(activeTaskForJob(db, userId, "tailor-cv", job.id)).not.toBeNull();
     resolveChatAction(ctx, card.actionId, "dismiss");
     expect(db.select().from(chatActions).all()[0].status).toBe("accepted");
+  });
+
+  it("revises the CV draft only once one exists, and tells the model when a version is ready", async () => {
+    const { db, userId, ctx, job, conversation } = await setup();
+    const results: Array<{ content: string; is_error?: boolean }> = [];
+    let step = 0;
+    override = (req) => {
+      const last = req.body.messages.at(-1) as { content: unknown };
+      if (Array.isArray(last.content)) for (const b of last.content as Array<{ type: string; content: string; is_error?: boolean }>) if (b.type === "tool_result") results.push(b);
+      step++;
+      return step % 2 === 1
+        ? { content: [{ type: "tool_use", id: `toolu_revise_${step}`, name: "revise_cv_draft", input: { instructions: "Make it shorter" } }], stop_reason: "tool_use" }
+        : { content: [{ type: "text", text: "Done." }] };
+    };
+    await turn(ctx, conversation.id, "Make my CV shorter");
+    expect(results[0]).toMatchObject({ is_error: true, content: expect.stringContaining("no tailored CV draft") });
+
+    const draft = await tailorCvForJob(ctx, job.id);
+    await turn(ctx, conversation.id, "Make my CV shorter, please");
+    expect(results[1].is_error).toBeUndefined();
+    const taskId = activeTaskForJob(db, userId, "tailor-cv", job.id)!;
+    expect(getTask(db, taskId)!.payload).toEqual({ jobId: job.id, revise: { fromDocId: draft.id, instructions: "Make it shorter" } });
+    const update = (requests.at(-2)!.messages.at(-1) as { content: Array<{ text?: string }> }).content.find((b) => b.text?.startsWith("<context_update>"));
+    expect(update?.text).toContain("Tailored CV draft version 1 is ready");
   });
 
   it("keeps nothing from a refused turn", async () => {

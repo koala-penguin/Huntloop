@@ -49,6 +49,36 @@ Each job also has:
   culture, red flags) with a source link and date for every claim, open-role counts from the employer's own job board
   where available, and advice for your application. Reports are kept for 30 days and shared with the chat.
 
+## Going for a job: tailored CV and LinkedIn
+
+When you decide to apply — with **Proceed & tailor my CV** on the job, or by accepting the AI's proposal in the chat —
+the job moves to *Applying*, employer research starts if there's none yet, and the **CV** tab drafts a version of your CV
+aimed at that job:
+
+- Claude plans what to emphasise (the requirements you meet, the posting's own keywords for them, what to leave out,
+  questions whose answers would strengthen the CV), then writes the summary, bullets and skills in the posting's language
+  and the market's spelling (e.g. en-AU).
+- **Your name, contact details, job titles, employers, dates, education and work rights come straight from your profile**
+  — the AI can't change them. Market conventions are applied in code: no photo or date of birth anywhere; in Australia and
+  New Zealand a work-rights line and "References available on request"; US Letter paper, and so on.
+- **Every line is checked in code.** It must rest on quotes that really are in your CV (or in facts you confirmed), from
+  the right role; numbers must appear in those quotes; requirements you don't meet must not be claimed, and posting
+  skills the role doesn't show are caught. A line that fails is flagged: **remove** it, **rewrite it in your own words**,
+  or **confirm it's true** (it's added to your profile as a fact). Downloads stay disabled until nothing is flagged.
+- You get a preview, the share of posting keywords on your CV before → after, a length estimate, and **Word (.docx) and
+  PDF** downloads — single column with standard headings, which applicant-tracking systems read best. Ask for changes in
+  the CV tab or in the chat; each new version is checked again, and older versions stay available.
+- Your **Interview Chance never uses the tailored CV**: it is computed from your verified profile only. Answers you give
+  and lines you confirm become facts; reassess the job to use them.
+
+**Profile → LinkedIn** writes your LinkedIn headline, About section and role descriptions once, for the target roles in
+your job preferences, with the same checks plus LinkedIn's character limits (headline 220, About 2,600, each role 2,000).
+Copy each section into LinkedIn yourself; Huntloop never signs in to or edits your LinkedIn. Each job's CV tab also lists
+the points worth making prominent on LinkedIn for that job.
+
+A tailored CV costs about $0.40–0.90 with Opus (plan + draft), a revision about $0.20–0.40, and LinkedIn text about
+$0.20–0.40.
+
 ## Searching for jobs
 
 On **Search**, describe what you want in your own words (any language), or leave it empty to use your job
@@ -154,7 +184,8 @@ tests/            unit/ (Vitest), e2e/ (Playwright)
 4. **AI search** — Adzuna and a Claude web-search agent ✅; SEEK and LinkedIn through a visible (headed) browser ✅;
    an AI browsing agent through Chrome DevTools MCP ✅.
 5. **Proceed → CV tailoring** — once you and the AI agree to go for a job, a tailored CV (DOCX/PDF) where every claim is
-   traceable to your real experience.
+   traceable to your real experience, and LinkedIn profile text for your target roles. ✅
+6. **The loop** — pipeline board with outcomes, saved searches, an employer watchlist, a coach chat across all jobs.
 
 ## License
 

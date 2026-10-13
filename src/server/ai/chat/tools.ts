@@ -9,7 +9,7 @@ import { restrictedDomains } from "../../ingest/domain-policy";
  * Tools of the per-job chat. A conversation keeps the toolset it was created with (the tools are
  * part of the cached prompt prefix); bump the version when the set changes.
  */
-export const JOB_CHAT_TOOLSET_VERSION = 1;
+export const JOB_CHAT_TOOLSET_VERSION = 2;
 
 type Tool = Anthropic.Beta.Messages.BetaTool;
 type ToolUnion = Anthropic.Beta.Messages.BetaToolUnion;
@@ -46,6 +46,11 @@ const CLIENT_TOOLS: Tool[] = [
       concerns: { type: "array", items: { type: "string" }, description: "Open risks to keep in mind (e.g. an unclear eligibility gate). Empty if none." },
     },
   ),
+  strict(
+    "revise_cv_draft",
+    "Ask Huntloop to write a new version of this job's tailored CV draft (shown in the CV tab) — e.g. shorter, a different emphasis, a role brought forward. Only after the candidate has proceeded and a draft exists. Huntloop checks every line of the new version against the CV and confirmed facts.",
+    { instructions: { type: "string", description: "What to change, in a sentence or two." } },
+  ),
   strict("start_company_research", "Start deep research on this employer in the background (what they do, recent activity, growth, hiring, culture). Results appear on the job page and are shared with you when ready.", {}),
 ];
 
@@ -54,6 +59,7 @@ export const toolInputSchemas = {
   set_job_status: z.object({ status: z.enum(JOB_STATUSES), reason: z.string().max(2000) }),
   propose_profile_fact: z.object({ fact: z.string().min(3).max(1000), why: z.string().max(1000) }),
   propose_proceed: z.object({ recommendation: z.string().min(1).max(2000), concerns: z.array(z.string().max(500)).max(10) }),
+  revise_cv_draft: z.object({ instructions: z.string().min(1).max(2000) }),
   start_company_research: z.object({}),
 } as const;
 export type ClientToolName = keyof typeof toolInputSchemas;

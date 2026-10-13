@@ -32,26 +32,28 @@ function headless(): boolean {
   return process.env.HUNTLOOP_BROWSER_HEADLESS === "1";
 }
 
-async function launch(debugging: boolean): Promise<BrowserContext> {
+/** Which browser to start: the configured path, else the installed Chrome, else Playwright's own Chromium. */
+export function browserCandidates(): Array<{ executablePath?: string; channel?: string }> {
   const executablePath = process.env.HUNTLOOP_BROWSER_PATH || undefined;
+  return executablePath ? [{ executablePath }] : [{ channel: "chrome" }, {}];
+}
+
+async function launch(debugging: boolean): Promise<BrowserContext> {
   const base = {
     headless: headless(),
     viewport: null,
     // The DevTools port (random, 127.0.0.1 only) is opened only when the browsing agent needs it.
     args: ["--no-first-run", "--no-default-browser-check", ...(debugging ? ["--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1"] : [])],
   };
-  try {
-    // The user's installed Chrome, unless a browser path is configured.
-    return await chromium.launchPersistentContext(browserProfileDir(), executablePath ? { ...base, executablePath } : { ...base, channel: "chrome" });
-  } catch (first) {
-    if (executablePath) throw new UserFacingError("browser_unavailable", String(first));
+  let first: unknown;
+  for (const candidate of browserCandidates()) {
     try {
-      // Fall back to Playwright's own Chromium if it is installed.
-      return await chromium.launchPersistentContext(browserProfileDir(), base);
-    } catch {
-      throw new UserFacingError("browser_unavailable", String(first));
+      return await chromium.launchPersistentContext(browserProfileDir(), { ...base, ...candidate });
+    } catch (error) {
+      first ??= error;
     }
   }
+  throw new UserFacingError("browser_unavailable", String(first));
 }
 
 async function context(debugging = false): Promise<BrowserContext> {

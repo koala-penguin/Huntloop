@@ -27,6 +27,8 @@ import { transcript } from "@/server/ai/chat/render";
 import { EmployerReport } from "@/components/jobs/employer-report";
 import { ResearchControls } from "@/components/jobs/research-controls";
 import { activeResearchTask, getLatestReport } from "@/server/research/company";
+import { cvWorkspaceData } from "@/server/cv/view";
+import { CvWorkspace, ProceedButton } from "@/components/cv/cv-workspace";
 
 const KNOWN_ERRORS = ["not_a_job_posting", "url_blocked", "missing_posting", "refusal", "budget", "invalid_output", "max_tokens"];
 
@@ -65,6 +67,12 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
       else translating = true;
     }
   }
+
+  const tCv = await getTranslations("cv");
+  const selectedCv = typeof query.cv === "string" ? Number(query.cv) : undefined;
+  const cv = cvWorkspaceData(db, user.id, job, fit, { selectedId: selectedCv, summaryLabel: tCv("where.summary") });
+  const proceeded = ["applying", "applied", "interviewing", "offer"].includes(job.status);
+  const tabParam = typeof query.tab === "string" ? query.tab : null;
 
   const title = job.title ?? t("untitled");
   const where = [job.companyName, placeLabel(job.locationText ?? job.city, job.country, locale)].filter(Boolean).join(" · ");
@@ -155,7 +163,10 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
           )}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <StatusSelect jobId={job.id} status={job.status} />
+          <div className="flex flex-wrap items-center gap-3">
+            <StatusSelect jobId={job.id} status={job.status} />
+            {!proceeded && cv.canTailor && job.intakeStatus === "ready" && <ProceedButton jobId={job.id} />}
+          </div>
           <DeleteJobButton jobId={job.id} />
         </div>
       </header>
@@ -257,7 +268,8 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
           )}
           {translating && <TranslateReport jobId={job.id} />}
           <SimpleTabs
-            defaultValue={fit.score && assessment ? "fit" : "posting"}
+            key={tabParam ?? ""}
+            defaultValue={tabParam && ["fit", "posting", "employer", "chat", "cv"].includes(tabParam) ? tabParam : fit.score && assessment ? "fit" : "posting"}
             tabs={[
               ...(fit.score && assessment
                 ? [
@@ -303,6 +315,23 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
                     </CardHeader>
                     <ChatPanel jobId={job.id} items={chatItems} hasConversation={!!conversation} />
                   </Card>
+                ),
+              },
+              {
+                value: "cv",
+                label: t("tabCv"),
+                content: (
+                  <CvWorkspace
+                    key={`${cv.doc?.id ?? "none"}:${cv.runningTaskId ?? ""}`}
+                    jobId={job.id}
+                    proceeded={proceeded}
+                    canTailor={cv.canTailor}
+                    runningTaskId={cv.runningTaskId}
+                    doc={cv.doc}
+                    versions={cv.versions}
+                    previewHtml={cv.previewHtml}
+                    doNotClaim={cv.doNotClaim}
+                  />
                 ),
               },
             ]}

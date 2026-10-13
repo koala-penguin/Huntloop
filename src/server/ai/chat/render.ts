@@ -36,7 +36,7 @@ export function transcript(rows: ChatMessageRow[], actions: ChatActionRow[]): Tr
         }
       } else if (block.type === "server_tool_use" || block.type === "tool_use") {
         const input = (block.input ?? {}) as Record<string, unknown>;
-        const detail = [input.query, input.url, input.note, input.status].find((v) => typeof v === "string") as string | undefined;
+        const detail = [input.query, input.url, input.note, input.status, input.instructions].find((v) => typeof v === "string") as string | undefined;
         if (!["propose_profile_fact", "propose_proceed"].includes(String(block.name))) current.activities.push({ name: String(block.name), detail: detail ?? null });
       }
     }

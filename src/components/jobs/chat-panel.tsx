@@ -58,7 +58,7 @@ function Markdown({ text }: { text: string }) {
 function Activity({ name, detail }: { name: string; detail: string | null }) {
   const t = useTranslations("chat.activity");
   const Icon = name === "web_search" ? Search : name === "web_fetch" ? Globe : name === "save_job_note" ? NotebookPen : Sparkles;
-  const known = ["web_search", "web_fetch", "save_job_note", "set_job_status", "start_company_research"].includes(name);
+  const known = ["web_search", "web_fetch", "save_job_note", "set_job_status", "start_company_research", "revise_cv_draft"].includes(name);
   return (
     <li className="flex items-center gap-1.5 text-xs text-muted">
       <Icon className="size-3.5 shrink-0" aria-hidden />

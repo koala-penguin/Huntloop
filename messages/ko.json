@@ -210,6 +210,10 @@
     "browserAgent": {
       "name": "브라우징 에이전트",
       "description": "다른 방법으로 읽을 수 없을 때 Huntloop 브라우저 창에서 채용 사이트와 회사 채용 페이지를 탐색합니다."
+    },
+    "linkedinProfile": {
+      "name": "LinkedIn 프로필 문구",
+      "description": "LinkedIn 헤드라인, 소개, 경력 설명을 작성합니다."
     }
   },
   "errors": {
@@ -234,7 +238,11 @@
     "chat_busy": "Claude가 아직 이전 메시지에 답하는 중입니다.",
     "browser_unavailable": "Huntloop 브라우저 창을 열 수 없었습니다. Google Chrome을 설치하거나 .env.local에 HUNTLOOP_BROWSER_PATH를 지정하세요.",
     "agent_disabled": "AI 브라우징 에이전트가 꺼져 있습니다. 설정 → 공고 출처에서 켜세요.",
-    "no_company": "이 공고에는 회사 이름이 없어서 회사 사이트에서 찾을 수 없습니다."
+    "no_company": "이 공고에는 회사 이름이 없어서 회사 사이트에서 찾을 수 없습니다.",
+    "no_profile": "먼저 프로필에서 CV를 추가하세요.",
+    "not_analyzed": "공고 분석이 끝날 때까지 기다려 주세요.",
+    "unresolved_flags": "다운로드하기 전에 표시된 문장을 먼저 처리하세요.",
+    "invalid": "입력 내용이 올바르지 않습니다."
   },
   "profile": {
     "title": "내 프로필",
@@ -335,7 +343,8 @@
     "showCvText": "CV 텍스트 보기",
     "saveProfile": "프로필 저장",
     "versionInfo": "버전 {version}",
-    "savedVersion": "버전 {version}으로 저장됨"
+    "savedVersion": "버전 {version}으로 저장됨",
+    "tabLinkedin": "LinkedIn"
   },
   "preferences": {
     "rolesTitle": "원하는 직무",
@@ -543,7 +552,8 @@
       "notFound": "에이전트가 회사 사이트에서 이 공고를 찾지 못했습니다.",
       "found": "찾았습니다. 이제 회사의 공고를 기준으로 분석합니다.",
       "disabled": "설정 → 공고 출처에서 AI 브라우징 에이전트를 켜면 회사 자체 사이트에서 이 공고를 찾을 수 있습니다."
-    }
+    },
+    "tabCv": "CV"
   },
   "jobStatus": {
     "new": "새 공고",
@@ -796,7 +806,8 @@
       "web_fetch": "페이지 읽기: {detail}",
       "save_job_note": "메모 저장: {detail}",
       "set_job_status": "공고 상태 변경: {detail}",
-      "start_company_research": "회사 조사 시작{detail}"
+      "start_company_research": "회사 조사 시작{detail}",
+      "revise_cv_draft": "새 CV 버전을 요청했습니다: {detail}"
     },
     "card": {
       "factTitle": "프로필에 추가할까요?",
@@ -973,5 +984,143 @@
       "linkedin": "LinkedIn",
       "other": "사이트"
     }
+  },
+  "cvDocument": {
+    "summary": "요약",
+    "skills": "보유 기술",
+    "experience": "경력",
+    "education": "학력",
+    "certifications": "자격증",
+    "languages": "언어",
+    "clearances": "보안 인가",
+    "present": "현재",
+    "referees": "추천인 정보는 요청 시 제공",
+    "workRight": {
+      "citizen": "{country} 시민권자",
+      "permanent_resident": "{country} 영주권자",
+      "unrestricted_visa": "{country} 취업 제한 없음"
+    },
+    "languageLevel": {
+      "native": "원어민",
+      "fluent": "유창",
+      "professional": "업무 가능",
+      "conversational": "일상 회화",
+      "basic": "기초"
+    },
+    "clearanceStatus": {
+      "active": "유효",
+      "lapsed": "만료",
+      "eligible": "취득 가능"
+    },
+    "fileTitle": "{name} — 이력서"
+  },
+  "cv": {
+    "proceed": "지원 진행 & CV 맞춤 작성",
+    "stage": {
+      "queued": "시작을 기다리는 중…",
+      "planning": "무엇을 강조할지 계획하는 중…",
+      "writing": "맞춤 CV를 작성하는 중…",
+      "checking": "모든 문장을 내 CV와 대조하는 중…"
+    },
+    "emptyTitle": "이 공고에 맞춘 CV",
+    "emptyDescription": "이 공고에 지원하기로 하면 Huntloop가 이 공고에 맞춘 CV를 작성합니다. 모든 문장은 실제 CV나 내가 확인한 사실에 근거해야 하며, 근거가 없는 문장은 다운로드 전에 표시해 드립니다.",
+    "needsAssessment": "먼저 프로필에 CV를 추가하고 Huntloop가 이 공고를 평가하게 하세요.",
+    "write": "맞춤 CV 작성",
+    "draftTitle": "맞춤 CV — 버전 {version}",
+    "draftDescription": "직함, 회사, 기간은 프로필에서 그대로 가져옵니다. 문장은 이 공고에 맞춰 작성되었고 내 CV와 대조해 확인했습니다.",
+    "versions": "버전:",
+    "versionLabel": "v{version}",
+    "stale": "이 초안을 작성한 뒤 프로필이 바뀌었습니다.",
+    "tailorAgain": "다시 맞춤 작성",
+    "blocking": "다운로드하기 전에 확인할 문장이 {count}개 있습니다.",
+    "allVerified": "모든 문장이 내 CV나 확인한 사실에 근거합니다.",
+    "download": {
+      "docx": "Word(.docx) 다운로드",
+      "pdf": "PDF 다운로드"
+    },
+    "atsTitle": "CV에 들어간 공고 키워드",
+    "atsValue": "{before}% → {after}%",
+    "lengthTitle": "분량",
+    "lengthValue": "약 {pages}페이지 (이 시장의 일반적 분량: {min}–{max}페이지)",
+    "languageFallback": "Huntloop가 아직 지원하지 않는 언어로 된 공고라서 CV를 영어로 작성했습니다.",
+    "checkTitle": "확인이 필요한 문장",
+    "checkDescription": "Huntloop가 내 CV나 확인한 사실에서 근거를 찾지 못한 문장입니다. 삭제하거나, 내 말로 고쳐 쓰거나, 사실임을 확인하세요. 확인한 문장은 프로필에 사실로 추가됩니다.",
+    "previewTitle": "미리보기",
+    "planTitle": "작성 계획",
+    "targets": "이 CV가 강조하는 요구 사항",
+    "targetLines": "{term} · {count}줄",
+    "doNotClaim": "제외한 항목 (프로필에서 확인되지 않음)",
+    "questions": "CV를 더 강하게 만들 수 있는 질문",
+    "answerLabel": "다음 질문에 대한 답: {question}",
+    "answerPlaceholder": "내 말로 답하세요. 프로필에 사실로 저장되며, 다시 맞춤 작성하면 반영됩니다.",
+    "saveAnswer": "답변 저장",
+    "answerSaved": "프로필에 저장했습니다. 다시 맞춤 작성하면 반영됩니다.",
+    "advice": "이번 지원을 위한 팁",
+    "linkedinPoints": "LinkedIn에서 강조할 점",
+    "linkedinSection": {
+      "headline": "헤드라인",
+      "about": "소개",
+      "experience": "경력",
+      "skills": "기술"
+    },
+    "reviseTitle": "수정 요청",
+    "reviseDescription": "바꿀 점을 적으세요. Huntloop가 새 버전을 작성하고 다시 확인합니다. AI에게 묻기 탭에서도 요청할 수 있습니다.",
+    "reviseLabel": "무엇을 바꿀까요?",
+    "revisePlaceholder": "예: 더 짧게, 접근성 작업을 앞에 두세요.",
+    "revise": "새 버전 작성",
+    "where": {
+      "summary": "요약"
+    },
+    "flag": {
+      "unverified_source": "근거로 든 인용문이 CV에 없습니다: “{quote}”",
+      "unsourced": "CV나 확인한 사실에 근거가 없습니다.",
+      "other_role": "다른 경력의 내용을 사용했습니다.",
+      "number": "숫자 {number}이(가) CV나 확인한 사실에 없습니다.",
+      "do_not_claim": "프로필에서 확인되지 않는 {term}을(를) 주장합니다.",
+      "term": "이 경력에서 확인되지 않는 {term}을(를) 언급합니다.",
+      "over_limit": "LinkedIn 글자 수 제한을 넘습니다: {limit}자 중 {length}자.",
+      "length": "약 {pages}페이지입니다. 이 시장에서는 보통 {min}–{max}페이지입니다."
+    },
+    "sources": "근거 ({count})",
+    "sourceFound": "{source}에서 찾음: “{quote}”",
+    "sourceMissing": "{source}에서 찾지 못함: “{quote}”",
+    "sourceKind": {
+      "cv": "CV",
+      "fact": "확인한 사실"
+    },
+    "yourWords": "내가 쓴 문장입니다.",
+    "editLabel": "이 문장 고쳐 쓰기",
+    "saveEdit": "저장",
+    "cancel": "취소",
+    "remove": "삭제",
+    "edit": "내 말로 고치기",
+    "confirmFact": "사실입니다 — 프로필에 추가"
+  },
+  "linkedin": {
+    "title": "LinkedIn 프로필",
+    "description": "Huntloop가 구직 선호에 있는 목표 직무에 맞춰, 실제 경력을 바탕으로 LinkedIn 헤드라인, 소개, 경력 설명을 작성합니다. 각 항목을 직접 복사해 LinkedIn에 붙여 넣으세요. Huntloop는 LinkedIn에 로그인하거나 프로필을 수정하지 않습니다.",
+    "language": "언어",
+    "languages": {
+      "en": "English",
+      "ko": "한국어"
+    },
+    "generate": "LinkedIn 프로필 작성",
+    "regenerate": "다시 작성",
+    "costHint": "Opus 기준 약 $0.20–0.40.",
+    "writing": "LinkedIn 프로필을 작성하는 중…",
+    "stale": "작성한 뒤 프로필이 바뀌었습니다.",
+    "blocking": "항목을 복사하기 전에 확인할 문장이 {count}개 있습니다.",
+    "checkTitle": "확인이 필요한 문장",
+    "checkDescription": "Huntloop가 내 CV나 확인한 사실에서 근거를 찾지 못한 문장입니다. 삭제하거나, 내 말로 고쳐 쓰거나, 사실임을 확인하세요.",
+    "section": {
+      "headline": "헤드라인",
+      "about": "소개",
+      "skills": "주요 기술"
+    },
+    "counter": "{length} / {limit}",
+    "copy": "복사",
+    "copied": "복사됨",
+    "copyLabel": "{section} 복사",
+    "copyBlocked": "이 항목의 표시된 문장을 처리한 뒤 복사할 수 있습니다."
   }
 }

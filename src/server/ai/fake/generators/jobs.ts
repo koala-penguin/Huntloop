@@ -35,14 +35,14 @@ function userBlocks(req: FakeRequest): Block[] {
     .flatMap((m) => (typeof m.content === "string" ? [{ type: "text", text: m.content }] : Array.isArray(m.content) ? (m.content as Block[]) : []));
 }
 
-function textOf(req: FakeRequest): string {
+export function textOf(req: FakeRequest): string {
   return userBlocks(req)
     .filter((b) => b.type === "text")
     .map((b) => String(b.text))
     .join("\n");
 }
 
-function json(value: unknown) {
+export function json(value: unknown) {
   return { content: [{ type: "text", text: JSON.stringify(value) }] };
 }
 
@@ -223,7 +223,7 @@ interface FakeJob {
   requirements: Array<{ id: string; postingQuote: string; kind: string; category: string; minYears: number | null; normalized: string }>;
 }
 
-function between(text: string, tag: string): string | null {
+export function between(text: string, tag: string): string | null {
   return new RegExp(`<${tag}>\\n([\\s\\S]*?)\\n</${tag}>`).exec(text)?.[1] ?? null;
 }
 

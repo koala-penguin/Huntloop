@@ -14,6 +14,9 @@ import { UserFacingError } from "../../errors";
 import { jobChatContext, jobChatSystem, jobStateDigest } from "./context";
 import { JOB_CHAT_TOOLSET_VERSION, isClientTool, jobChatTools, toolInputSchemas } from "./tools";
 import { companyResearchHooks } from "./research-hooks";
+import { latestCvDocument } from "../../repo/cv-documents";
+import { startTailoring } from "../../jobs/proceed";
+import { blockingCount } from "@/shared/schemas/cv";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type ContentBlock = Anthropic.Beta.Messages.BetaContentBlock;
@@ -57,13 +60,18 @@ function researchReady(ctx: Pick<AiContext, "db" | "userId">, job: JobRow): bool
   return companyResearchHooks.isReady(ctx, job);
 }
 
+function cvDraftState(ctx: Pick<AiContext, "db" | "userId">, job: JobRow): { version: number; blocking: number } | null {
+  const doc = latestCvDocument(ctx.db, ctx.userId, "cv", job.id);
+  return doc ? { version: doc.version, blocking: blockingCount(doc.flags) } : null;
+}
+
 function currentDigest(ctx: AiContext, job: JobRow, conversationId: number | null) {
   const fit = loadJobFit(ctx.db, ctx.userId, job);
   const actions = conversationId ? listChatActions(ctx, conversationId) : [];
   return {
     fit,
     digest: <Record<string, unknown>>{
-      ...jobStateDigest(job, fit, researchReady(ctx, job)),
+      ...jobStateDigest(job, fit, researchReady(ctx, job), cvDraftState(ctx, job)),
       actions: Object.fromEntries(actions.map((a) => [a.toolUseId, a.status])),
     },
   };
@@ -135,11 +143,17 @@ export function describeStateChange(before: Record<string, unknown> | null, afte
     for (const action of actions) {
       if (b[action.toolUseId] === action.status || action.status === "pending") continue;
       const payload = action.payload as Record<string, unknown>;
-      const what = action.kind === "profile_fact" ? `the profile fact "${payload.fact}"` : "proceeding with this job (status set to applying)";
+      const what = action.kind === "profile_fact" ? `the profile fact "${payload.fact}"` : "proceeding with this job (status set to applying; Huntloop is drafting a tailored CV in the CV tab)";
       lines.push(`The candidate ${action.status === "accepted" ? "accepted" : "dismissed"} ${what}.`);
     }
   }
   if (changed("researchReady") && after.researchReady) lines.push("Employer research has finished; its report is included below.");
+  if (changed("cvDraft") && after.cvDraft) {
+    const draft = after.cvDraft as { version: number; blocking: number };
+    lines.push(
+      `Tailored CV draft version ${draft.version} is ready in the CV tab.${draft.blocking ? ` ${draft.blocking} line(s) couldn't be traced to the CV or confirmed facts; the candidate must fix or remove them before exporting.` : ""}`,
+    );
+  }
   return lines.length ? lines.join("\n") : null;
 }
 
@@ -172,6 +186,15 @@ async function runTool(ctx: AiContext, conversation: ConversationRow, job: JobRo
         .get();
       emit({ type: "card", actionId: action.id });
       return result("Shown to the candidate as a confirmation card. Nothing changes unless they accept; you will be told what they decide.");
+    }
+    case "revise_cv_draft": {
+      const draft = latestCvDocument(ctx.db, ctx.userId, "cv", job.id);
+      if (!draft) return result("There is no tailored CV draft for this job yet. It is written once the candidate proceeds (propose_proceed).", true);
+      const taskId = startTailoring(ctx.db, ctx.userId, job.id, { revise: { fromDocId: draft.id, instructions: String(input.instructions) } });
+      emit({ type: "tool", name: "revise_cv_draft", detail: String(input.instructions) });
+      return taskId
+        ? result(`Writing version ${draft.version + 1} of the CV draft. It will appear in the CV tab; you'll be told when it's ready.`)
+        : result("The CV draft can't be revised right now.", true);
     }
     case "start_company_research": {
       const started = companyResearchHooks.start(ctx, job);

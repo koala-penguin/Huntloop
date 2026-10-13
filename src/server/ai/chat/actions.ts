@@ -1,11 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import { chatActions, conversations } from "../../db/schema";
-import { getJob, setJobStatus } from "../../repo/jobs";
 import { getCurrentProfile, saveProfileVersion } from "../../repo/profile";
 import { rescoreAllJobs } from "../../jobs/fit";
 import { UserFacingError } from "../../errors";
 import type { AiContext } from "../client";
-import { companyResearchHooks } from "./research-hooks";
+import { proceedWithJob } from "../../jobs/proceed";
 
 /**
  * The user's answer to a card the AI proposed. Only this click changes the profile or the job;
@@ -30,9 +29,7 @@ export function resolveChatAction(ctx: AiContext, actionId: number, decision: "a
       saveProfileVersion(ctx.db, ctx.userId, { cvText: profile.cvText, data: { ...profile.data, facts: [...profile.data.facts, fact] } });
       rescoreAllJobs(ctx.db, ctx.userId);
     } else if (row.action.kind === "proceed" && row.conversation.jobId) {
-      setJobStatus(ctx.db, ctx.userId, row.conversation.jobId, "applying", "Agreed in chat");
-      const job = getJob(ctx.db, ctx.userId, row.conversation.jobId);
-      if (job && !companyResearchHooks.isReady(ctx, job)) companyResearchHooks.start(ctx, job);
+      proceedWithJob(ctx.db, ctx.userId, row.conversation.jobId, "chat");
     }
   }
   ctx.db

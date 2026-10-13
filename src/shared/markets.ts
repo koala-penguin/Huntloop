@@ -16,6 +16,19 @@ export interface WorkRightOption {
   visa?: string;
 }
 
+/** How CVs are usually written in a market (used by CV tailoring and export). */
+export interface CvConventions {
+  paper: "A4" | "Letter";
+  /** Usual length in pages [min, max]. */
+  pages: [number, number];
+  /** Spelling variant for English CVs (BCP 47). */
+  spelling: string;
+  /** Add "References available on request". */
+  referees: boolean;
+  /** Show the candidate's work rights in this country near the top. */
+  workRightsLine: boolean;
+}
+
 export interface MarketPack {
   country: string;
   asOf: string;
@@ -30,6 +43,8 @@ export interface MarketPack {
   adzunaCountry?: string;
   /** Notes for prompts (English; not shown in the UI). */
   promptNotes: string;
+  /** CV conventions. No market pack asks for a photo, date of birth or marital status. */
+  cv: CvConventions;
 }
 
 const generic: Omit<MarketPack, "country"> = {
@@ -46,6 +61,7 @@ const generic: Omit<MarketPack, "country"> = {
   ],
   clearanceLevels: [],
   suggestedCities: [],
+  cv: { paper: "A4", pages: [1, 2], spelling: "en-GB", referees: false, workRightsLine: false },
   promptNotes:
     "No Huntloop market pack for this country: apply your own knowledge of its hiring conventions, work-authorization rules and salary norms, and say when something should be verified.",
 };
@@ -53,6 +69,7 @@ const generic: Omit<MarketPack, "country"> = {
 export const MARKET_PACKS: Record<string, MarketPack> = {
   AU: {
     country: "AU",
+    cv: { paper: "A4", pages: [2, 3], spelling: "en-AU", referees: true, workRightsLine: true },
     asOf: "2026-10",
     currency: "AUD",
     salaryPeriod: "year",
@@ -82,6 +99,7 @@ export const MARKET_PACKS: Record<string, MarketPack> = {
   },
   NZ: {
     country: "NZ",
+    cv: { paper: "A4", pages: [2, 3], spelling: "en-NZ", referees: true, workRightsLine: true },
     asOf: "2026-10",
     currency: "NZD",
     salaryPeriod: "year",
@@ -102,6 +120,7 @@ export const MARKET_PACKS: Record<string, MarketPack> = {
   },
   SG: {
     country: "SG",
+    cv: { paper: "A4", pages: [1, 2], spelling: "en-SG", referees: false, workRightsLine: true },
     asOf: "2026-10",
     currency: "SGD",
     salaryPeriod: "month",
@@ -119,6 +138,7 @@ export const MARKET_PACKS: Record<string, MarketPack> = {
   },
   US: {
     country: "US",
+    cv: { paper: "Letter", pages: [1, 2], spelling: "en-US", referees: false, workRightsLine: false },
     asOf: "2026-10",
     currency: "USD",
     salaryPeriod: "year",

@@ -390,3 +390,38 @@ export const sourceCalls = sqliteTable(
   },
   (t) => [index("source_calls_source").on(t.source, t.createdAt)],
 );
+
+/**
+ * Tailored CVs (per job) and LinkedIn profile drafts (jobId null). Each generation or revision is a
+ * new version; flags are recomputed after every user edit, and exports are rendered on demand.
+ */
+export const cvDocuments = sqliteTable(
+  "cv_documents",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    jobId: integer("job_id").references(() => jobs.id, { onDelete: "cascade" }),
+    /** "cv" | "linkedin" */
+    kind: text("kind").notNull(),
+    version: integer("version").notNull(),
+    profileVersion: integer("profile_version").notNull(),
+    profileHash: text("profile_hash").notNull(),
+    analysisId: integer("analysis_id"),
+    language: text("language").notNull(),
+    market: text("market"),
+    model: text("model").notNull(),
+    promptVersion: integer("prompt_version").notNull(),
+    plan: text("plan", { mode: "json" }),
+    content: text("content", { mode: "json" }).notNull(),
+    flags: text("flags", { mode: "json" }).notNull(),
+    checks: text("checks", { mode: "json" }),
+    edits: text("edits", { mode: "json" }).notNull().default(sql`'[]'`),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch('subsec') * 1000)`),
+  },
+  (t) => [index("cv_documents_owner").on(t.userId, t.kind, t.jobId, t.version)],
+);

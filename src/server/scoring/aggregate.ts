@@ -14,6 +14,7 @@ import type { Preferences } from "@/shared/schemas/preferences";
 import { experienceYears } from "@/shared/experience";
 import { buildQuoteIndex, quoteFound } from "./quotes";
 import { computeGates } from "./gates";
+import { keywordCoverage } from "./keywords";
 import {
   ADJUSTMENT_CAP,
   NEUTRAL,
@@ -39,7 +40,6 @@ export interface ScoreInput {
 }
 
 const average = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : NEUTRAL);
-const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Applies evidence verification, years-in-code and the user's answers to every assessed requirement. */
 export function resolveItems(input: ScoreInput, now: Date): { items: ScoredItem[]; candidateYears: number } {
@@ -114,11 +114,7 @@ function core(input: ScoreInput, items: ScoredItem[], candidateYears: number): C
   const relevance = (RELEVANCE_CREDIT[input.assessment.titleRelevance] + RELEVANCE_CREDIT[input.assessment.industryRelevance]) / 2;
 
   // Exact keywords already on the CV — the part a tailored CV can fix.
-  const keywordReqs = input.analysis.requirements.filter((r) => ["skill", "certification", "title"].includes(r.category) && r.normalized.trim().length > 1);
-  const cv = input.profile.cvText;
-  const keywords = keywordReqs.length
-    ? keywordReqs.filter((r) => new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegex(r.normalized.trim())}(?![\\p{L}\\p{N}])`, "iu").test(cv)).length / keywordReqs.length
-    : NEUTRAL;
+  const keywords = keywordCoverage(input.analysis, input.profile.cvText).share ?? NEUTRAL;
 
   const unmetMusts = musts.filter((r) => statusOf(r) === "unmet").length;
   if (unmetMusts >= 2) caps.push({ reasonKey: "two_unmet_musts", maxTier: "stretch" });

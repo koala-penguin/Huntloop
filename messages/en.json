@@ -210,6 +210,10 @@
     "browserAgent": {
       "name": "Browsing agent",
       "description": "Browses job sites and employer career pages in Huntloop's browser window when there's no other way to read them."
+    },
+    "linkedinProfile": {
+      "name": "LinkedIn profile text",
+      "description": "Writes your LinkedIn headline, About section and role descriptions."
     }
   },
   "errors": {
@@ -234,7 +238,11 @@
     "chat_busy": "Claude is still answering your last message.",
     "browser_unavailable": "Huntloop couldn't open its browser window. Install Google Chrome, or set HUNTLOOP_BROWSER_PATH in .env.local.",
     "agent_disabled": "The AI browsing agent is turned off. Turn it on in Settings → Job sources.",
-    "no_company": "This job has no employer name, so Huntloop can't look for it on their site."
+    "no_company": "This job has no employer name, so Huntloop can't look for it on their site.",
+    "no_profile": "Add your CV in Profile first.",
+    "not_analyzed": "Wait until the posting has been analysed.",
+    "unresolved_flags": "Resolve the flagged lines before downloading.",
+    "invalid": "That input isn't valid."
   },
   "profile": {
     "title": "Your profile",
@@ -335,7 +343,8 @@
     "showCvText": "Show CV text",
     "saveProfile": "Save profile",
     "versionInfo": "Version {version}",
-    "savedVersion": "Saved as version {version}"
+    "savedVersion": "Saved as version {version}",
+    "tabLinkedin": "LinkedIn"
   },
   "preferences": {
     "rolesTitle": "Roles you want",
@@ -543,7 +552,8 @@
       "notFound": "The agent couldn't find this job on the employer's site.",
       "found": "Found it — the job now uses the employer's posting.",
       "disabled": "Turn on the AI browsing agent in Settings → Job sources to look for this job on the employer's own site."
-    }
+    },
+    "tabCv": "CV"
   },
   "jobStatus": {
     "new": "New",
@@ -796,7 +806,8 @@
       "web_fetch": "Read a page: {detail}",
       "save_job_note": "Saved a note: {detail}",
       "set_job_status": "Changed the job status: {detail}",
-      "start_company_research": "Started researching the employer{detail}"
+      "start_company_research": "Started researching the employer{detail}",
+      "revise_cv_draft": "Asked for a new CV version: {detail}"
     },
     "card": {
       "factTitle": "Add this to your profile?",
@@ -973,5 +984,143 @@
       "linkedin": "LinkedIn",
       "other": "The site"
     }
+  },
+  "cvDocument": {
+    "summary": "Summary",
+    "skills": "Skills",
+    "experience": "Experience",
+    "education": "Education",
+    "certifications": "Certifications",
+    "languages": "Languages",
+    "clearances": "Security clearances",
+    "present": "Present",
+    "referees": "References available on request",
+    "workRight": {
+      "citizen": "{country} citizen",
+      "permanent_resident": "{country} permanent resident",
+      "unrestricted_visa": "Full working rights in {country}"
+    },
+    "languageLevel": {
+      "native": "native",
+      "fluent": "fluent",
+      "professional": "professional",
+      "conversational": "conversational",
+      "basic": "basic"
+    },
+    "clearanceStatus": {
+      "active": "active",
+      "lapsed": "lapsed",
+      "eligible": "eligible"
+    },
+    "fileTitle": "{name} — CV"
+  },
+  "cv": {
+    "proceed": "Proceed & tailor my CV",
+    "stage": {
+      "queued": "Waiting to start…",
+      "planning": "Planning what to emphasise…",
+      "writing": "Writing your tailored CV…",
+      "checking": "Checking every line against your CV…"
+    },
+    "emptyTitle": "A CV tailored to this job",
+    "emptyDescription": "When you decide to go for this job, Huntloop writes a version of your CV aimed at it. Every line must trace back to your real CV or facts you confirmed; anything that doesn't is flagged for you before you can download it.",
+    "needsAssessment": "Add your CV in Profile and let Huntloop assess this job first.",
+    "write": "Write my tailored CV",
+    "draftTitle": "Tailored CV — version {version}",
+    "draftDescription": "Titles, employers and dates come straight from your profile. The wording was written for this job and checked against your CV.",
+    "versions": "Versions:",
+    "versionLabel": "v{version}",
+    "stale": "Your profile has changed since this draft was written.",
+    "tailorAgain": "Tailor again",
+    "blocking": "{count, plural, one {# line needs} other {# lines need}} your check before you can download.",
+    "allVerified": "Every line is traced to your CV or facts you confirmed.",
+    "download": {
+      "docx": "Download Word (.docx)",
+      "pdf": "Download PDF"
+    },
+    "atsTitle": "Posting keywords on your CV",
+    "atsValue": "{before}% → {after}%",
+    "lengthTitle": "Length",
+    "lengthValue": "About {pages} pages (usual here: {min}–{max})",
+    "languageFallback": "The posting is in a language Huntloop doesn't write CVs in yet, so this CV is in English.",
+    "checkTitle": "Lines to check",
+    "checkDescription": "Huntloop couldn't trace these to your CV or confirmed facts. Remove them, rewrite them in your own words, or confirm they're true — confirmed lines are added to your profile as facts.",
+    "previewTitle": "Preview",
+    "planTitle": "The plan",
+    "targets": "What this CV highlights",
+    "targetLines": "{term} · {count, plural, =0 {not mentioned} one {# line} other {# lines}}",
+    "doNotClaim": "Left out (your profile doesn't show these)",
+    "questions": "Questions that could strengthen it",
+    "answerLabel": "Your answer to: {question}",
+    "answerPlaceholder": "Answer in your own words. It's saved to your profile as a fact; tailor again to use it.",
+    "saveAnswer": "Save answer",
+    "answerSaved": "Saved to your profile. Tailor again to use it.",
+    "advice": "Tips for this application",
+    "linkedinPoints": "On LinkedIn, make these prominent",
+    "linkedinSection": {
+      "headline": "Headline",
+      "about": "About",
+      "experience": "Experience",
+      "skills": "Skills"
+    },
+    "reviseTitle": "Ask for changes",
+    "reviseDescription": "Describe what to change. Huntloop writes a new version and checks it again. You can also ask in the Ask AI tab.",
+    "reviseLabel": "What should change?",
+    "revisePlaceholder": "e.g. Make it shorter and lead with the accessibility work.",
+    "revise": "Write a new version",
+    "where": {
+      "summary": "Summary"
+    },
+    "flag": {
+      "unverified_source": "A quote it relies on isn't in your CV: “{quote}”",
+      "unsourced": "Not backed by anything in your CV or confirmed facts.",
+      "other_role": "Uses something from a different role.",
+      "number": "The number {number} isn't in your CV or confirmed facts.",
+      "do_not_claim": "Claims {term}, which your profile doesn't show.",
+      "term": "Mentions {term}, which isn't shown for this role.",
+      "over_limit": "Too long for LinkedIn: {length} of {limit} characters.",
+      "length": "About {pages} pages; CVs here are usually {min}–{max}."
+    },
+    "sources": "Sources ({count})",
+    "sourceFound": "Found in your {source}: “{quote}”",
+    "sourceMissing": "Not found in your {source}: “{quote}”",
+    "sourceKind": {
+      "cv": "CV",
+      "fact": "confirmed facts"
+    },
+    "yourWords": "Written by you.",
+    "editLabel": "Rewrite this line",
+    "saveEdit": "Save",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "edit": "Edit in my words",
+    "confirmFact": "This is true — add to my profile"
+  },
+  "linkedin": {
+    "title": "LinkedIn profile",
+    "description": "Huntloop writes your LinkedIn headline, About section and role descriptions for the target roles in your job preferences, from your real experience. Copy each section into LinkedIn yourself — Huntloop never signs in to or edits your LinkedIn.",
+    "language": "Language",
+    "languages": {
+      "en": "English",
+      "ko": "한국어"
+    },
+    "generate": "Write my LinkedIn profile",
+    "regenerate": "Write it again",
+    "costHint": "About $0.20–0.40 with Opus.",
+    "writing": "Writing your LinkedIn profile…",
+    "stale": "Your profile has changed since this was written.",
+    "blocking": "{count, plural, one {# line needs} other {# lines need}} your check before you can copy its section.",
+    "checkTitle": "Lines to check",
+    "checkDescription": "Huntloop couldn't trace these to your CV or confirmed facts. Remove them, rewrite them in your own words, or confirm they're true.",
+    "section": {
+      "headline": "Headline",
+      "about": "About",
+      "skills": "Top skills"
+    },
+    "counter": "{length} / {limit}",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyLabel": "Copy {section}",
+    "copyBlocked": "Resolve the flagged lines in this section before copying it."
   }
 }
