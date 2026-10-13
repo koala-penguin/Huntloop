@@ -17,6 +17,8 @@ export interface RequestOptions {
   progressUpdates?: boolean;
   /** Preserved-thinking guard for multi-turn conversations. */
   prefixMismatch?: "error" | "drop_block";
+  /** Betas the request needs (e.g. context management); always sent. */
+  extraBetas?: Beta[];
   /**
    * Leave out optional beta features (fallbacks, progress notes, block binding).
    * Set after a request with them was rejected, so a feature mismatch never blocks the user.
@@ -41,7 +43,7 @@ export interface BaseParams {
 export function buildBaseParams(model: ModelId, effort: Effort, options: RequestOptions = {}): BaseParams {
   const info = MODELS[model];
   const optional = !options.withoutOptionalFeatures;
-  const betas: Beta[] = [];
+  const betas: Beta[] = [...(options.extraBetas ?? [])];
   const thinking: ThinkingConfig = { type: "adaptive" };
 
   if (optional && options.progressUpdates && info.displayUpdates) {

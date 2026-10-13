@@ -15,6 +15,8 @@ export interface BrowserRunContext {
   maxPages: number;
   waitForUser?: TaskContext["waitForUser"];
   note?: (text: string) => void;
+  /** Filled in by a run: results pages loaded, job links found, whether a wall stopped it. */
+  stats?: { resultPages: number; jobLinks: number; blocked: boolean };
 }
 
 export interface SiteQuery {
@@ -150,7 +152,11 @@ export async function runSiteSearch(adapter: SiteAdapter, filters: SearchFilters
       for (let index = 0; index < MAX_RESULT_PAGES; index++) {
         if (found.size >= ctx.maxPages) break search;
         await goto(page, query.pageUrl(index), ctx);
-        if (!(await clearBlocks(page, adapter.site, ctx))) break search;
+        if (!(await clearBlocks(page, adapter.site, ctx))) {
+          if (ctx.stats) ctx.stats.blocked = true;
+          break search;
+        }
+        if (ctx.stats) ctx.stats.resultPages++;
         const current = new URL(page.url());
         const hrefs = await page.$$eval("a[href]", (links) => links.map((a) => (a as HTMLAnchorElement).href));
         let added = 0;
@@ -168,6 +174,7 @@ export async function runSiteSearch(adapter: SiteAdapter, filters: SearchFilters
           added++;
           if (found.size >= ctx.maxPages) break;
         }
+        if (ctx.stats) ctx.stats.jobLinks = found.size;
         ctx.note?.(`${adapter.site}: ${found.size} job links`);
         if (added === 0) break; // no more results
       }

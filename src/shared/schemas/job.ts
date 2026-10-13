@@ -25,7 +25,7 @@ export const SALARY_BASIS = ["base", "base_plus_super", "package", "unknown"] as
 export const JOB_STATUSES = ["new", "shortlisted", "applying", "applied", "interviewing", "offer", "rejected", "archived"] as const;
 export type JobStatus = (typeof JOB_STATUSES)[number];
 
-export const JOB_SOURCES = ["paste", "url", "screenshot", "pdf", "greenhouse", "lever", "ashby", "adzuna", "web_agent", "seek", "linkedin", "jsearch"] as const;
+export const JOB_SOURCES = ["paste", "url", "screenshot", "pdf", "greenhouse", "lever", "ashby", "adzuna", "web_agent", "seek", "linkedin", "browser_agent", "jsearch"] as const;
 export type JobSource = (typeof JOB_SOURCES)[number];
 
 /** Claude's reading of a posting. Profile-independent, cached per posting text. */

@@ -10,7 +10,7 @@ import { appContext } from "@/server/context";
 import { deleteJob, setJobAnswer, setJobStatus } from "@/server/repo/jobs";
 import { getCurrentProfile, saveProfileVersion } from "@/server/repo/profile";
 import { rescoreAllJobs } from "@/server/jobs/fit";
-import { readFullPosting, reassessJob, saveJobText } from "@/server/jobs/intake";
+import { findOnEmployerSite, readFullPosting, reassessJob, saveJobText } from "@/server/jobs/intake";
 import { errorCodeOf } from "@/server/errors";
 import { resolveChatAction } from "@/server/ai/chat/actions";
 import { createJobConversation, getJobConversation, isConversationBusy } from "@/server/ai/chat/harness";
@@ -128,6 +128,15 @@ export async function readFullPostingAction(jobId: number): Promise<ActionResult
     const taskId = readFullPosting(db, user.id, jobId);
     revalidatePath(`/jobs/${jobId}`);
     return { ok: true, value: { taskId } };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function findOnEmployerSiteAction(jobId: number): Promise<ActionResult<{ taskId: number }>> {
+  const { db, user } = appContext();
+  try {
+    return { ok: true, value: { taskId: findOnEmployerSite(db, user.id, jobId) } };
   } catch (error) {
     return fail(error);
   }

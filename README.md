@@ -85,6 +85,31 @@ automated. When on:
 It uses your installed Google Chrome; set `HUNTLOOP_BROWSER_PATH` in `.env.local` to use another Chrome/Chromium. Use
 **Test the browser window** in Settings to check it opens.
 
+### AI browsing agent (Chrome DevTools MCP)
+
+For sites without a built-in reader, Claude can browse in the same visible window itself. Huntloop starts the
+[Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) server, attached only to its own window
+through a local port, and gives Claude a small set of its tools: open and switch pages, read the page, click, type, press
+keys, wait. Turn it on in **Settings → Job sources** (after a notice). It's used for:
+
+- **other job sites** you list there (e.g. a government jobs site): searches include them;
+- **SEEK or LinkedIn when their pages change** and the built-in reader finds nothing (optional);
+- **"Find on the employer's site"** on a job's Posting tab: looks for the job on the employer's careers pages and, if
+  found, re-analyses it from the employer's full posting.
+
+Safeguards, enforced in code before each action reaches the browser:
+
+- it can only search and read. Clicks on "Apply", "Sign in", "Message", "Connect", "Save", "Share" and similar (in English
+  and Korean) are refused, and it can only type short search terms into search fields;
+- it stays on the sites allowed for the task: the site you listed; or, when looking for a job on the employer's site,
+  that site, sites it found through web search, and applicant-tracking systems such as Greenhouse, Lever or Workday (never
+  SEEK, LinkedIn or other job boards Huntloop doesn't read). Other links are refused;
+- it has no script execution, file upload, network or performance tools. Chrome DevTools MCP's usage statistics are
+  turned off;
+- a job is kept only if the agent actually opened its page, and Huntloop reads that page itself;
+- a CAPTCHA or sign-in wall pauses the run for you, as above. Runs are capped in steps and jobs, and cost about
+  $0.50–2 each with Opus (counted towards your spending cap).
+
 ## Models and cost
 
 Every AI task uses **Claude Opus 5.5** by default. In **Settings → AI models** you can pick a different default model and
@@ -127,7 +152,7 @@ tests/            unit/ (Vitest), e2e/ (Playwright)
 3. **Bring your own job** — add postings by URL, long pasted text, screenshots or PDF; "Interview Chance" tier with
    evidence; per-job AI chat; employer deep research. ✅
 4. **AI search** — Adzuna and a Claude web-search agent ✅; SEEK and LinkedIn through a visible (headed) browser ✅;
-   Chrome DevTools MCP for AI-driven browsing.
+   an AI browsing agent through Chrome DevTools MCP ✅.
 5. **Proceed → CV tailoring** — once you and the AI agree to go for a job, a tailored CV (DOCX/PDF) where every claim is
    traceable to your real experience.
 

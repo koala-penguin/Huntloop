@@ -17,7 +17,7 @@ import { processJob, readJobUrl } from "../jobs/pipeline";
 import { errorCodeOf, formatTaskError } from "../errors";
 import { getSourceSettings } from "../repo/settings";
 import { TaskCancelledError, type TaskContext } from "../tasks/runner";
-import { searchBrowserSite } from "../sources/browser";
+import { searchBrowserSite, searchOtherSites } from "../sources/browser";
 import { mapLimit } from "./limit";
 
 export type SearchStage = "planning" | "sourcing" | "filtering" | "screening" | "deep" | "done";
@@ -62,6 +62,7 @@ export function availableSources(db: Db, userId: number): SearchSource[] {
     "web_agent" as const,
     ...(sites.seek.enabled ? (["seek"] as const) : []),
     ...(sites.linkedin.enabled ? (["linkedin"] as const) : []),
+    ...(sites.agent.enabled && sites.agent.sites.length ? (["browser_agent"] as const) : []),
   ];
 }
 
@@ -186,7 +187,9 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
           ? await searchAdzuna(ctx.db, filters, options.adzunaFetcher)
           : source === "seek" || source === "linkedin"
             ? await searchBrowserSite(ctx, source, filters, { signal: ctx.signal, waitForUser: options.waitForUser, note })
-            : (await searchWithAgent(ctx, { filters, candidate }, note, now)).leads;
+            : source === "browser_agent"
+              ? await searchOtherSites(ctx, filters, { signal: ctx.signal, waitForUser: options.waitForUser, note })
+              : (await searchWithAgent(ctx, { filters, candidate }, note, now)).leads;
       leads.push(...found);
       summary.sources[source] = { leads: found.length, error: null };
     } catch (error) {

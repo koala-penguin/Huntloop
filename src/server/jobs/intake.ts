@@ -6,6 +6,7 @@ import { canonicalizeUrl } from "../ingest/domain-policy";
 import { saveUpload } from "../storage";
 import { enqueueTask } from "../tasks/runner";
 import { PROCESS_JOB_TASK, type ProcessJobPayload } from "../tasks/handlers/process-job";
+import { FIND_EMPLOYER_POSTING_TASK } from "../tasks/handlers/find-employer-posting";
 import { addAttachments, createJob, findJobByUrl, getJob, updateJob } from "../repo/jobs";
 
 export const MAX_FILES = 12;
@@ -138,7 +139,7 @@ export function activeJobTask(db: Db, userId: number, job: JobRow): number | nul
     .where(and(eq(tasks.userId, userId), eq(tasks.kind, PROCESS_JOB_TASK), sql`json_extract(${tasks.payload}, '$.jobId') = ${job.id}`))
     .orderBy(desc(tasks.id))
     .get();
-  return row && ["queued", "running"].includes(row.status) ? row.id : null;
+  return row && ["queued", "running", "needs_user_action"].includes(row.status) ? row.id : null;
 }
 
 /** Replace a search snippet with the full posting from the job's link (falls back to asking the user). */
@@ -147,4 +148,24 @@ export function readFullPosting(db: Db, userId: number, jobId: number): number {
   if (!job?.sourceUrl) throw new UserFacingError("not_found");
   updateJob(db, job.id, { intakeStatus: "processing", intakeError: null });
   return enqueue(db, userId, { jobId: job.id, preferUrl: true });
+}
+
+/** Ask the browsing agent to find this job on the employer's own site (background task). */
+export function findOnEmployerSite(db: Db, userId: number, jobId: number): number {
+  const job = getJob(db, userId, jobId);
+  if (!job) throw new UserFacingError("not_found");
+  const running = activeTaskForJob(db, userId, FIND_EMPLOYER_POSTING_TASK, job.id);
+  if (running) return running;
+  return enqueueTask(db, userId, FIND_EMPLOYER_POSTING_TASK, { jobId: job.id }).id;
+}
+
+/** The newest queued/running/waiting task of a kind for a job. */
+export function activeTaskForJob(db: Db, userId: number, kind: string, jobId: number): number | null {
+  const row = db
+    .select({ id: tasks.id, status: tasks.status })
+    .from(tasks)
+    .where(and(eq(tasks.userId, userId), eq(tasks.kind, kind), sql`json_extract(${tasks.payload}, '$.jobId') = ${jobId}`))
+    .orderBy(desc(tasks.id))
+    .get();
+  return row && ["queued", "running", "needs_user_action"].includes(row.status) ? row.id : null;
 }

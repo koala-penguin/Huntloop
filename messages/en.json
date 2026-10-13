@@ -127,6 +127,27 @@
         "risk": "LinkedIn's terms of use don't allow automated access, and LinkedIn may restrict accounts it believes are automated. Guest mode keeps your account out of it. Use at your own risk, for your personal job search only.",
         "useLogin": "Use my LinkedIn login",
         "useLoginHint": "You sign in yourself in Huntloop's browser window; Huntloop never sees your password. This puts your account at risk if LinkedIn flags the activity — guest mode is safer."
+      },
+      "agent": {
+        "name": "AI browsing agent",
+        "description": "Claude browses sites in Huntloop's browser window (through Chrome DevTools): job sites you list below, SEEK or LinkedIn if their pages change, and \"find this job on the employer's site\".",
+        "toggle": "Use the AI browsing agent",
+        "noticeTitle": "Before you turn this on",
+        "noticeCost": "Each run costs more than other searches — roughly $0.50–2 with Opus — and counts towards your spending cap.",
+        "noticeGuard": "It can only search and read: Huntloop refuses any apply, sign-in, message, connect, save or upload action, keeps it on the allowed sites, and pauses for you on any check or sign-in.",
+        "noticeTerms": "Only list sites whose terms allow you to browse them this way.",
+        "turnOn": "Turn it on",
+        "fallback": "Let it take over when SEEK or LinkedIn return no jobs",
+        "fallbackHint": "Useful if one of those sites changes its pages. Only when that site is turned on above.",
+        "maxJobs": "Jobs per site per search",
+        "sites": "Other job sites",
+        "sitesHint": "Job boards without an API or adapter, e.g. a government jobs site. Give its search page; searches will include them.",
+        "siteName": "Site name",
+        "siteNamePlaceholder": "e.g. APS Jobs",
+        "siteUrl": "Search page URL",
+        "removeSite": "Remove {site}",
+        "addSite": "Add a site",
+        "saveSites": "Save sites"
       }
     }
   },
@@ -185,6 +206,10 @@
     "translate": {
       "name": "Translate",
       "description": "Translates AI explanations when you switch language."
+    },
+    "browserAgent": {
+      "name": "Browsing agent",
+      "description": "Browses job sites and employer career pages in Huntloop's browser window when there's no other way to read them."
     }
   },
   "errors": {
@@ -207,7 +232,9 @@
     "url_blocked": "Huntloop doesn't open links to local or private network addresses.",
     "not_a_job_posting": "This doesn't look like a job posting. Check the text or screenshots and try again.",
     "chat_busy": "Claude is still answering your last message.",
-    "browser_unavailable": "Huntloop couldn't open its browser window. Install Google Chrome, or set HUNTLOOP_BROWSER_PATH in .env.local."
+    "browser_unavailable": "Huntloop couldn't open its browser window. Install Google Chrome, or set HUNTLOOP_BROWSER_PATH in .env.local.",
+    "agent_disabled": "The AI browsing agent is turned off. Turn it on in Settings → Job sources.",
+    "no_company": "This job has no employer name, so Huntloop can't look for it on their site."
   },
   "profile": {
     "title": "Your profile",
@@ -507,7 +534,16 @@
     "provisionalTitle": "Provisional assessment",
     "provisionalDescription": "Found through {source}, so this is based on a short excerpt of the posting. Read the full posting for a complete assessment.",
     "readFullPosting": "Read the full posting",
-    "pasteFullPosting": "Or paste the full posting yourself"
+    "pasteFullPosting": "Or paste the full posting yourself",
+    "findOnEmployer": {
+      "title": "The employer's own posting",
+      "description": "Job boards often show a shortened ad. The AI browsing agent can look for this job on {company}'s own careers pages and read it in full.",
+      "button": "Find on the employer's site",
+      "running": "Looking for the job on the employer's site…",
+      "notFound": "The agent couldn't find this job on the employer's site.",
+      "found": "Found it — the job now uses the employer's posting.",
+      "disabled": "Turn on the AI browsing agent in Settings → Job sources to look for this job on the employer's own site."
+    }
   },
   "jobStatus": {
     "new": "New",
@@ -567,7 +603,8 @@
       "web_agent": "Web search",
       "seek": "SEEK",
       "linkedin": "LinkedIn",
-      "jsearch": "JSearch"
+      "jsearch": "JSearch",
+      "browser_agent": "AI browsing agent"
     },
     "site": {
       "seek": "SEEK",
@@ -881,7 +918,8 @@
       "adzuna": "Adzuna",
       "web_agent": "Web search",
       "seek": "SEEK",
-      "linkedin": "LinkedIn"
+      "linkedin": "LinkedIn",
+      "browser_agent": "Other sites"
     },
     "progress": {
       "stage": {

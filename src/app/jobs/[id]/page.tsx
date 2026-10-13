@@ -5,7 +5,10 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { appContext } from "@/server/context";
 import { findDuplicates, getJob, listAttachments } from "@/server/repo/jobs";
 import { loadJobFit } from "@/server/jobs/fit";
-import { activeJobTask } from "@/server/jobs/intake";
+import { activeJobTask, activeTaskForJob } from "@/server/jobs/intake";
+import { FIND_EMPLOYER_POSTING_TASK } from "@/server/tasks/handlers/find-employer-posting";
+import { getSourceSettings } from "@/server/repo/settings";
+import { FindOnEmployerSite } from "@/components/jobs/find-on-employer";
 import { applyProse, getCachedTranslation, missingGlosses } from "@/server/jobs/prose";
 import { parseTaskError } from "@/server/errors";
 import { placeLabel } from "@/shared/countries";
@@ -40,6 +43,8 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
   const conversation = getJobConversation({ db, userId: user.id }, job.id);
   const chatItems = conversation ? transcript(listChatMessages({ db }, conversation.id), listChatActions({ db }, conversation.id)) : [];
   const report = job.companyId ? getLatestReport(db, job.companyId) : null;
+  const agentEnabled = getSourceSettings(db, user.id).agent.enabled;
+  const findTask = activeTaskForJob(db, user.id, FIND_EMPLOYER_POSTING_TASK, job.id);
   const researchTask = job.companyId ? activeResearchTask(db, user.id, job.companyId) : null;
 
   const taskId = activeJobTask(db, user.id, job);
@@ -67,6 +72,15 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
 
   const postingTab = (
     <div className="flex flex-col gap-4">
+      {job.companyName && job.title && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("findOnEmployer.title")}</CardTitle>
+            <CardDescription>{t("findOnEmployer.description", { company: job.companyName })}</CardDescription>
+          </CardHeader>
+          <FindOnEmployerSite jobId={job.id} runningTaskId={findTask} enabled={agentEnabled} />
+        </Card>
+      )}
       {fit && <PostingOverview analysis={fit.analysis} summary={assessment?.postingSummary ?? null} locale={locale} postedAt={job.postedAt} closesAt={job.closesAt} />}
       {attachments.length > 0 && (
         <Card>

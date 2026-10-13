@@ -130,6 +130,57 @@ export function handler(state) {
     }
     if (url.pathname === "/feed/") return state.signedIn ? send(200, page("Feed | LinkedIn", "<main>Welcome back</main>")) : send(302, "", { location: "/login?redirect=feed" });
 
+    // A job board without an adapter (for the browsing agent).
+    if (url.pathname === "/board/search") {
+      return send(
+        200,
+        page(
+          "Search jobs - Example Public Jobs",
+          `<main><form role="search"><input type="search" aria-label="Search jobs" name="q"></form>
+           <a href="/board/job/501">Frontend Engineer — Department of Example</a>
+           <a href="/board/job/502">Senior Web Developer — Example Agency</a>
+           <a href="/board/search?q=x&page=2">Next page</a>
+           <button>Sign in</button></main>`,
+        ),
+      );
+    }
+    const board = /^\/board\/job\/(\d+)$/.exec(url.pathname);
+    if (board) {
+      const [title, org] = board[1] === "501" ? ["Frontend Engineer", "Department of Example"] : ["Senior Web Developer", "Example Agency"];
+      return send(
+        200,
+        page(
+          `${title} - Example Public Jobs`,
+          `<main><h1>${title}</h1><p>${org} · Canberra ACT</p>
+           <p>${org} is looking for a ${title.toLowerCase()} to build accessible online services used by millions of Australians.</p>
+           <ul><li>4+ years building web applications</li><li>React and TypeScript</li><li>Australian citizenship is required</li></ul>
+           <button>Apply now</button></main>`,
+        ),
+      );
+    }
+
+    // An employer's own website with a careers section.
+    if (url.pathname === "/employer/") return send(200, page("Tidal Labs", `<main><h1>Tidal Labs</h1><a href="/employer/careers">Careers</a><a href="/employer/about">About us</a></main>`));
+    if (url.pathname === "/employer/careers") {
+      return send(
+        200,
+        page("Careers - Tidal Labs", `<main><h1>Open roles</h1><a href="/employer/careers/frontend-engineer">Frontend Engineer</a><a href="/employer/careers/data-scientist">Data Scientist</a></main>`),
+      );
+    }
+    if (url.pathname === "/employer/careers/frontend-engineer") {
+      return send(
+        200,
+        page(
+          "Frontend Engineer - Tidal Labs Careers",
+          `<main><h1>Frontend Engineer</h1><p>Tidal Labs · Sydney, Australia · Full time</p>
+           <p>Tidal Labs builds data tools for ocean researchers. We are hiring a frontend engineer to own our visualisation app, working with scientists and our platform team.</p>
+           <h2>What you'll bring</h2><ul><li>3+ years with React</li><li>Experience with data visualisation (D3 or similar)</li><li>TypeScript</li><li>Experience with WebGL is a plus</li></ul>
+           <p>Salary: $150,000 – $170,000 + super. Hybrid, two days a week in our Sydney office.</p>
+           <button>Apply for this job</button></main>`,
+        ),
+      );
+    }
+
     send(404, page("Not found", "<p>Not found</p>"));
   };
 }
