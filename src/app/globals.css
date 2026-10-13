@@ -17,6 +17,8 @@
   --tier-good: #2f6db0;
   --tier-stretch: #a86b00;
   --tier-longshot: #8a8a85;
+  /* Single-series chart marks (validated: lightness band, chroma floor, >= 3:1 on the surface). */
+  --chart-series: #1baf7a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -37,6 +39,7 @@
     --tier-good: #7fb0ec;
     --tier-stretch: #e8b04f;
     --tier-longshot: #9a9a94;
+    --chart-series: #199e70;
   }
 }
 
@@ -57,6 +60,7 @@
   --color-tier-good: var(--tier-good);
   --color-tier-stretch: var(--tier-stretch);
   --color-tier-longshot: var(--tier-longshot);
+  --color-chart-series: var(--chart-series);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR",
     "Malgun Gothic", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

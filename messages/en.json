@@ -52,7 +52,8 @@
     "addJob": "Add a job",
     "bestBetsTitle": "Your best bets",
     "bestBetsDescription": "Jobs you haven't applied to yet, with your strongest Interview Chance first.",
-    "bestBetsEmpty": "No jobs yet. Add one to see your chances."
+    "bestBetsEmpty": "No jobs yet. Add one to see your chances.",
+    "spendDetails": "See where it went"
   },
   "settings": {
     "title": "Settings",
@@ -151,7 +152,8 @@
         "addSite": "Add a site",
         "saveSites": "Save sites"
       }
-    }
+    },
+    "usageLink": "See usage details"
   },
   "effort": {
     "low": "Low",
@@ -1281,5 +1283,43 @@
       "notesDescription": "Saved by you or the AI in this job's chat."
     },
     "emptyColumn": "Nothing here"
+  },
+  "usage": {
+    "title": "AI usage",
+    "subtitle": "What Huntloop's Claude calls cost, worked out from the API's own usage data (including refusal fallbacks and web searches).",
+    "today": "Today",
+    "ofDailyCap": "of your {cap} daily cap",
+    "month": "This month",
+    "ofMonthlyCap": "of your {cap} monthly cap",
+    "noMonthlyCap": "No monthly cap set",
+    "last30": "Last 30 days",
+    "calls": "{count, plural, one {# call} other {# calls}}",
+    "simulated": "{count, plural, one {# call was} other {# calls were}} answered in demo mode and cost nothing.",
+    "chartTitle": "Daily spend",
+    "chartDescription": "The last 30 days. Hover or focus a day for details.",
+    "showTable": "Show as a table",
+    "byTaskTitle": "By task",
+    "byTaskDescription": "Each kind of AI work, last 30 days. Cached input is reused prompt text, billed at a fraction of the price.",
+    "byModelTitle": "By model",
+    "byModelDescription": "The model that actually answered, last 30 days.",
+    "empty": "No AI calls in the last 30 days.",
+    "settingsHint": "Choose models, effort and spending caps in",
+    "settingsLink": "Settings",
+    "table": {
+      "date": "Date",
+      "task": "Task",
+      "model": "Model",
+      "calls": "Calls",
+      "tokens": "Tokens in / out",
+      "tokensValue": "{input} / {output}",
+      "cached": "Cached input",
+      "searches": "Web searches",
+      "cost": "Cost"
+    },
+    "chart": {
+      "aria": "Daily AI spend over the last {days} days",
+      "bar": "{date}: {cost}, {calls} calls",
+      "calls": "{count, plural, one {# call} other {# calls}}"
+    }
   }
 }

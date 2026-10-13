@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -202,7 +203,10 @@ export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
               }
             />
             <FieldHint>
-              {t("monthlyCapHint")} {t("spentMonth", { amount: spentMonth })}
+              {t("monthlyCapHint")} {t("spentMonth", { amount: spentMonth })}{" "}
+              <Link href="/usage" className="underline">
+                {t("usageLink")}
+              </Link>
             </FieldHint>
           </div>
           <div className="flex flex-col gap-2">

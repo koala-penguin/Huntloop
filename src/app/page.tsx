@@ -87,6 +87,9 @@ export default async function DashboardPage() {
               <dd className="text-lg font-semibold tabular-nums">{formatUsd(budget.monthUsd, locale)}</dd>
             </div>
           </dl>
+          <Link href="/usage" className="mt-3 inline-block text-sm underline">
+            {t("spendDetails")}
+          </Link>
         </Card>
       </div>
 

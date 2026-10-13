@@ -52,7 +52,8 @@
     "addJob": "공고 추가",
     "bestBetsTitle": "가장 승산 있는 공고",
     "bestBetsDescription": "아직 지원하지 않은 공고 중 인터뷰 가능성이 높은 순서입니다.",
-    "bestBetsEmpty": "아직 공고가 없습니다. 공고를 추가하면 가능성을 보여 드립니다."
+    "bestBetsEmpty": "아직 공고가 없습니다. 공고를 추가하면 가능성을 보여 드립니다.",
+    "spendDetails": "어디에 썼는지 보기"
   },
   "settings": {
     "title": "설정",
@@ -151,7 +152,8 @@
         "addSite": "사이트 추가",
         "saveSites": "사이트 저장"
       }
-    }
+    },
+    "usageLink": "사용 내역 자세히 보기"
   },
   "effort": {
     "low": "낮음",
@@ -1281,5 +1283,43 @@
       "notesDescription": "이 공고의 채팅에서 내가 또는 AI가 저장한 메모입니다."
     },
     "emptyColumn": "없음"
+  },
+  "usage": {
+    "title": "AI 사용량",
+    "subtitle": "Huntloop의 Claude 호출 비용입니다. API가 알려 주는 사용량(거절 대체 모델 호출과 웹 검색 포함)으로 계산합니다.",
+    "today": "오늘",
+    "ofDailyCap": "일일 한도 {cap} 중",
+    "month": "이번 달",
+    "ofMonthlyCap": "월 한도 {cap} 중",
+    "noMonthlyCap": "월 한도 없음",
+    "last30": "최근 30일",
+    "calls": "호출 {count}회",
+    "simulated": "{count}회는 데모 모드로 응답해 비용이 들지 않았습니다.",
+    "chartTitle": "일별 지출",
+    "chartDescription": "최근 30일입니다. 날짜에 마우스를 올리거나 포커스하면 자세히 볼 수 있습니다.",
+    "showTable": "표로 보기",
+    "byTaskTitle": "작업별",
+    "byTaskDescription": "최근 30일 동안의 AI 작업 종류별 사용량입니다. 캐시된 입력은 다시 쓴 프롬프트로, 훨씬 싸게 청구됩니다.",
+    "byModelTitle": "모델별",
+    "byModelDescription": "최근 30일 동안 실제로 응답한 모델입니다.",
+    "empty": "최근 30일 동안 AI 호출이 없습니다.",
+    "settingsHint": "모델, 노력 수준, 지출 한도는 여기서 정합니다:",
+    "settingsLink": "설정",
+    "table": {
+      "date": "날짜",
+      "task": "작업",
+      "model": "모델",
+      "calls": "호출",
+      "tokens": "입력 / 출력 토큰",
+      "tokensValue": "{input} / {output}",
+      "cached": "캐시된 입력",
+      "searches": "웹 검색",
+      "cost": "비용"
+    },
+    "chart": {
+      "aria": "최근 {days}일 동안의 일별 AI 지출",
+      "bar": "{date}: {cost}, 호출 {calls}회",
+      "calls": "호출 {count}회"
+    }
   }
 }

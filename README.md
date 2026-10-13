@@ -140,13 +140,38 @@ Safeguards, enforced in code before each action reaches the browser:
 - a CAPTCHA or sign-in wall pauses the run for you, as above. Runs are capped in steps and jobs, and cost about
   $0.50–2 each with Opus (counted towards your spending cap).
 
+## Keeping the hunt going
+
+- **Pipeline** — every job you're pursuing by stage (Shortlisted → Applying → Applied → Interviewing → Offer), with days in
+  each stage and a nudge to follow up after two quiet weeks. Moving a job to Applied, Interviewing, Offer or Rejected (on
+  the board or the job page) lets you record a few optional details: the date, how you applied, the interview round,
+  where it ended. Each job's **History** tab lists everything that happened. "What your outcomes say" shows, for each
+  Interview Chance tier at the time you applied, how many applications reached an interview or an offer — the start of
+  checking Huntloop's tiers against your real results.
+- **Saved searches** — save a search (with a name) to keep it at the top of Search with what's new since its last run.
+  "Check daily" re-runs it once a day while Huntloop is running, with **Adzuna and the web-search agent only**: SEEK,
+  LinkedIn and the browsing agent only ever run when you start them. Daily checks cost about $1–1.50 with Opus and are
+  skipped when your spending is near its cap.
+- **Employer watchlist** (Search → Employers you watch) — watch your target employers' own Greenhouse, Lever or Ashby job
+  boards: paste a link to the board or any job on it, or use "Watch this employer's job board" on a job. Boards are
+  checked daily through their free public APIs; new roles are matched against your preferences in code (place, age,
+  exclusions, and a distinctive title word in common), so watching costs nothing until you **Add & assess** a role.
+- **Coach** — one conversation about your whole hunt: what to focus on this week, which jobs to compare, what needs a
+  follow-up. It sees your profile, preferences and every job, can list, read and compare jobs, start a search or add a
+  job by link when you ask, update a job's status when you tell it, and propose profile facts for you to confirm. It's
+  told when searches finish, jobs are scored or statuses change.
+- **AI usage** (from the dashboard or Settings) — spend today and this month against your caps, a 30-day chart, and
+  breakdowns by task and by model (calls, tokens, cached input, web searches, cost).
+
+Set `HUNTLOOP_SCHEDULER=off` to turn off the daily checks.
+
 ## Models and cost
 
 Every AI task uses **Claude Opus 5.5** by default. In **Settings → AI models** you can pick a different default model and
 override the model and effort level per task (CV reading, posting analysis, interview-chance assessment, screening, chat,
 search agent, employer research, CV tailoring, …). Settings also has daily/monthly spending caps; background work pauses
 when a cap is reached. Spend is computed from the API's usage data (including refusal-fallback attempts and web searches)
-and shown on the dashboard.
+and shown on the dashboard and the **AI usage** page.
 
 Refusal fallbacks (`fallbacks: "default"`) are enabled on models that support them, so a false-positive safety decline is
 retried on another model instead of failing.
@@ -185,7 +210,11 @@ tests/            unit/ (Vitest), e2e/ (Playwright)
    an AI browsing agent through Chrome DevTools MCP ✅.
 5. **Proceed → CV tailoring** — once you and the AI agree to go for a job, a tailored CV (DOCX/PDF) where every claim is
    traceable to your real experience, and LinkedIn profile text for your target roles. ✅
-6. **The loop** — pipeline board with outcomes, saved searches, an employer watchlist, a coach chat across all jobs.
+6. **The loop** — pipeline board with outcomes, saved searches with daily checks, an employer watchlist, a coach chat
+   across all jobs, and an AI usage page. ✅
+
+Next ideas: calibrating Interview Chance weights from your outcomes, cover letters, interview preparation, technical-test
+practice.
 
 ## License
 
