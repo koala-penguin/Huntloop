@@ -24,7 +24,8 @@
     "settings": "Settings",
     "profile": "Profile",
     "jobs": "Jobs",
-    "search": "Search"
+    "search": "Search",
+    "pipeline": "Pipeline"
   },
   "dashboard": {
     "title": "Welcome to Huntloop",
@@ -553,7 +554,8 @@
       "found": "Found it — the job now uses the employer's posting.",
       "disabled": "Turn on the AI browsing agent in Settings → Job sources to look for this job on the employer's own site."
     },
-    "tabCv": "CV"
+    "tabCv": "CV",
+    "tabHistory": "History"
   },
   "jobStatus": {
     "new": "New",
@@ -1122,5 +1124,80 @@
     "copied": "Copied",
     "copyLabel": "Copy {section}",
     "copyBlocked": "Resolve the flagged lines in this section before copying it."
+  },
+  "pipeline": {
+    "title": "Pipeline",
+    "subtitle": "Every application by stage. Record what happened as you go — it also shows how Interview Chance tiers turn into interviews for you.",
+    "otherStages": "Other stages",
+    "stageCount": "{stage}: {count}",
+    "emptyTitle": "Nothing in your pipeline yet",
+    "emptyDescription": "Shortlist a job, or proceed with one, and it appears here.",
+    "goToJobs": "Go to your jobs",
+    "appliedOn": "Applied {date}",
+    "daysInStage": "{days, plural, =0 {Moved here today} one {# day in this stage} other {# days in this stage}}",
+    "followUp": "No news for {days} days — time to follow up?",
+    "statsTitle": "What your outcomes say",
+    "statsDescription": "For each job you applied to: its Interview Chance tier when you applied, and how far it went. Small numbers — treat it as a hint.",
+    "statsTier": "Tier when you applied",
+    "statsApplied": "Applied",
+    "statsInterviews": "Interviews",
+    "statsOffers": "Offers",
+    "unscored": "Not scored",
+    "rate": "{count} ({percent}%)",
+    "outcome": {
+      "title": {
+        "applied": "You applied — any details?",
+        "interviewing": "An interview — any details?",
+        "offer": "An offer — congratulations!",
+        "rejected": "Where did it end?"
+      },
+      "date": {
+        "applied": "Date applied",
+        "interviewing": "Interview date",
+        "offer": "Offer date",
+        "rejected": "Date"
+      },
+      "channel": "How you applied",
+      "notSaying": "—",
+      "channels": {
+        "employer_site": "Employer's website",
+        "job_board": "Job board",
+        "referral": "Referral",
+        "recruiter": "Recruiter",
+        "other": "Other"
+      },
+      "round": "Round",
+      "roundPlaceholder": "e.g. Phone screen",
+      "stage": "Stage reached",
+      "stages": {
+        "no_response": "No response",
+        "after_application": "Rejected after applying",
+        "after_interview": "After an interview",
+        "after_offer": "After an offer (declined or withdrawn)"
+      },
+      "note": "Note (optional)",
+      "notePlaceholder": {
+        "applied": "Anything to remember, e.g. who you contacted.",
+        "interviewing": "Who you met, what they asked.",
+        "offer": "Salary, start date, deadline to reply.",
+        "rejected": "Any feedback or reason given."
+      },
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "history": {
+      "title": "History",
+      "description": "Everything that happened with this job.",
+      "created": "Added ({source})",
+      "status": "{from} → {to}",
+      "answer": "Answered “{requirement}”: {answer}",
+      "answerCleared": "Cleared the answer to “{requirement}”",
+      "yes": "yes",
+      "no": "no",
+      "cvExported": "Downloaded the tailored CV ({format}, {version})",
+      "notesTitle": "Notes",
+      "notesDescription": "Saved by you or the AI in this job's chat."
+    },
+    "emptyColumn": "Nothing here"
   }
 }

@@ -173,6 +173,10 @@ export const jobs = sqliteTable(
     scoreData: text("score_data", { mode: "json" }),
     notes: text("notes"),
     dedupeKey: text("dedupe_key"),
+    /** When the user applied (from the outcome they recorded, else when the status became "applied"). */
+    appliedAt: integer("applied_at", { mode: "timestamp_ms" }),
+    /** When the pipeline status last changed — for "days in this stage" and follow-up nudges. */
+    statusChangedAt: integer("status_changed_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
   },
@@ -193,17 +197,23 @@ export const jobAttachments = sqliteTable("job_attachments", {
   createdAt: createdAt(),
 });
 
-export const jobEvents = sqliteTable("job_events", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  jobId: integer("job_id")
-    .notNull()
-    .references(() => jobs.id, { onDelete: "cascade" }),
-  type: text("type").notNull(),
-  fromValue: text("from_value"),
-  toValue: text("to_value"),
-  note: text("note"),
-  createdAt: createdAt(),
-});
+export const jobEvents = sqliteTable(
+  "job_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    jobId: integer("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    fromValue: text("from_value"),
+    toValue: text("to_value"),
+    note: text("note"),
+    /** Structured details, e.g. the outcome recorded with a status change and the tier at that moment. */
+    data: text("data", { mode: "json" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("job_events_job").on(t.jobId)],
+);
 
 /** Profile-independent posting analysis, cached by posting text hash + prompt version + model. */
 export const postingAnalyses = sqliteTable(

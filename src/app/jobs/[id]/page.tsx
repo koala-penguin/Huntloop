@@ -20,7 +20,10 @@ import { PostingInput } from "@/components/jobs/posting-input";
 import { JobProgress } from "@/components/jobs/job-progress";
 import { FitReport } from "@/components/jobs/fit-report";
 import { PostingOverview } from "@/components/jobs/posting-overview";
-import { DeleteJobButton, PostingTextEditor, ReadFullPostingButton, ReassessButton, StatusSelect, TranslateReport } from "@/components/jobs/job-controls";
+import { DeleteJobButton, PostingTextEditor, ReadFullPostingButton, ReassessButton, TranslateReport } from "@/components/jobs/job-controls";
+import { StatusSelect } from "@/components/pipeline/status-select";
+import { JobHistory } from "@/components/pipeline/job-history";
+import { jobHistory } from "@/server/pipeline/outcomes";
 import { ChatPanel } from "@/components/jobs/chat-panel";
 import { getJobConversation, listChatActions, listChatMessages } from "@/server/ai/chat/harness";
 import { transcript } from "@/server/ai/chat/render";
@@ -269,7 +272,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
           {translating && <TranslateReport jobId={job.id} />}
           <SimpleTabs
             key={tabParam ?? ""}
-            defaultValue={tabParam && ["fit", "posting", "employer", "chat", "cv"].includes(tabParam) ? tabParam : fit.score && assessment ? "fit" : "posting"}
+            defaultValue={tabParam && ["fit", "posting", "employer", "chat", "cv", "history"].includes(tabParam) ? tabParam : fit.score && assessment ? "fit" : "posting"}
             tabs={[
               ...(fit.score && assessment
                 ? [
@@ -331,6 +334,18 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
                     versions={cv.versions}
                     previewHtml={cv.previewHtml}
                     doNotClaim={cv.doNotClaim}
+                  />
+                ),
+              },
+              {
+                value: "history",
+                label: t("tabHistory"),
+                content: (
+                  <JobHistory
+                    entries={jobHistory(db, job.id)}
+                    notes={job.notes}
+                    requirementQuotes={Object.fromEntries(fit.analysis.requirements.map((r) => [r.id, r.postingQuote]))}
+                    locale={locale}
                   />
                 ),
               },

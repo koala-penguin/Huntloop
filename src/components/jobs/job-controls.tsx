@@ -7,50 +7,15 @@ import { Check, Loader2, RefreshCw, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label, Select, Textarea } from "@/components/ui/form";
 import { Alert } from "@/components/ui/badge";
-import { JOB_STATUSES } from "@/shared/schemas/job";
 import {
   answerRequirementAction,
   deleteJobAction,
   readFullPostingAction,
   reassessJobAction,
   saveJobTextAction,
-  setJobStatusAction,
   setWorkRightAction,
 } from "@/app/jobs/[id]/actions";
 import { JobProgress } from "./job-progress";
-
-export function StatusSelect({ jobId, status }: { jobId: number; status: string }) {
-  const t = useTranslations("jobStatus");
-  const tJob = useTranslations("job");
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  return (
-    <div className="flex items-center gap-2">
-      <Label htmlFor={`status-${jobId}`} className="text-sm text-muted">
-        {tJob("statusLabel")}
-      </Label>
-      <Select
-        id={`status-${jobId}`}
-        value={status}
-        disabled={pending}
-        className="h-8 w-auto"
-        onChange={(e) => {
-          const next = e.target.value;
-          start(async () => {
-            await setJobStatusAction(jobId, next);
-            router.refresh();
-          });
-        }}
-      >
-        {JOB_STATUSES.map((s) => (
-          <option key={s} value={s}>
-            {t(s)}
-          </option>
-        ))}
-      </Select>
-    </div>
-  );
-}
 
 /** Yes / No / Skip for a requirement Huntloop couldn't settle from the CV. */
 export function AnswerButtons({ jobId, requirementId, answer }: { jobId: number; requirementId: string; answer: "yes" | "no" | null }) {

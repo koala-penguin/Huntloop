@@ -24,7 +24,8 @@
     "settings": "설정",
     "profile": "프로필",
     "jobs": "채용 공고",
-    "search": "검색"
+    "search": "검색",
+    "pipeline": "지원 현황"
   },
   "dashboard": {
     "title": "Huntloop에 오신 것을 환영합니다",
@@ -553,7 +554,8 @@
       "found": "찾았습니다. 이제 회사의 공고를 기준으로 분석합니다.",
       "disabled": "설정 → 공고 출처에서 AI 브라우징 에이전트를 켜면 회사 자체 사이트에서 이 공고를 찾을 수 있습니다."
     },
-    "tabCv": "CV"
+    "tabCv": "CV",
+    "tabHistory": "기록"
   },
   "jobStatus": {
     "new": "새 공고",
@@ -1122,5 +1124,80 @@
     "copied": "복사됨",
     "copyLabel": "{section} 복사",
     "copyBlocked": "이 항목의 표시된 문장을 처리한 뒤 복사할 수 있습니다."
+  },
+  "pipeline": {
+    "title": "지원 현황",
+    "subtitle": "모든 지원을 단계별로 봅니다. 진행 상황을 기록해 두면 Interview Chance 등급이 실제로 면접으로 얼마나 이어지는지도 보여 줍니다.",
+    "otherStages": "기타 단계",
+    "stageCount": "{stage}: {count}",
+    "emptyTitle": "아직 진행 중인 지원이 없습니다",
+    "emptyDescription": "공고를 관심 목록에 넣거나 지원을 진행하면 여기에 나타납니다.",
+    "goToJobs": "내 공고로 가기",
+    "appliedOn": "{date} 지원",
+    "daysInStage": "이 단계에서 {days}일째",
+    "followUp": "{days}일째 소식이 없습니다. 연락해 볼까요?",
+    "statsTitle": "결과로 본 등급",
+    "statsDescription": "지원한 공고마다 지원 당시의 Interview Chance 등급과 어디까지 진행됐는지 보여 줍니다. 건수가 적으니 참고로만 보세요.",
+    "statsTier": "지원 당시 등급",
+    "statsApplied": "지원",
+    "statsInterviews": "면접",
+    "statsOffers": "오퍼",
+    "unscored": "평가 안 됨",
+    "rate": "{count} ({percent}%)",
+    "outcome": {
+      "title": {
+        "applied": "지원했군요. 기록할 내용이 있나요?",
+        "interviewing": "면접이 잡혔군요. 기록할 내용이 있나요?",
+        "offer": "오퍼를 받았군요. 축하합니다!",
+        "rejected": "어디에서 끝났나요?"
+      },
+      "date": {
+        "applied": "지원일",
+        "interviewing": "면접일",
+        "offer": "오퍼 받은 날",
+        "rejected": "날짜"
+      },
+      "channel": "지원 경로",
+      "notSaying": "—",
+      "channels": {
+        "employer_site": "회사 웹사이트",
+        "job_board": "채용 사이트",
+        "referral": "추천",
+        "recruiter": "리크루터",
+        "other": "기타"
+      },
+      "round": "면접 단계",
+      "roundPlaceholder": "예: 전화 면접",
+      "stage": "도달한 단계",
+      "stages": {
+        "no_response": "응답 없음",
+        "after_application": "지원 후 불합격",
+        "after_interview": "면접 후",
+        "after_offer": "오퍼 후 (거절 또는 철회)"
+      },
+      "note": "메모 (선택)",
+      "notePlaceholder": {
+        "applied": "기억해 둘 내용, 예: 연락한 사람.",
+        "interviewing": "만난 사람, 받은 질문.",
+        "offer": "연봉, 입사일, 회신 기한.",
+        "rejected": "받은 피드백이나 이유."
+      },
+      "save": "저장",
+      "cancel": "취소"
+    },
+    "history": {
+      "title": "기록",
+      "description": "이 공고에서 있었던 모든 일입니다.",
+      "created": "추가됨 ({source})",
+      "status": "{from} → {to}",
+      "answer": "“{requirement}”에 답함: {answer}",
+      "answerCleared": "“{requirement}”에 대한 답을 지움",
+      "yes": "예",
+      "no": "아니요",
+      "cvExported": "맞춤 CV 다운로드 ({format}, {version})",
+      "notesTitle": "메모",
+      "notesDescription": "이 공고의 채팅에서 내가 또는 AI가 저장한 메모입니다."
+    },
+    "emptyColumn": "없음"
   }
 }

@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import type { Db } from "../db/database";
 import { companies, jobAttachments, jobEvents, jobs, type JobRow } from "../db/schema";
 import { JOB_STATUSES, type JobStatus } from "@/shared/schemas/job";
+import type { Outcome, StatusEventData } from "@/shared/schemas/pipeline";
 
 export type NewJob = Omit<typeof jobs.$inferInsert, "id" | "userId" | "createdAt">;
 
@@ -88,11 +89,15 @@ export function findDuplicates(db: Db, userId: number, job: JobRow): JobRow[] {
     .all();
 }
 
-export function setJobStatus(db: Db, userId: number, id: number, status: JobStatus, note?: string): JobRow | undefined {
+export function setJobStatus(db: Db, userId: number, id: number, status: JobStatus, note?: string, outcome?: Outcome): JobRow | undefined {
   const job = getJob(db, userId, id);
   if (!job || !JOB_STATUSES.includes(status) || job.status === status) return job;
-  db.insert(jobEvents).values({ jobId: id, type: "status", fromValue: job.status, toValue: status, note: note ?? null }).run();
-  return updateJob(db, id, { status });
+  const data: StatusEventData = { snapshot: { tier: job.tier, score: job.score, eligibility: job.eligibility }, ...(outcome ? { outcome } : {}) };
+  db.insert(jobEvents).values({ jobId: id, type: "status", fromValue: job.status, toValue: status, note: note ?? null, data }).run();
+  const now = new Date();
+  const patch: Partial<NewJob> = { status, statusChangedAt: now };
+  if (status === "applied" && !job.appliedAt) patch.appliedAt = outcome?.date ? new Date(`${outcome.date}T12:00:00`) : now;
+  return updateJob(db, id, patch);
 }
 
 export function setJobAnswer(db: Db, userId: number, id: number, requirementId: string, answer: "yes" | "no" | null): JobRow | undefined {

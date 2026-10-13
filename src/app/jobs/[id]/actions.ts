@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { JOB_STATUSES } from "@/shared/schemas/job";
+import { isOutcomeStatus, outcomeSchema } from "@/shared/schemas/pipeline";
 import { WORK_RIGHT_STATUSES } from "@/shared/schemas/profile";
 import { marketPack } from "@/shared/markets";
 import { isCountryCode } from "@/shared/countries";
@@ -24,11 +25,12 @@ function fail(error: unknown): { ok: false; error: string } {
   return { ok: false, error: code };
 }
 
-export async function setJobStatusAction(jobId: number, status: string): Promise<ActionResult<null>> {
+export async function setJobStatusAction(jobId: number, status: string, outcome?: unknown): Promise<ActionResult<null>> {
   const parsed = z.enum(JOB_STATUSES).safeParse(status);
-  if (!parsed.success) return { ok: false, error: "invalid" };
+  const parsedOutcome = outcome === undefined || outcome === null ? null : outcomeSchema.safeParse(outcome);
+  if (!parsed.success || (parsedOutcome && !parsedOutcome.success)) return { ok: false, error: "invalid" };
   const { db, user } = appContext();
-  setJobStatus(db, user.id, jobId, parsed.data);
+  setJobStatus(db, user.id, jobId, parsed.data, undefined, parsedOutcome?.success && isOutcomeStatus(parsed.data) ? parsedOutcome.data : undefined);
   revalidatePath("/", "layout");
   return { ok: true, value: null };
 }
