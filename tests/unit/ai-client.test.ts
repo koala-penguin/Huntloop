@@ -29,7 +29,7 @@ describe("AI client in demo mode", () => {
     registerFakeGenerator("translate", (req) => ({ content: [{ type: "text", text: JSON.stringify({ model: req.body.model }) }] }));
     const { db, userId } = testDb();
     const settings = defaultAiSettings();
-    settings.tasks.translate = { model: "claude-haiku-5-5", effort: "low" };
+    settings.tasks.translate = { model: "claude-haiku-5-5", effort: "low", connection: "profile" };
     const result = await callStructured({ db, userId, settings }, "translate", {
       schema: z.object({ model: z.string() }),
       messages: [{ role: "user", content: "x" }],

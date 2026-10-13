@@ -37,6 +37,7 @@ export function SavedSearchControls({ searchId, saved, name, daily, scheduleNote
         </span>
       </label>
       {saved && scheduleNote === "budget" && <Alert>{t("skippedBudget")}</Alert>}
+      {saved && scheduleNote === "limit" && <Alert>{t("skippedLimit")}</Alert>}
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" disabled={pending} onClick={() => run(() => saveSearchAction(searchId, value, checkDaily))}>
           <Bookmark className="size-3.5" aria-hidden />

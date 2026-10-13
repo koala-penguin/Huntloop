@@ -9,6 +9,7 @@ import { FieldHint, Label, Textarea } from "@/components/ui/form";
 import { Alert } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 
+import { AI_ERROR_CODES } from "@/shared/ai-errors";
 const ACCEPT = "image/png,image/jpeg,image/webp,image/gif,application/pdf";
 const MAX_FILES = 12;
 const KNOWN_ERRORS = [
@@ -19,8 +20,7 @@ const KNOWN_ERRORS = [
   "file_too_large",
   "unsupported_posting_file",
   "text_too_long",
-  "not_found",
-];
+  "not_found", ...AI_ERROR_CODES];
 
 interface Picked {
   file: File;

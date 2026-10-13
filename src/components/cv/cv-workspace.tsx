@@ -13,7 +13,8 @@ import { answerCvQuestionAction, proceedAction, reviseCvAction, tailorCvAction }
 import type { CvChecks, TailoringPlan } from "@/shared/schemas/cv";
 import { FlagCard, type FlaggedLine } from "./flag-card";
 
-const KNOWN_ERRORS = ["not_found", "no_profile", "not_analyzed", "refusal", "budget", "invalid_output", "max_tokens", "invalid"];
+import { AI_ERROR_CODES } from "@/shared/ai-errors";
+const KNOWN_ERRORS = ["not_found", "no_profile", "not_analyzed", "refusal", "budget", "invalid_output", "max_tokens", "invalid", ...AI_ERROR_CODES];
 
 function ErrorAlert({ code, message }: { code: string | null; message?: string | null }) {
   const tErrors = useTranslations("errors");

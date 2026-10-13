@@ -1,7 +1,9 @@
 import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "../db/database";
 import { searches, tasks, watchedBoards } from "../db/schema";
-import { budgetStatus } from "../ai/client";
+import { resolveTaskModel } from "@/shared/ai-settings";
+import { budgetStatus, modeFor, settingsFor } from "../ai/client";
+import { subscriptionNearLimit } from "../ai/claude-code/limits";
 import { SEARCH_TASK } from "../search/tasks";
 import { enqueueTask } from "./runner";
 import { WATCH_CHECK_TASK } from "./handlers/watch-check";
@@ -9,7 +11,8 @@ import { WATCH_CHECK_TASK } from "./handlers/watch-check";
 /**
  * Daily work while Huntloop is running: saved searches the user set to "check daily" (API sources
  * only — SEEK, LinkedIn and the browsing agent never run unattended) and watched job boards.
- * Searches are skipped while the AI budget is at its warning level or over the cap.
+ * Searches are skipped while the AI budget is at its warning level or over the cap — or, on the
+ * Claude subscription, while its usage limit is close or reached.
  */
 
 const DAY = 86_400_000;
@@ -41,9 +44,14 @@ export function runDueWork(db: Db, now = new Date()): DueWork {
     .all();
   for (const search of dueSearches) {
     if (hasActiveTask(db, SEARCH_TASK, "searchId", search.id)) continue;
-    const budget = budgetStatus({ db, userId: search.userId });
-    if (budget.exceeded || budget.warning) {
-      db.update(searches).set({ nextRunAt: next, scheduleNote: "budget" }).where(eq(searches.id, search.id)).run();
+    const ctx = { db, userId: search.userId };
+    const settings = settingsFor(ctx);
+    // Screening is most of a search's AI work; its connection decides which limit applies.
+    const mode = modeFor(resolveTaskModel(settings, "screen").connection);
+    const budget = budgetStatus({ ...ctx, settings });
+    const note = mode === "claude_code" ? (subscriptionNearLimit(settings.budget.warnAtPercent, now) ? "limit" : null) : budget.exceeded || budget.warning ? "budget" : null;
+    if (note) {
+      db.update(searches).set({ nextRunAt: next, scheduleNote: note }).where(eq(searches.id, search.id)).run();
       out.skippedSearches.push(search.id);
       continue;
     }

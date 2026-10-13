@@ -12,6 +12,7 @@ import { useTask } from "@/components/tasks/use-task";
 import { generateLinkedinAction } from "@/app/cv/actions";
 import { FlagCard, type FlaggedLine } from "./flag-card";
 
+import { AI_ERROR_CODES } from "@/shared/ai-errors";
 export interface LinkedinSection {
   key: string;
   label: string;
@@ -55,7 +56,7 @@ function Progress({ taskId }: { taskId: number }) {
     if (task?.status === "succeeded") router.refresh();
   }, [task?.status, router]);
   if (task?.status === "failed") {
-    const known = ["no_profile", "refusal", "budget", "invalid_output", "max_tokens"];
+    const known = ["no_profile", "refusal", "budget", "invalid_output", "max_tokens", ...AI_ERROR_CODES];
     return <Alert tone="danger">{task.errorCode && known.includes(task.errorCode) ? tErrors(task.errorCode) : tErrors("generic", { message: task.errorMessage ?? "" })}</Alert>;
   }
   return (

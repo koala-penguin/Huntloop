@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/badge";
 import { useTask } from "@/components/tasks/use-task";
 import { startResearchAction } from "@/app/jobs/[id]/actions";
 
+import { AI_ERROR_CODES } from "@/shared/ai-errors";
 function ResearchProgress({ taskId }: { taskId: number }) {
   const t = useTranslations("employer");
   const tErrors = useTranslations("errors");
@@ -20,7 +21,7 @@ function ResearchProgress({ taskId }: { taskId: number }) {
   }, [task?.status, router]);
   const notes = ((task?.progress as { notes?: string[] } | null)?.notes ?? []).slice(-4);
   if (task?.status === "failed") {
-    const known = ["refusal", "budget", "invalid_output", "max_tokens", "not_found"];
+    const known = ["refusal", "budget", "invalid_output", "max_tokens", "not_found", ...AI_ERROR_CODES];
     return <Alert tone="danger">{task.errorCode && known.includes(task.errorCode) ? tErrors(task.errorCode) : tErrors("generic", { message: task.errorMessage ?? "" })}</Alert>;
   }
   return (

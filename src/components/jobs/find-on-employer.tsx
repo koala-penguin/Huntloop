@@ -10,7 +10,8 @@ import { useTask } from "@/components/tasks/use-task";
 import { UserActionPrompt, type TaskUserAction } from "@/components/tasks/user-action-prompt";
 import { findOnEmployerSiteAction } from "@/app/jobs/[id]/actions";
 
-const KNOWN_ERRORS = ["agent_disabled", "no_company", "budget", "refusal", "browser_unavailable"];
+import { AI_ERROR_CODES } from "@/shared/ai-errors";
+const KNOWN_ERRORS = ["agent_disabled", "no_company", "budget", "refusal", "browser_unavailable", ...AI_ERROR_CODES];
 
 /** "Find on the employer's site": the browsing agent looks for the employer's own posting. */
 export function FindOnEmployerSite({ jobId, runningTaskId, enabled }: { jobId: number; runningTaskId: number | null; enabled: boolean }) {

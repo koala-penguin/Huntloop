@@ -32,7 +32,7 @@ export default async function DashboardPage() {
   const locale = await getLocale();
   const { ai, settings, db, user } = appContext();
   const profile = getCurrentProfile(db, user.id);
-  const live = currentAiMode() === "live";
+  const live = (await currentAiMode(ai)) !== "fake";
   const budget = budgetStatus(ai);
   const jobs = listJobs(db, user.id, { status: "active" });
   const bestBets = jobs.filter((j) => j.tier && ["new", "shortlisted"].includes(j.status)).slice(0, 5);

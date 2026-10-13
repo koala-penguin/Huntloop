@@ -2,32 +2,25 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
 import { MODEL_IDS, type Effort, type ModelId } from "@/shared/models";
-import { resolveTaskModel, type AiSettings, type AiTask } from "@/shared/ai-settings";
-import { aiMode, envDefaultModel } from "../config/env";
+import { resolveTaskModel, type AiSettings, type AiTask, type Connection } from "@/shared/ai-settings";
+import { aiMode, envDefaultModel, readEnv } from "../config/env";
 import type { Db } from "../db/database";
 import { getAiSettings } from "../repo/settings";
 import { logUsage, spendSummary } from "../repo/usage";
 import { computeCost, type UsageCost } from "./cost";
 import { buildBaseParams, type RequestOptions } from "./request";
 import { createFakeFetch } from "./fake/transport";
+import { AiError } from "./errors";
+import { cachedClaudeCodeStatus, defaultConnection, getClaudeCodeStatus } from "./claude-code/status";
+import { subscriptionLimitedUntil } from "./claude-code/limits";
+import { callStructuredViaCli } from "./claude-code/structured";
 import "./fake/generators";
 
 type StreamParams = Anthropic.Beta.Messages.MessageCreateParamsStreaming;
 type BetaMessage = Anthropic.Beta.Messages.BetaMessage;
 type StreamEvent = Anthropic.Beta.Messages.BetaRawMessageStreamEvent;
 
-export type AiErrorCode = "refusal" | "max_tokens" | "invalid_output" | "budget" | "api";
-
-export class AiError extends Error {
-  constructor(
-    public readonly code: AiErrorCode,
-    message: string,
-    public readonly detail?: unknown,
-  ) {
-    super(message);
-    this.name = "AiError";
-  }
-}
+export { AiError, type AiErrorCode } from "./errors";
 
 export interface AiContext {
   db: Db;
@@ -38,43 +31,85 @@ export interface AiContext {
 }
 
 interface ClientState {
-  client?: Anthropic;
-  mode?: "live" | "fake";
+  clients: Partial<Record<"live" | "fake", Anthropic>>;
   /** Models whose optional beta features were rejected once; they're sent without them from then on. */
   degraded: Set<string>;
 }
 
-const state = ((globalThis as unknown as { huntloopAi?: ClientState }).huntloopAi ??= { degraded: new Set() });
+const state = ((globalThis as unknown as { huntloopAi?: ClientState }).huntloopAi ??= { clients: {}, degraded: new Set() });
+state.clients ??= {};
 
-export function currentAiMode(): "live" | "fake" {
-  return aiMode();
+/**
+ * How a call is answered: the Anthropic API ("api"), the user's Claude subscription through the
+ * Claude Code CLI ("claude_code"), or the demo simulator ("fake") when the chosen connection isn't
+ * available (no API key; CLI missing or signed out) or HUNTLOOP_AI=fake.
+ */
+export type AiMode = "api" | "claude_code" | "fake";
+
+export function modeFor(connection: Connection): AiMode {
+  const env = readEnv();
+  if (env.HUNTLOOP_AI === "fake") return "fake";
+  if (connection === "api") return aiMode(env) === "live" ? "api" : "fake";
+  if (env.HUNTLOOP_AI === "claude-code") return "claude_code";
+  return cachedClaudeCodeStatus()?.loggedIn ? "claude_code" : "fake";
 }
 
-export function getAnthropic(): Anthropic {
-  const mode = aiMode();
-  if (!state.client || state.mode !== mode) {
-    state.mode = mode;
-    state.client =
-      mode === "fake"
-        ? new Anthropic({
-            apiKey: "demo-mode",
-            maxRetries: 0,
-            fetch: createFakeFetch({ streamDelayMs: process.env.NODE_ENV === "test" ? 0 : 12, models: [...MODEL_IDS] }),
-          })
-        : new Anthropic();
-  }
-  return state.client;
+/** Like `modeFor`, but checks the CLI first if it hasn't been checked yet. */
+export async function resolveMode(connection: Connection): Promise<AiMode> {
+  if (connection === "subscription" && !cachedClaudeCodeStatus() && readEnv().HUNTLOOP_AI !== "fake") await getClaudeCodeStatus();
+  return modeFor(connection);
 }
 
-/** For tests: drop the cached client (e.g. after changing HUNTLOOP_AI). */
+/** The mode of the active connection (for banners and the settings page). */
+export async function currentAiMode(ctx?: AiContext): Promise<AiMode> {
+  const connection = ctx ? settingsFor(ctx).connection : "api";
+  return resolveMode(connection);
+}
+
+export function getAnthropic(mode: "live" | "fake" = aiMode()): Anthropic {
+  state.clients[mode] ??=
+    mode === "fake"
+      ? new Anthropic({
+          apiKey: "demo-mode",
+          maxRetries: 0,
+          fetch: createFakeFetch({ streamDelayMs: process.env.NODE_ENV === "test" ? 0 : 12, models: [...MODEL_IDS] }),
+        })
+      : new Anthropic();
+  return state.clients[mode]!;
+}
+
+/** For tests: drop the cached clients (e.g. after changing HUNTLOOP_AI). */
 export function resetAiClient(): void {
-  state.client = undefined;
-  state.mode = undefined;
+  state.clients = {};
   state.degraded.clear();
 }
 
 export function settingsFor(ctx: AiContext): AiSettings {
-  return ctx.settings ?? getAiSettings(ctx.db, ctx.userId, envDefaultModel());
+  return ctx.settings ?? getAiSettings(ctx.db, ctx.userId, envDefaultModel(), defaultConnection());
+}
+
+export interface ResolvedCall {
+  settings: AiSettings;
+  connection: Connection;
+  mode: AiMode;
+  model: ModelId;
+  effort: Effort;
+}
+
+/** Which connection, model and effort a task's call uses; checks the budget or subscription limit for background work. */
+export async function resolveCall(ctx: AiContext, task: AiTask, options: Pick<CallOptions, "model" | "effort" | "connection" | "enforceBudget"> = {}): Promise<ResolvedCall> {
+  const settings = settingsFor(ctx);
+  const resolved = resolveTaskModel(settings, task);
+  const connection = options.connection ?? resolved.connection;
+  const mode = await resolveMode(connection);
+  if (options.enforceBudget && mode !== "claude_code" && budgetStatus({ ...ctx, settings }).exceeded) {
+    throw new AiError("budget", "AI budget cap reached");
+  }
+  if (options.enforceBudget && mode === "claude_code") {
+    const until = subscriptionLimitedUntil();
+    if (until) throw new AiError("subscription_limit", "Claude subscription usage limit reached", { resetsAt: until.toISOString() });
+  }
+  return { settings, connection, mode, model: options.model ?? resolved.model, effort: options.effort ?? resolved.effort };
 }
 
 export interface BudgetStatus {
@@ -102,10 +137,12 @@ export function budgetStatus(ctx: AiContext): BudgetStatus {
 }
 
 export interface CallOptions extends RequestOptions {
-  /** Bulk/background work is blocked once the budget cap is reached; interactive calls only warn. */
+  /** Bulk/background work is blocked once the budget cap (or the subscription's limit) is reached; interactive calls only warn. */
   enforceBudget?: boolean;
   model?: ModelId;
   effort?: Effort;
+  /** Use this connection instead of the task's (a chat thread stays on the one it started with). */
+  connection?: Connection;
   onEvent?: (event: StreamEvent) => void;
 }
 
@@ -125,17 +162,12 @@ export interface CallResult {
  * `stop_reason` themselves (chat needs to handle `tool_use` / `pause_turn` / `refusal`).
  */
 export async function callModel(ctx: AiContext, task: AiTask, request: CallRequest, options: CallOptions = {}): Promise<CallResult> {
-  const settings = settingsFor(ctx);
-  const resolved = resolveTaskModel(settings, task);
-  const model = options.model ?? resolved.model;
-  const effort = options.effort ?? resolved.effort;
-
-  if (options.enforceBudget && budgetStatus({ ...ctx, settings }).exceeded) {
-    throw new AiError("budget", "AI budget cap reached");
-  }
-
-  const client = getAnthropic();
-  const mode = aiMode();
+  const call = await resolveCall(ctx, task, options);
+  // Subscription calls run whole agent turns through the CLI (see claude-code/); callers branch first.
+  if (call.mode === "claude_code") throw new Error(`callModel can't serve ${task} through Claude Code`);
+  const { model, effort } = call;
+  const mode = call.mode === "api" ? "live" : "fake";
+  const client = getAnthropic(mode);
   const send = async (withoutOptionalFeatures: boolean) => {
     const base = buildBaseParams(model, effort, { ...options, withoutOptionalFeatures });
     const { betas, ...rest } = base;
@@ -179,6 +211,7 @@ export async function callModel(ctx: AiContext, task: AiTask, request: CallReque
     model,
     servedModel: message.model ?? null,
     simulated: mode === "fake",
+    via: "api",
   });
   return { message, model, effort, cost };
 }
@@ -204,6 +237,8 @@ export async function callStructured<S extends z.ZodType>(
   request: StructuredRequest<S>,
   options: CallOptions = {},
 ): Promise<StructuredResult<z.infer<S>>> {
+  const call = await resolveCall(ctx, task, options);
+  if (call.mode === "claude_code") return callStructuredViaCli(ctx, task, request, call);
   const format = betaZodOutputFormat(request.schema);
   let maxTokens = options.maxTokens ?? 32_000;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -213,7 +248,7 @@ export async function callStructured<S extends z.ZodType>(
         ctx,
         task,
         { system: request.system, messages: request.messages, tools: request.tools, output_config: { format } },
-        { ...options, maxTokens },
+        { ...options, connection: call.connection, maxTokens },
       );
     } catch (error) {
       if (error instanceof Anthropic.AnthropicError && !(error instanceof Anthropic.APIError)) {

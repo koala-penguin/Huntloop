@@ -1,7 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { resolveTaskModel, type AiTask } from "@/shared/ai-settings";
-import { AiError, callModel, settingsFor, type AiContext } from "./client";
+import type { AiTask } from "@/shared/ai-settings";
+import { AiError, callModel, resolveCall, type AiContext } from "./client";
+import { runSubmitLoopViaCli } from "./claude-code/agent";
 
 type Block = Record<string, unknown> & { type: string };
 type ToolUnion = Anthropic.Beta.Messages.BetaToolUnion;
@@ -76,7 +77,9 @@ export interface SubmitLoopResult<T> {
  * pause_turn continues the same turn. Only URLs in `sources` were really seen.
  */
 export async function runSubmitLoop<S extends z.ZodType>(ctx: AiContext, task: AiTask, options: SubmitLoopOptions<S>): Promise<SubmitLoopResult<z.infer<S>>> {
-  const { model, effort } = resolveTaskModel(settingsFor(ctx), task);
+  const call = await resolveCall(ctx, task, { enforceBudget: true });
+  if (call.mode === "claude_code") return runSubmitLoopViaCli(ctx, task, options, call);
+  const { model, effort, connection } = call;
   const tools = [...options.tools, submitTool(options.submit.name, options.submit.description, options.submit.schema)];
   const messages = [...options.messages];
   const seen: Block[] = [];
@@ -86,6 +89,7 @@ export async function runSubmitLoop<S extends z.ZodType>(ctx: AiContext, task: A
     const { message } = await callModel(ctx, task, { system: options.system, messages, tools }, {
       model,
       effort,
+      connection,
       maxTokens: options.maxTokens ?? 32_000,
       progressUpdates: true,
       enforceBudget: true,

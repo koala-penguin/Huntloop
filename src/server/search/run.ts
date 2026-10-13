@@ -199,7 +199,7 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
       leads.push(...found);
       summary.sources[source] = { leads: found.length, error: null };
     } catch (error) {
-      if (error instanceof AiError && error.code === "budget") summary.stoppedBy = "budget";
+      if (error instanceof AiError && (error.code === "budget" || error.code === "subscription_limit")) summary.stoppedBy = error.code === "budget" ? "budget" : "limit";
       if (error instanceof TaskCancelledError) throw error;
       summary.sources[source] = {
         leads: 0,
@@ -264,7 +264,7 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
       await processJob(ctx, job, { screen: true });
       screenedIds.push(job.id);
     } catch (error) {
-      if (error instanceof AiError && error.code === "budget") summary.stoppedBy = "budget";
+      if (error instanceof AiError && (error.code === "budget" || error.code === "subscription_limit")) summary.stoppedBy = error.code === "budget" ? "budget" : "limit";
       updateJob(ctx.db, job.id, { intakeStatus: "failed", intakeError: formatTaskError(error) });
     } finally {
       progress.counts.screened++;
@@ -278,7 +278,7 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
   summary.screened = screenedIds.length;
 
   // 6. Deep pass: fetch the full posting for the best few and analyse them properly.
-  const enrich = options.enrich ?? currentAiMode() === "live";
+  const enrich = options.enrich ?? (await currentAiMode(ctx)) !== "fake";
   const ranked = screenedIds
     .map((id) => getJob(ctx.db, ctx.userId, id)!)
     .filter((j) => j.eligibility !== "ineligible" && !j.descriptionIsFull && j.sourceUrl)
@@ -300,7 +300,7 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
         summary.deep++;
       }
     } catch (error) {
-      if (error instanceof AiError && error.code === "budget") summary.stoppedBy = "budget";
+      if (error instanceof AiError && (error.code === "budget" || error.code === "subscription_limit")) summary.stoppedBy = error.code === "budget" ? "budget" : "limit";
       // Keep the screened (provisional) result.
     } finally {
       progress.counts.deep++;

@@ -2,16 +2,18 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { aiSettingsSchema, type AiSettings } from "@/shared/ai-settings";
+import { aiSettingsSchema, CONNECTIONS, type AiConfig, type AiSettings, type Connection } from "@/shared/ai-settings";
 import { MODEL_IDS, type ModelId } from "@/shared/models";
 import { isLocale, LOCALE_COOKIE } from "@/i18n/locales";
 import { appContext } from "@/server/context";
-import { saveAiSettings, saveSourceSettings } from "@/server/repo/settings";
+import { getAiConfig, saveAiConfig, saveAiSettings, saveSourceSettings } from "@/server/repo/settings";
+import { envDefaultModel } from "@/server/config/env";
 import { sourceSettingsSchema, type SourceSettings } from "@/shared/source-settings";
 import { withBrowserPage } from "@/server/browser/service";
 import { errorCodeOf } from "@/server/errors";
 import { setUserLocale } from "@/server/repo/users";
-import { currentAiMode, getAnthropic } from "@/server/ai/client";
+import { getAnthropic, modeFor } from "@/server/ai/client";
+import { defaultConnection, getClaudeCodeStatus, isConsoleSignIn } from "@/server/ai/claude-code/status";
 
 export async function setLocaleAction(locale: string): Promise<void> {
   if (!isLocale(locale)) throw new Error("Unsupported language");
@@ -24,13 +26,40 @@ export async function setLocaleAction(locale: string): Promise<void> {
 
 export type SaveResult = { ok: true; settings: AiSettings } | { ok: false; error: string };
 
+/** Saves one profile (API or subscription); which connection is active stays as it is. */
 export async function saveAiSettingsAction(input: unknown): Promise<SaveResult> {
   const parsed = aiSettingsSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join("; ") };
   const { db, user } = appContext();
-  const settings = saveAiSettings(db, user.id, parsed.data);
+  const settings = saveAiSettings(db, user.id, parsed.data, defaultConnection());
   revalidatePath("/", "layout");
   return { ok: true, settings };
+}
+
+/** Switches between the API key and the Claude subscription (from the next AI call). */
+export async function setActiveConnectionAction(connection: string): Promise<{ ok: true; config: AiConfig } | { ok: false; error: string }> {
+  if (!(CONNECTIONS as readonly string[]).includes(connection)) return { ok: false, error: "invalid" };
+  const { db, user } = appContext();
+  const config = getAiConfig(db, user.id, envDefaultModel(), defaultConnection());
+  const saved = saveAiConfig(db, user.id, { ...config, active: connection as Connection });
+  revalidatePath("/", "layout");
+  return { ok: true, config: saved };
+}
+
+export interface ClaudeCodeView {
+  found: boolean;
+  version: string | null;
+  loggedIn: boolean;
+  authMethod: string | null;
+  /** Signed in with a Console API key: billed per token, not the plan's limits. */
+  consoleSignIn: boolean;
+}
+
+/** Asks the Claude Code CLI again whether it is installed and signed in (nothing about the credentials). */
+export async function checkClaudeCodeAction(): Promise<ClaudeCodeView> {
+  const status = await getClaudeCodeStatus({ refresh: true });
+  revalidatePath("/", "layout");
+  return { found: status.found, version: status.version, loggedIn: status.loggedIn, authMethod: status.authMethod, consoleSignIn: isConsoleSignIn(status.authMethod) };
 }
 
 export type ModelAccessResult =
@@ -40,9 +69,10 @@ export type ModelAccessResult =
 /** Lists the models this API key can use (Models API) and intersects them with Huntloop's registry. */
 export async function checkModelAccessAction(): Promise<ModelAccessResult> {
   try {
+    const mode = modeFor("api") === "api" ? "live" : "fake";
     const ids = new Set<string>();
-    for await (const model of getAnthropic().models.list()) ids.add(model.id);
-    return { ok: true, mode: currentAiMode(), available: MODEL_IDS.filter((id) => ids.has(id)) };
+    for await (const model of getAnthropic(mode).models.list()) ids.add(model.id);
+    return { ok: true, mode, available: MODEL_IDS.filter((id) => ids.has(id)) };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
 import { appContext } from "@/server/context";
 import { budgetStatus } from "@/server/ai/client";
+import { subscriptionUsage } from "@/server/ai/claude-code/limits";
 import { usageReport, type UsageRow } from "@/server/repo/usage";
 import { AI_TASKS, type AiTask } from "@/shared/ai-settings";
 import { MODELS, isModelId } from "@/shared/models";
@@ -21,6 +22,10 @@ export default async function UsagePage() {
   const report = usageReport(db, user.id, DAYS);
   const number = (n: number) => new Intl.NumberFormat(locale, { notation: n >= 10_000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(n);
   const ratio = budget.dailyCapUsd > 0 ? budget.todayUsd / budget.dailyCapUsd : 0;
+  const limits = subscriptionUsage();
+  const when = (d: Date) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(d);
+  const percent = (n: number) => new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(n);
+  const showSubscription = report.subscriptionCalls > 0 || !!limits;
 
   const table = (rows: UsageRow[], label: (key: string) => string, caption: string) => (
     <table className="w-full text-left text-sm">
@@ -33,6 +38,7 @@ export default async function UsagePage() {
           <th className="py-1 text-right font-medium">{t("table.cached")}</th>
           <th className="py-1 text-right font-medium">{t("table.searches")}</th>
           <th className="py-1 text-right font-medium">{t("table.cost")}</th>
+          {showSubscription && <th className="py-1 text-right font-medium">{t("table.subscription")}</th>}
         </tr>
       </thead>
       <tbody style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -46,6 +52,9 @@ export default async function UsagePage() {
               <td className="py-1.5 text-right">{input ? `${Math.round((r.cacheReadTokens / input) * 100)}%` : "–"}</td>
               <td className="py-1.5 text-right">{number(r.webSearches)}</td>
               <td className="py-1.5 text-right">{formatUsd(r.costUsd, locale)}</td>
+              {showSubscription && (
+                <td className="py-1.5 text-right">{r.subscriptionCalls ? t("table.subscriptionValue", { calls: number(r.subscriptionCalls), value: formatUsd(r.subscriptionUsd, locale) }) : "–"}</td>
+              )}
             </tr>
           );
         })}
@@ -86,6 +95,36 @@ export default async function UsagePage() {
       </div>
 
       {report.simulatedCalls > 0 && <p className="text-sm text-muted">{t("simulated", { count: report.simulatedCalls })}</p>}
+
+      {showSubscription && (
+        <Card data-section="subscription">
+          <CardHeader>
+            <CardTitle>{t("subscriptionTitle")}</CardTitle>
+            <CardDescription>{t("subscriptionDescription")}</CardDescription>
+          </CardHeader>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted">{t("last30")}</p>
+              <p className="text-2xl font-semibold">{t("calls", { count: report.subscriptionCalls })}</p>
+              <p className="text-xs text-muted">{t("subscriptionValue", { value: formatUsd(report.subscriptionUsd, locale) })}</p>
+            </div>
+            {(["fiveHour", "sevenDay"] as const).map((key) => {
+              const w = limits?.[key];
+              return (
+                <div key={key}>
+                  <p className="text-xs text-muted">{t(`window.${key}`)}</p>
+                  <p className="text-2xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    {w?.utilization !== null && w?.utilization !== undefined ? percent(w.utilization) : "–"}
+                  </p>
+                  <p className="text-xs text-muted">{w?.resetsAt ? t("window.resets", { time: when(w.resetsAt) }) : t("window.unknown")}</p>
+                </div>
+              );
+            })}
+          </div>
+          {limits?.status === "rejected" && limits.resetsAt && <p className="mt-3 text-sm text-warning">{t("limitReached", { time: when(limits.resetsAt) })}</p>}
+          {limits && <p className="mt-3 text-xs text-muted">{t("limitsAsOf", { time: when(limits.updatedAt) })}</p>}
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

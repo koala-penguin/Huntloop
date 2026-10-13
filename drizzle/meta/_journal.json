@@ -71,6 +71,13 @@
       "when": 1791861554764,
       "tag": "0009_watchlist",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791894880008,
+      "tag": "0010_claude_code",
+      "breakpoints": true
     }
   ]
 }

@@ -4,19 +4,23 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { LanguageForm } from "@/components/settings/language-form";
 import { AiSettingsForm } from "@/components/settings/ai-settings-form";
+import { ConnectionSettings } from "@/components/settings/connection-settings";
 import { appContext } from "@/server/context";
 import { spendSummary } from "@/server/repo/usage";
-import { readEnv } from "@/server/config/env";
-import { getSourceSettings } from "@/server/repo/settings";
+import { envDefaultModel, readEnv } from "@/server/config/env";
+import { getAiConfig, getSourceSettings } from "@/server/repo/settings";
+import { defaultConnection, getClaudeCodeStatus, isConsoleSignIn } from "@/server/ai/claude-code/status";
 import { SourcesForm } from "@/components/settings/sources-form";
 
 export default async function SettingsPage() {
   const t = await getTranslations("settings");
   const tCommon = await getTranslations("common");
   const locale = await getLocale();
-  const { db, user, settings } = appContext();
+  const { db, user } = appContext();
   const spend = spendSummary(db, user.id);
   const env = readEnv();
+  const cli = await getClaudeCodeStatus();
+  const config = getAiConfig(db, user.id, envDefaultModel(), defaultConnection());
   const keys = [
     { label: t("keyAnthropic"), set: !!env.ANTHROPIC_API_KEY, optional: false },
     { label: t("keyAdzuna"), set: !!(env.ADZUNA_APP_ID && env.ADZUNA_APP_KEY), optional: true },
@@ -38,7 +42,21 @@ export default async function SettingsPage() {
         <LanguageForm />
       </Card>
 
-      <AiSettingsForm initial={settings} spentToday={formatUsd(spend.todayUsd, locale)} spentMonth={formatUsd(spend.monthUsd, locale)} />
+      <ConnectionSettings
+        key={`connection-${config.active}`}
+        active={config.active}
+        apiKeySet={!!env.ANTHROPIC_API_KEY}
+        cli={{ found: cli.found, version: cli.version, loggedIn: cli.loggedIn, authMethod: cli.authMethod, consoleSignIn: isConsoleSignIn(cli.authMethod) }}
+        demoForced={env.HUNTLOOP_AI === "fake"}
+      />
+
+      <AiSettingsForm
+        key={config.active}
+        profiles={config.profiles}
+        active={config.active}
+        spentToday={formatUsd(spend.todayUsd, locale)}
+        spentMonth={formatUsd(spend.monthUsd, locale)}
+      />
 
       <SourcesForm initial={getSourceSettings(db, user.id)} adzunaConfigured={!!(env.ADZUNA_APP_ID && env.ADZUNA_APP_KEY)} today={new Date().toISOString().slice(0, 10)} />
 

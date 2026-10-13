@@ -40,6 +40,8 @@ export const usageLog = sqliteTable(
     webSearches: integer("web_searches").notNull().default(0),
     costUsd: real("cost_usd").notNull().default(0),
     simulated: integer("simulated", { mode: "boolean" }).notNull().default(false),
+    /** "api" (billed per token) or "claude_code" (the user's Claude subscription; cost is the API-equivalent, not billed). */
+    via: text("via").notNull().default("api"),
     createdAt: createdAt(),
   },
   (t) => [index("usage_log_created").on(t.createdAt)],
@@ -290,6 +292,10 @@ export const conversations = sqliteTable(
     tools: text("tools", { mode: "json" }).notNull(),
     /** Snapshot of the job state last told to the model; a change is sent as a context update. */
     stateDigest: text("state_digest"),
+    /** "api" or "subscription" (Claude Code CLI); frozen like the model. */
+    provider: text("provider").notNull().default("api"),
+    /** The Claude Code session holding this thread (subscription threads). */
+    providerSession: text("provider_session"),
     createdAt: createdAt(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
   },

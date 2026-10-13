@@ -10,7 +10,8 @@ import { FieldHint, Label, Textarea } from "@/components/ui/form";
 import { Alert } from "@/components/ui/badge";
 import { useTask } from "@/components/tasks/use-task";
 
-const KNOWN_ERRORS = ["unsupported_file", "file_too_large", "text_too_long", "cv_too_short", "missing_input", "refusal", "budget", "invalid_output", "max_tokens"];
+import { AI_ERROR_CODES } from "@/shared/ai-errors";
+const KNOWN_ERRORS = ["unsupported_file", "file_too_large", "text_too_long", "cv_too_short", "missing_input", "refusal", "budget", "invalid_output", "max_tokens", ...AI_ERROR_CODES];
 
 export function CvUpload({ replacing }: { replacing: boolean }) {
   const t = useTranslations("profile.upload");

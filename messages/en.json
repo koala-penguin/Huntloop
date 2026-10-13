@@ -11,12 +11,17 @@
     "configured": "Configured",
     "missing": "Missing",
     "optional": "Optional",
-    "demoBanner": "Demo mode: AI responses are simulated. Add ANTHROPIC_API_KEY to .env.local and restart to use Claude.",
+    "demoBanner": {
+      "forced": "Demo mode: AI responses are simulated (HUNTLOOP_AI=fake).",
+      "api": "Demo mode: AI responses are simulated. The API key connection has no ANTHROPIC_API_KEY — add it to .env.local and restart, or switch to your Claude subscription.",
+      "subscription": "Demo mode: AI responses are simulated. Claude Code isn't installed or signed in — run “claude auth login” in a terminal and check again in Settings, or switch to the API key."
+    },
     "budgetWarning": "AI spend today is {today} of your {cap} daily cap.",
     "budgetExceeded": "Daily AI budget reached ({cap}). Background work is paused until tomorrow or until you raise the cap in Settings.",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "saveFailed": "Could not save: {message}"
+    "saveFailed": "Could not save: {message}",
+    "subscriptionLimited": "Your Claude subscription's usage limit is reached. Background work waits until it resets ({time}); switch to the API key to keep going now."
   },
   "nav": {
     "main": "Main navigation",
@@ -34,7 +39,7 @@
     "setupTitle": "Getting started",
     "stepKey": "Connect Claude",
     "stepKeyDone": "Claude is connected.",
-    "stepKeyTodo": "Add your Anthropic API key to .env.local. Until then everything runs in demo mode.",
+    "stepKeyTodo": "Add your Anthropic API key, or sign in to Claude Code to use your Claude subscription (Settings → Claude connection). Until then everything runs in demo mode.",
     "stepModels": "Choose your AI models",
     "stepModelsBody": "Every task uses {model} by default. You can change models and effort per task in Settings.",
     "stepProfile": "Add your CV",
@@ -153,7 +158,59 @@
         "saveSites": "Save sites"
       }
     },
-    "usageLink": "See usage details"
+    "usageLink": "See usage details",
+    "connection": {
+      "title": "Claude connection",
+      "description": "Choose how Huntloop reaches Claude. You can switch at any time; each connection keeps its own models and limits below.",
+      "inUse": "In use",
+      "useThis": "Use this",
+      "switchLabel": "Claude via",
+      "api": {
+        "short": "API key",
+        "title": "Anthropic API key",
+        "body": "Calls go to the Claude API and are billed per token to your Claude Console account. Spending caps apply.",
+        "keySet": "API key configured",
+        "keyMissing": "No API key",
+        "howTo": "Add ANTHROPIC_API_KEY to .env.local (or your environment's secrets) and restart Huntloop.",
+        "credits": "Max and Team plans include monthly API credits: create the key in the Console organisation linked to your plan and they are used first."
+      },
+      "subscription": {
+        "short": "Subscription",
+        "title": "Claude subscription (Claude Code)",
+        "body": "Huntloop runs your own signed-in Claude Code CLI (claude -p). Calls count against your Pro or Max plan's usage limits instead of being billed per token.",
+        "notInstalled": "Claude Code not found",
+        "signedOut": "Not signed in",
+        "signedIn": "Signed in",
+        "version": "Claude Code {version}",
+        "checkAgain": "Check again",
+        "checking": "Checking…",
+        "install": "Install Claude Code:",
+        "installCommand": "npm install -g @anthropic-ai/claude-code",
+        "login": "Sign in with your Claude account in a terminal:",
+        "loginCommand": "claude auth login",
+        "thenCheck": "Then press “Check again”.",
+        "consoleSignIn": "Claude Code is signed in with a Console API key, so these calls are billed per token. Sign in with your Claude account to use your plan's limits.",
+        "privacy": "Huntloop never sees or stores your sign-in; it only asks Claude Code whether it is signed in."
+      },
+      "demoForced": "HUNTLOOP_AI=fake is set, so every AI call is simulated whichever connection you choose.",
+      "notReady": {
+        "api": "The API key connection is selected but no key is configured, so Huntloop runs in demo mode.",
+        "subscription": "The subscription connection is selected but Claude Code isn't ready, so Huntloop runs in demo mode."
+      },
+      "notReadyShort": {
+        "api": "No API key configured",
+        "subscription": "Claude Code isn't installed or signed in"
+      }
+    },
+    "profileTabs": "Settings for",
+    "profileInUse": "(in use)",
+    "profileHint": {
+      "api": "Models, effort and caps used while the API key connection is selected.",
+      "subscription": "Models, effort and limits used while the subscription connection is selected. Larger models use up your plan's limits faster."
+    },
+    "taskConnection": "Connection",
+    "taskConnectionProfile": "As selected ({connection})",
+    "budgetSubscriptionHint": "On the subscription, calls count against your plan's usage limits rather than these caps. The caps still apply to any task you set to use the API key, and daily checks are skipped when your plan's limit is close."
   },
   "effort": {
     "low": "Low",
@@ -252,7 +309,11 @@
     "unresolved_flags": "Resolve the flagged lines before downloading.",
     "invalid": "That input isn't valid.",
     "unsupported_board": "Huntloop can watch Greenhouse, Lever and Ashby job boards. Paste a link to the employer's board or one of its jobs there.",
-    "board_unavailable": "That job board couldn't be read right now. Huntloop will try again tomorrow."
+    "board_unavailable": "That job board couldn't be read right now. Huntloop will try again tomorrow.",
+    "cli_missing": "Claude Code isn't installed (or not where HUNTLOOP_CLAUDE_PATH points). Install it, or switch to the API key in Settings.",
+    "cli_login": "Claude Code isn't signed in. Run “claude auth login” in a terminal, then try again.",
+    "subscription_limit": "Your Claude subscription's usage limit has been reached. Try again after it resets, or switch to the API key in Settings.",
+    "model_unavailable": "That model isn't available on your plan. Choose another model for this task in Settings."
   },
   "profile": {
     "title": "Your profile",
@@ -810,7 +871,12 @@
       "max_tokens": "The answer was cut off. Ask Claude to continue or to be shorter.",
       "chat_busy": "Claude is still answering your last message.",
       "job_not_ready": "Wait until the posting has been analysed.",
-      "api": "Claude couldn't be reached. Try again in a moment."
+      "api": "Claude couldn't be reached. Try again in a moment.",
+      "invalid_output": "The answer came back in an unexpected format. Please try again.",
+      "cli_missing": "Claude Code isn't installed. Install it, or switch to the API key in Settings.",
+      "cli_login": "Claude Code isn't signed in. Run “claude auth login” in a terminal, then try again.",
+      "subscription_limit": "Your Claude subscription's usage limit has been reached. Try again after it resets, or switch to the API key.",
+      "model_unavailable": "The chat's model isn't available on your plan. Start a new conversation after choosing another model in Settings."
     },
     "activity": {
       "web_search": "Searched the web: {detail}",
@@ -932,7 +998,10 @@
       "budget": "stopped because your AI spending cap was reached",
       "refusal": "Claude declined this search",
       "other": "couldn't be reached this time",
-      "browser_unavailable": "Huntloop couldn't open its browser window (see Settings → Job sources)"
+      "browser_unavailable": "Huntloop couldn't open its browser window (see Settings → Job sources)",
+      "subscription_limit": "stopped because your Claude subscription's usage limit was reached",
+      "cli_login": "Claude Code isn't signed in",
+      "cli_missing": "Claude Code isn't installed"
     },
     "summaryCounts": "{unique} unique · {known} already in your list · {screened} newly assessed · {deep} with the full posting",
     "filteredOut": "Left out before any AI call:",
@@ -1012,7 +1081,8 @@
       "listDescription": "Searches you saved, with what each found for the first time in its latest run.",
       "listEmpty": "None yet. Open a search and save it to keep it here.",
       "newCount": "{count} new",
-      "dailyBadge": "Daily"
+      "dailyBadge": "Daily",
+      "skippedLimit": "The last daily check was skipped because your Claude subscription was close to its usage limit."
     },
     "watch": {
       "summaryTitle": "Employers you watch",
@@ -1052,7 +1122,8 @@
         "excluded_company": "Excluded company",
         "excluded_keyword": "Has a word you excluded"
       }
-    }
+    },
+    "stoppedByLimit": "The run stopped early because your Claude subscription's usage limit was reached. Run it again after the limit resets, or switch to the API key."
   },
   "userAction": {
     "title": "Action needed in Huntloop's browser window",
@@ -1314,12 +1385,25 @@
       "tokensValue": "{input} / {output}",
       "cached": "Cached input",
       "searches": "Web searches",
-      "cost": "Cost"
+      "cost": "Cost",
+      "subscription": "Subscription",
+      "subscriptionValue": "{calls} · ≈{value}"
     },
     "chart": {
       "aria": "Daily AI spend over the last {days} days",
       "bar": "{date}: {cost}, {calls} calls",
       "calls": "{count, plural, one {# call} other {# calls}}"
-    }
+    },
+    "subscriptionTitle": "Claude subscription",
+    "subscriptionDescription": "Calls made through your Claude subscription (Claude Code). They count against your plan's usage limits and aren't billed; the value shows what they would have cost on the API.",
+    "subscriptionValue": "≈ {value} at API prices, not billed",
+    "window": {
+      "fiveHour": "5-hour limit used",
+      "sevenDay": "Weekly limit used",
+      "resets": "resets {time}",
+      "unknown": "shown after the next call"
+    },
+    "limitReached": "The usage limit is reached. Background work resumes after {time}.",
+    "limitsAsOf": "Limits as Claude Code last reported them ({time})."
   }
 }

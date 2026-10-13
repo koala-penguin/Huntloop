@@ -35,7 +35,8 @@ import { WatchEmployerButton } from "@/components/search/watchlist-controls";
 import { cvWorkspaceData } from "@/server/cv/view";
 import { CvWorkspace, ProceedButton } from "@/components/cv/cv-workspace";
 
-const KNOWN_ERRORS = ["not_a_job_posting", "url_blocked", "missing_posting", "refusal", "budget", "invalid_output", "max_tokens"];
+import { AI_ERROR_CODES } from "@/shared/ai-errors";
+const KNOWN_ERRORS = ["not_a_job_posting", "url_blocked", "missing_posting", "refusal", "budget", "invalid_output", "max_tokens", ...AI_ERROR_CODES];
 
 export default async function JobPage({ params, searchParams }: PageProps<"/jobs/[id]">) {
   const { id } = await params;

@@ -52,6 +52,8 @@ export default defineConfig({
         // The employer watchlist reads a local Greenhouse-style board; no daily checks during tests.
         HUNTLOOP_ATS_API_BASE: `http://127.0.0.1:${SITES_PORT}/ats`,
         HUNTLOOP_SCHEDULER: "off",
+        // The Settings page asks Claude Code whether it is signed in; keep the real CLI out of tests.
+        HUNTLOOP_CLAUDE_PATH: "/nonexistent/claude",
         ...(chromium ? { HUNTLOOP_BROWSER_PATH: chromium } : {}),
       },
     },

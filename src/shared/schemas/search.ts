@@ -53,5 +53,6 @@ export interface SearchRunSummary {
   filtered: Record<string, number>;
   screened: number;
   deep: number;
-  stoppedBy: "budget" | null;
+  /** Background AI work stopped: the API spending cap, or the Claude subscription's usage limit. */
+  stoppedBy: "budget" | "limit" | null;
 }

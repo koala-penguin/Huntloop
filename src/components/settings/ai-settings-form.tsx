@@ -4,16 +4,19 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { AI_TASKS, type AiSettings, type AiTask } from "@/shared/ai-settings";
+import { AI_TASKS, CONNECTIONS, TASK_CONNECTIONS, type AiSettings, type AiTask, type Connection, type TaskConnection } from "@/shared/ai-settings";
 import { EFFORT_LEVELS, MODEL_IDS, MODELS, isModelId, type Effort, type ModelId } from "@/shared/models";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FieldHint, Input, Label, Select } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/cn";
 import { saveAiSettingsAction, checkModelAccessAction, type ModelAccessResult } from "@/app/settings/actions";
 
 interface Props {
-  initial: AiSettings;
+  /** One settings profile per connection; the active one is used for AI calls. */
+  profiles: Record<Connection, AiSettings>;
+  active: Connection;
   /** Pre-formatted on the server (Intl output can differ between Node and the browser). */
   spentToday: string;
   spentMonth: string;
@@ -21,13 +24,18 @@ interface Props {
 
 type Status = { kind: "idle" } | { kind: "saved" } | { kind: "error"; message: string };
 
-export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
+export function AiSettingsForm({ profiles: initialProfiles, active, spentToday, spentMonth }: Props) {
   const t = useTranslations("settings");
   const tTasks = useTranslations("aiTasks");
   const tEffort = useTranslations("effort");
   const tCommon = useTranslations("common");
   const router = useRouter();
-  const [settings, setSettings] = useState<AiSettings>(initial);
+  const tConnection = useTranslations("settings.connection");
+  const [profiles, setProfiles] = useState(initialProfiles);
+  const [editing, setEditing] = useState<Connection>(active);
+  const settings = profiles[editing];
+  const setSettings = (next: AiSettings | ((s: AiSettings) => AiSettings)) =>
+    setProfiles((all) => ({ ...all, [editing]: typeof next === "function" ? next(all[editing]) : next }));
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [pending, startTransition] = useTransition();
   const [access, setAccess] = useState<ModelAccessResult | null>(null);
@@ -38,7 +46,7 @@ export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
     setStatus({ kind: "idle" });
   };
 
-  const setTask = (task: AiTask, patch: Partial<{ model: ModelId | null; effort: Effort }>) =>
+  const setTask = (task: AiTask, patch: Partial<{ model: ModelId | null; effort: Effort; connection: TaskConnection }>) =>
     update((s) => ({ ...s, tasks: { ...s.tasks, [task]: { ...s.tasks[task], ...patch } } }));
 
   const save = () =>
@@ -65,8 +73,32 @@ export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
 
   const defaultLabel = MODELS[settings.defaultModel].label;
 
+  const profileTabs = (
+    <div role="group" aria-label={t("profileTabs")} className="flex flex-wrap gap-1 border-b border-border">
+      {CONNECTIONS.map((connection) => (
+        <button
+          key={connection}
+          type="button"
+          aria-pressed={editing === connection}
+          onClick={() => {
+            setEditing(connection);
+            setStatus({ kind: "idle" });
+          }}
+          className={cn("-mb-px border-b-2 px-3 py-2 text-sm", editing === connection ? "border-accent font-medium" : "border-transparent text-muted hover:text-foreground")}
+        >
+          {tConnection(`${connection}.short`)}
+          {connection === active && <span className="ml-2 text-xs text-muted">{t("profileInUse")}</span>}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <>
+      <section aria-label={t("profileTabs")} className="flex flex-col gap-1">
+        {profileTabs}
+        <p className="text-sm text-muted">{t(`profileHint.${editing}`)}</p>
+      </section>
       <Card>
         <CardHeader>
           <CardTitle>{t("modelsTitle")}</CardTitle>
@@ -94,14 +126,14 @@ export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
           </FieldHint>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        {editing === "api" && <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button type="button" variant="secondary" size="sm" disabled={checking} onClick={() => startChecking(async () => setAccess(await checkModelAccessAction()))}>
             {checking ? t("checking") : t("checkAccess")}
           </Button>
           {access?.ok === false && <span className="text-sm text-danger">{t("accessError", { message: access.error })}</span>}
           {access?.ok && access.mode === "fake" && <span className="text-sm text-muted">{t("accessDemo")}</span>}
-        </div>
-        {access?.ok && (
+        </div>}
+        {editing === "api" && access?.ok && (
           <ul className="mt-3 flex flex-wrap gap-2">
             {MODEL_IDS.map((id) => {
               const available = access.available.includes(id);
@@ -124,7 +156,8 @@ export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
               <tr className="border-b border-border text-left text-xs text-muted">
                 <th className="py-2 pr-4 font-medium">{t("task")}</th>
                 <th className="py-2 pr-4 font-medium">{t("model")}</th>
-                <th className="py-2 font-medium">{t("effort")}</th>
+                <th className="py-2 pr-4 font-medium">{t("effort")}</th>
+                <th className="py-2 font-medium">{t("taskConnection")}</th>
               </tr>
             </thead>
             <tbody>
@@ -150,7 +183,7 @@ export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
                         ))}
                       </Select>
                     </td>
-                    <td className="py-3 align-top">
+                    <td className="py-3 pr-4 align-top">
                       <Select
                         aria-label={`${tTasks(`${task}.name`)} — ${t("effort")}`}
                         value={entry.effort}
@@ -159,6 +192,19 @@ export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
                         {EFFORT_LEVELS.map((level) => (
                           <option key={level} value={level}>
                             {tEffort(level)}
+                          </option>
+                        ))}
+                      </Select>
+                    </td>
+                    <td className="py-3 align-top">
+                      <Select
+                        aria-label={`${tTasks(`${task}.name`)} — ${t("taskConnection")}`}
+                        value={entry.connection}
+                        onChange={(e) => setTask(task, { connection: e.target.value as TaskConnection })}
+                      >
+                        {TASK_CONNECTIONS.map((c) => (
+                          <option key={c} value={c}>
+                            {c === "profile" ? t("taskConnectionProfile", { connection: tConnection(`${editing}.short`) }) : tConnection(`${c}.short`)}
                           </option>
                         ))}
                       </Select>
@@ -177,6 +223,7 @@ export function AiSettingsForm({ initial, spentToday, spentMonth }: Props) {
           <CardTitle>{t("budgetTitle")}</CardTitle>
           <CardDescription>{t("budgetDescription")}</CardDescription>
         </CardHeader>
+        {editing === "subscription" && <p className="mb-4 text-sm text-muted">{t("budgetSubscriptionHint")}</p>}
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-2">
             <Label htmlFor="daily-cap">{t("dailyCap")}</Label>
