@@ -3,8 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { BrowserContext } from "playwright-core";
 import type { SearchFilters } from "@/shared/schemas/search";
 import { stableStringify } from "@/shared/stable-json";
-import { resolveTaskModel } from "@/shared/ai-settings";
-import { AiError, callModel, settingsFor, type AiContext } from "../client";
+import { AiError, callModel, resolveCall, type AiContext } from "../client";
 import { BETA_CONTEXT_MANAGEMENT, webTools } from "../request";
 import { normalizeUrl, seenSources, submitTool } from "../agent-loop";
 import { leadsSchema } from "../tasks/search-agent";
@@ -15,6 +14,10 @@ import { capturePage } from "../../sources/browser/common";
 import { TaskCancelledError, type TaskContext } from "../../tasks/runner";
 import type { JobLead } from "../../sources/types";
 import { McpBrowserBridge } from "./mcp-bridge";
+import { runClaudeCode, type CliEvent } from "../claude-code/cli";
+import { cliSources, cliToolNote } from "../claude-code/agent";
+import { cliJsonSchema, isRefusal, logCliUsage } from "../claude-code/structured";
+import { MCP_PREFIX, mcpServersFor, openMcpRun } from "../claude-code/mcp-runs";
 import { checkToolCall, hostAllowList, parseSnapshot, selectedPageId, type GuardState } from "./guard";
 
 export type AgentGoal =
@@ -111,7 +114,8 @@ function isRestrictedHost(host: string): boolean {
  * that drift off the allowed sites are closed; walls pause for the user.
  */
 export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: AgentRunOptions = {}): Promise<AgentResult> {
-  const { model } = resolveTaskModel(settingsFor(ctx), "browserAgent");
+  const call = await resolveCall(ctx, "browserAgent", { enforceBudget: true });
+  const { model, connection } = call;
   const staticHosts = new Set<string>();
   const searchedHosts = new Set<string>();
   if (goal.kind === "search") staticHosts.add(hostOf(goal.site.url) ?? "");
@@ -130,7 +134,66 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
     const note = (text: string) => options.onProgress?.(text);
     let refused = 0;
     let steps = 0;
+    /** One browser action: the guard first, then the browser, then what navigation changed. */
+    const runGuarded = async (name: string, input: Record<string, unknown>): Promise<{ text: string; isError: boolean }> => {
+      if (options.signal?.aborted) throw new TaskCancelledError();
+      const decision = checkToolCall(name, input, guard);
+      if (!decision.ok) {
+        refused++;
+        return { text: `Refused: ${decision.reason}`, isError: true };
+      }
+      note(describe(name, decision.input));
+      const out = await bridge.call(name, decision.input);
+      if (!out.isError && out.text.includes("uid=")) {
+        const page = Number(decision.input.pageId ?? selectedPageId(out.text));
+        if (Number.isFinite(page)) guard.snapshots.set(page, parseSnapshot(out.text));
+      }
+      const extra = NAVIGATING.has(name) ? await afterNavigation(browser, guard, visited, options) : [];
+      return { text: [out.text, ...extra].join("\n"), isError: out.isError };
+    };
     try {
+      if (call.mode === "claude_code") {
+        // The user's Claude subscription: Claude Code drives the browser through the same guarded tools, over MCP.
+        const mcp = openMcpRun({
+          tools: bridge.tools().map((t) => ({ name: t.name, description: t.description ?? t.name, inputSchema: t.input_schema as unknown as Record<string, unknown> })),
+          call: async (name, input) => {
+            steps++;
+            return runGuarded(name, input);
+          },
+        });
+        const web = goal.kind === "find_on_employer_site" ? ["WebSearch"] : [];
+        const events: CliEvent[] = [];
+        try {
+          const run = await runClaudeCode({
+            model: call.model,
+            effort: call.effort,
+            systemPrompt: `${SYSTEM}${cliToolNote(REPORT, web)}\n- The browser tools carry the prefix ${MCP_PREFIX} (for example take_snapshot is ${MCP_PREFIX}take_snapshot).`,
+            input: [{ type: "text", text: instructions(goal, new Date().toISOString().slice(0, 10)) }],
+            tools: web,
+            allowedTools: [...web, "mcp__huntloop"],
+            mcpServers: mcpServersFor(mcp.token),
+            jsonSchema: cliJsonSchema(leadsSchema),
+            maxTurns: (options.maxSteps ?? 30) + 5,
+            signal: options.signal,
+            onEvent: (event) => {
+              if (event.type === "system" && event.subtype === "task_summary" && typeof event.detail === "string" && event.detail.trim()) note(event.detail.trim());
+              if (event.type !== "assistant" && event.type !== "user") return;
+              events.push(event);
+              // Sites found by web search become allowed, as on the API.
+              if (event.type === "user") for (const source of cliSources(events)) searchedHosts.add(hostOf(source.url) ?? "");
+            },
+          });
+          logCliUsage(ctx, "browserAgent", call.model, run);
+          if (isRefusal(run)) throw new AiError("refusal", "Claude declined this browsing task");
+          return { ...(await acceptLeads(browser, goal, run.result.structured_output, visited, options)), refused, steps };
+        } catch (error) {
+          if (options.signal?.aborted) throw new TaskCancelledError();
+          throw error;
+        } finally {
+          mcp.close();
+        }
+      }
+
       const tools: Anthropic.Beta.Messages.BetaToolUnion[] = [
         ...bridge.tools(),
         submitTool(REPORT, "Report the job postings you opened. Call it once, at the end.", leadsSchema),
@@ -155,6 +218,7 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
           },
           {
             model,
+            connection,
             maxTokens: 16_000,
             progressUpdates: true,
             enforceBudget: true,
@@ -184,20 +248,8 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
 
         const results: Anthropic.Beta.Messages.BetaToolResultBlockParam[] = [];
         for (const use of uses) {
-          const decision = checkToolCall(use.name, use.input, guard);
-          if (!decision.ok) {
-            refused++;
-            results.push({ type: "tool_result", tool_use_id: use.id, content: `Refused: ${decision.reason}`, is_error: true });
-            continue;
-          }
-          note(describe(use.name, decision.input));
-          const out = await bridge.call(use.name, decision.input);
-          if (!out.isError && out.text.includes("uid=")) {
-            const page = Number(decision.input.pageId ?? selectedPageId(out.text));
-            if (Number.isFinite(page)) guard.snapshots.set(page, parseSnapshot(out.text));
-          }
-          const extra = NAVIGATING.has(use.name) ? await afterNavigation(browser, guard, visited, options) : [];
-          results.push({ type: "tool_result", tool_use_id: use.id, content: [out.text, ...extra].join("\n"), ...(out.isError ? { is_error: true } : {}) });
+          const out = await runGuarded(use.name, use.input as Record<string, unknown>);
+          results.push({ type: "tool_result", tool_use_id: use.id, content: out.text, ...(out.isError ? { is_error: true } : {}) });
         }
         messages.push({ role: "user", content: results });
       }

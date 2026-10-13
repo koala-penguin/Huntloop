@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { POST as mcpPost } from "@/app/api/claude-code/mcp/route";
 import { setCliSpawner } from "@/server/ai/claude-code/cli";
 import { setClaudeCodeStatus } from "@/server/ai/claude-code/status";
 import { createJobConversation, listChatActions, listChatMessages, runChatTurn, type ChatEvent } from "@/server/ai/chat/harness";
@@ -17,7 +16,7 @@ import { defaultAiSettings } from "@/shared/ai-settings";
 import { defaultPreferences } from "@/shared/schemas/preferences";
 import { testDb } from "../helpers/db";
 import { CV_TEXT, profile, right } from "../helpers/scoring";
-import { cliAssistant, cliResult, cliToolResult, fakeCli, type FakeCliCall } from "../helpers/fake-cli";
+import { cliAssistant, cliResult, cliToolResult, fakeCli, mcp, mcpServer, type McpServerEntry } from "../helpers/fake-cli";
 
 const env = { ai: process.env.HUNTLOOP_AI, data: process.env.HUNTLOOP_DATA_DIR };
 beforeAll(() => {
@@ -40,28 +39,6 @@ async function setup() {
   const job = await processJob({ db, userId, settings: defaultAiSettings(undefined, "api") }, createJob(db, userId, { source: "paste", rawText: DEMO_SCREENSHOT_POSTING }));
   const ctx = { db, userId, settings: defaultAiSettings(undefined, "subscription") };
   return { db, userId, ctx, job, conversation: createJobConversation(ctx, job) };
-}
-
-interface McpServerEntry {
-  url: string;
-  headers: { Authorization: string };
-}
-
-/** The MCP server the CLI was given (read while the run is going; the file is removed afterwards). */
-function mcpServer(call: FakeCliCall): McpServerEntry {
-  return (JSON.parse(fs.readFileSync(call.arg("--mcp-config")!, "utf8")) as { mcpServers: { huntloop: McpServerEntry } }).mcpServers.huntloop;
-}
-
-/** What the CLI would do: talk JSON-RPC to Huntloop's MCP route with the run's bearer token. */
-async function mcp(server: McpServerEntry, method: string, params: Record<string, unknown>, authorization = server.headers.Authorization) {
-  const response = await mcpPost(
-    new Request(server.url, {
-      method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-    }),
-  );
-  return { status: response.status, body: response.status === 200 ? ((await response.json()) as { result: Record<string, unknown> }) : null };
 }
 
 async function turn(ctx: Parameters<typeof runChatTurn>[0], conversationId: number, text: string) {

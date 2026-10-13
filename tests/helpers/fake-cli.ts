@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events";
+import fs from "node:fs";
 import { PassThrough } from "node:stream";
 import type { CliEvent, CliProcess, CliSpawner } from "@/server/ai/claude-code/cli";
+import { POST as mcpPost } from "@/app/api/claude-code/mcp/route";
 
 export interface FakeCliCall {
   command: string;
@@ -88,3 +90,25 @@ export const cliToolResult = (toolUseId: string, content: string, structured: un
   message: { role: "user", content: [{ type: "tool_result", tool_use_id: toolUseId, content, ...(isError ? { is_error: true } : {}) }] },
   tool_use_result: structured,
 });
+
+export interface McpServerEntry {
+  url: string;
+  headers: { Authorization: string };
+}
+
+/** The MCP server the CLI was given (read while the run is going; the file is removed afterwards). */
+export function mcpServer(call: FakeCliCall): McpServerEntry {
+  return (JSON.parse(fs.readFileSync(call.arg("--mcp-config")!, "utf8")) as { mcpServers: { huntloop: McpServerEntry } }).mcpServers.huntloop;
+}
+
+/** What the CLI would do: talk JSON-RPC to Huntloop's MCP route with the run's bearer token. */
+export async function mcp(server: McpServerEntry, method: string, params: Record<string, unknown>, authorization = server.headers.Authorization) {
+  const response = await mcpPost(
+    new Request(server.url, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    }),
+  );
+  return { status: response.status, body: response.status === 200 ? ((await response.json()) as { result: Record<string, unknown> }) : null };
+}

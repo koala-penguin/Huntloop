@@ -19,6 +19,9 @@ import { defaultSourceSettings } from "@/shared/source-settings";
 import { testDb } from "../helpers/db";
 import { CV_TEXT, profile, right } from "../helpers/scoring";
 import { startFixtureSites } from "../fixtures/browser/sites.mjs";
+import { setCliSpawner } from "@/server/ai/claude-code/cli";
+import { defaultAiSettings } from "@/shared/ai-settings";
+import { cliResult, fakeCli, mcp, mcpServer } from "../helpers/fake-cli";
 
 const SNAPSHOT = `## Latest page snapshot
 uid=1_0 RootWebArea "Frontend Engineer - Example" url="https://jobs.example.gov.au/job/501"
@@ -194,5 +197,48 @@ describe.skipIf(!fs.existsSync(CHROMIUM))("browsing agent (Chrome DevTools MCP, 
     const updated = getJob(db, userId, job.id)!;
     expect(updated).toMatchObject({ applyUrl: `${sites.url}/employer/careers/frontend-engineer`, descriptionIsFull: true, intakeStatus: "ready" });
     expect(updated.rawText).toContain("Experience with WebGL is a plus");
+  }, 60_000);
+
+  it("on the Claude subscription, Claude Code drives the browser through the same guard over MCP", async () => {
+    const { db, userId } = testDb();
+    const previous = process.env.HUNTLOOP_AI;
+    process.env.HUNTLOOP_AI = "claude-code";
+    const replies: string[] = [];
+    let listed: string[] = [];
+    const { spawner, calls } = fakeCli(async (call) => {
+      const server = mcpServer(call);
+      const tool = async (name: string, args: Record<string, unknown>) => {
+        const out = await mcp(server, "tools/call", { name, arguments: args });
+        const text = (out.body!.result.content as Array<{ text: string }>)[0].text;
+        replies.push(text);
+        return { text, isError: out.body!.result.isError === true };
+      };
+      listed = ((await mcp(server, "tools/list", {})).body!.result.tools as Array<{ name: string }>).map((t) => t.name);
+      const opened = await tool("new_page", { url: `${sites.url}/board/job/501` });
+      const pageId = Number(/^(\d+):.*\[selected\]/m.exec(opened.text)?.[1] ?? 1);
+      const snapshot = await tool("take_snapshot", { pageId });
+      const apply = /uid=(\S+) button "Apply now"/.exec(snapshot.text)?.[1] ?? "x";
+      expect((await tool("click", { pageId, uid: apply })).isError).toBe(true);
+      const lead = (url: string) => ({ url, title: "Frontend Engineer", company: null, location: null, country: "AU", snippet: "", postedText: null });
+      return [cliResult({ structured_output: { leads: [lead(`${sites.url}/board/job/501`), lead(`${sites.url}/board/job/999`)] } })];
+    });
+    setCliSpawner(spawner);
+    try {
+      const result = await runBrowserAgent(
+        { db, userId, settings: defaultAiSettings(undefined, "subscription") },
+        { kind: "search", site: { name: "Example", url: `${sites.url}/board/search` }, filters, maxJobs: 5, source: "browser_agent" },
+      );
+      expect(listed).toEqual(expect.arrayContaining(["new_page", "take_snapshot", "click", "fill"]));
+      expect(result.refused).toBe(1);
+      expect(replies.some((r) => /Refused: "Apply now" would act on the user's behalf/.test(r))).toBe(true);
+      expect(result.leads.map((l) => l.url)).toEqual([`${sites.url}/board/job/501`]);
+      expect(result.dropped).toBe(1);
+      expect(calls[0].arg("--tools")).toBe("");
+      expect(JSON.parse(calls[0].arg("--json-schema")!).required).toEqual(["leads"]);
+      expect(db.select().from(usageLog).all()).toEqual([expect.objectContaining({ task: "browserAgent", via: "claude_code" })]);
+    } finally {
+      setCliSpawner(null);
+      process.env.HUNTLOOP_AI = previous;
+    }
   }, 60_000);
 });

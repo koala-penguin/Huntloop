@@ -13,12 +13,14 @@ Requirements: Node.js 20.9 or newer.
 
 ```bash
 npm install
-cp .env.example .env.local   # then add your ANTHROPIC_API_KEY
+cp .env.example .env.local   # then add your ANTHROPIC_API_KEY — or use your Claude subscription (below)
 npm run build && npm start   # http://127.0.0.1:3000
 ```
 
-- Without `ANTHROPIC_API_KEY` the app runs in **demo mode**: every AI feature works with simulated responses, so you can
-  click through everything without spending anything.
+- Huntloop reaches Claude through an **Anthropic API key** or your own **Claude subscription** (via Claude Code); see
+  [Claude connection](#claude-connection-api-key-or-your-claude-subscription).
+- When the chosen connection isn't set up yet, the app runs in **demo mode**: every AI feature works with simulated
+  responses, so you can click through everything without spending anything.
 - `npm run dev` is fine for development, but use `npm run build && npm start` for real use: long background tasks
   (searches, research) restart when the dev server hot-reloads.
 - The server binds to `127.0.0.1` only. Huntloop has no login and stores your CV and job data locally in `./data`
@@ -165,6 +167,37 @@ Safeguards, enforced in code before each action reaches the browser:
 
 Set `HUNTLOOP_SCHEDULER=off` to turn off the daily checks.
 
+## Claude connection: API key or your Claude subscription
+
+**Settings → Claude connection** switches between two ways of reaching Claude, at any time (there's also a quick switch at
+the bottom of the sidebar). Each has its own settings profile — models, effort, caps — so you can, say, run Opus on your
+subscription and Sonnet on the API key.
+
+- **Anthropic API key** — `ANTHROPIC_API_KEY` in `.env.local` (or your environment's secrets). Billed per token to your
+  Claude Console account; the spending caps apply. Max and Team plans include
+  [monthly API credits](https://support.claude.com/en/articles/17154008-monthly-api-credits-for-max-and-team-plans):
+  create the key in the Console organisation linked to your plan and those credits are used first.
+- **Claude subscription (Claude Code)** — Huntloop runs your own signed-in [Claude Code](https://code.claude.com) CLI
+  (`claude -p`), so calls count against your Pro or Max plan's usage limits instead of being billed per token.
+  1. Install Claude Code: `npm install -g @anthropic-ai/claude-code`
+  2. Sign in with your Claude account in a terminal: `claude auth login`
+  3. In Settings, press **Check again**, then **Use this** on the subscription card.
+
+  Huntloop never sees, stores or forwards your sign-in: it starts the unmodified `claude` binary (Anthropic's own
+  sign-in flow) and only asks `claude auth status` whether it's signed in. Each run is isolated — an empty working
+  directory (`data/claude-code/`), no settings, hooks or MCP servers of yours, only the tools that task needs, no
+  permission prompts — and never gets Huntloop's `ANTHROPIC_API_KEY`. Chats and the browsing agent reach Huntloop's own
+  tools (notes, status changes, the guarded browser) over MCP at `/api/claude-code/mcp`, with a random token that only
+  lives for that turn. Set `HUNTLOOP_CLAUDE_PATH` if `claude` isn't on your PATH, and `HUNTLOOP_ORIGIN` if Huntloop isn't
+  served on `http://127.0.0.1:$PORT`.
+
+  Subscription calls show on the **AI usage** page with what they would have cost on the API (not billed), next to your
+  plan's 5-hour and weekly limits as Claude Code reports them. When a limit is reached, background work and daily checks
+  wait for the reset; chats tell you when you can continue. Your plan's limits assume ordinary personal use — bulk
+  searches use them up quickly, so you can pin individual tasks (e.g. screening) to the API key in the model table.
+
+A chat thread keeps the connection it started with; start a new conversation after switching to move it over.
+
 ## Models and cost
 
 Every AI task uses **Claude Opus 5.5** by default. In **Settings → AI models** you can pick a different default model and
@@ -184,7 +217,8 @@ retried on another model instead of failing.
 | `npm run build` / `npm start` | Production build / server |
 | `npm run lint` | ESLint (includes a rule that every UI string comes from `messages/*.json`) |
 | `npm run typecheck` | Route type generation + `tsc` |
-| `npm test` | Unit tests (Vitest, demo-mode AI) |
+| `npm test` | Unit tests (Vitest, demo-mode AI and a stand-in Claude Code CLI) |
+| `npm run test:live` | Opt-in checks against your signed-in Claude Code (uses a little of your plan's limits) |
 | `npm run test:e2e` | Browser tests (Playwright) against a production build with simulated AI |
 | `npm run db:generate` | Generate a migration after changing `src/server/db/schema.ts` |
 
@@ -212,6 +246,8 @@ tests/            unit/ (Vitest), e2e/ (Playwright)
    traceable to your real experience, and LinkedIn profile text for your target roles. ✅
 6. **The loop** — pipeline board with outcomes, saved searches with daily checks, an employer watchlist, a coach chat
    across all jobs, and an AI usage page. ✅
+7. **Your Claude subscription** — switch between an API key and your own Claude subscription (Claude Code), each with its
+   own models and limits. ✅
 
 Next ideas: calibrating Interview Chance weights from your outcomes, cover letters, interview preparation, technical-test
 practice.

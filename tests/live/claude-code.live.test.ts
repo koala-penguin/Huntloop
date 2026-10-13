@@ -71,3 +71,23 @@ describe("live: coach chat on the subscription, with Huntloop's tools over MCP",
     }
   });
 });
+
+describe("live: employer research on the subscription", () => {
+  it("researches with Claude Code's web search and keeps only sourced claims", async () => {
+    const { researchCompany } = await import("@/server/ai/tasks/company-research");
+    const c = ctx();
+    const notes: string[] = [];
+    const result = await researchCompany(
+      c,
+      { company: { name: "Atlassian", domain: "atlassian.com", country: "AU" }, job: { title: "Senior Frontend Engineer", location: "Sydney", country: "AU" }, candidate: null, language: "en" },
+      (n) => notes.push(n),
+    );
+    expect(result.sources.length).toBeGreaterThan(0);
+    const claims = result.report.sections.flatMap((s) => s.claims);
+    expect(claims.length).toBeGreaterThan(0);
+    // verifyReport already dropped claims citing pages Claude never saw.
+    const { normalizeUrl } = await import("@/server/ai/agent-loop");
+    const seen = new Set(result.sources.map((s) => normalizeUrl(s.url)));
+    for (const claim of claims) expect(seen.has(normalizeUrl(claim.sourceUrl))).toBe(true);
+  }, 600_000);
+});
