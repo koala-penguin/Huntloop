@@ -1015,7 +1015,8 @@
       "excluded_keyword": "with words you excluded",
       "too_old": "posted too long ago",
       "outside_markets": "outside your countries",
-      "title_mismatch": "with unrelated titles"
+      "title_mismatch": "with unrelated titles",
+      "closed": "already closed (checked on the posting's page)"
     },
     "stoppedByBudget": "The run stopped early because your AI spending cap was reached. Raise it in Settings to assess more.",
     "noResults": "No jobs yet. Try broader filters, or run the search again later.",

@@ -1,10 +1,12 @@
 import dns from "node:dns/promises";
 import net from "node:net";
+import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 
 /**
  * Server-side fetch for user-supplied URLs. Blocks private, loopback and link-local addresses
  * (re-checked on every redirect), caps redirects, time and size. Huntloop runs on the user's
- * machine, so this mainly stops a pasted link from reaching the local network.
+ * machine, so this mainly stops a pasted link from reaching the local network. When HTTPS_PROXY /
+ * HTTP_PROXY is set (corporate networks, sandboxed cloud machines) requests go through the proxy.
  */
 
 export class FetchBlockedError extends Error {
@@ -13,6 +15,8 @@ export class FetchBlockedError extends Error {
     message?: string,
     /** The URL that was refused (for "restricted": a site Huntloop may not read). */
     public readonly url?: string,
+    /** For "http_error": the response status. */
+    public readonly status?: number,
   ) {
     super(message ?? reason);
     this.name = "FetchBlockedError";
@@ -49,13 +53,38 @@ export type Resolver = (host: string) => Promise<string[]>;
 
 const defaultResolver: Resolver = async (host) => (await dns.lookup(host, { all: true, verbatim: true })).map((r) => r.address);
 
-async function assertPublic(url: URL, resolve: Resolver): Promise<void> {
+/** An outbound proxy is configured (HTTPS_PROXY / HTTP_PROXY; NO_PROXY is honoured per request). */
+export function proxyConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return !!(env.HTTPS_PROXY || env.https_proxy || env.HTTP_PROXY || env.http_proxy);
+}
+
+let proxiedFetch: typeof fetch | null = null;
+
+/** Node's built-in fetch ignores proxy variables; with a proxy configured, requests go through it. */
+export function outboundFetch(): typeof fetch {
+  if (!proxyConfigured()) return fetch;
+  if (!proxiedFetch) {
+    const dispatcher = new EnvHttpProxyAgent();
+    proxiedFetch = ((input: string | URL, init?: RequestInit) => undiciFetch(input, { ...(init as object), dispatcher } as never)) as unknown as typeof fetch;
+  }
+  return proxiedFetch;
+}
+
+async function assertPublic(url: URL, resolve: Resolver, viaProxy: boolean): Promise<void> {
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new FetchBlockedError("invalid_url");
   const host = url.hostname.replace(/^\[|\]$/g, "");
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {
     throw new FetchBlockedError("private_address");
   }
-  const addresses = net.isIP(host) ? [host] : await resolve(host);
+  let addresses: string[];
+  try {
+    addresses = net.isIP(host) ? [host] : await resolve(host);
+  } catch (error) {
+    // Behind a proxy the machine may not resolve outside names itself; the proxy connects instead.
+    const code = (error as NodeJS.ErrnoException).code;
+    if (viaProxy && (code === "ENOTFOUND" || code === "EAI_AGAIN")) return;
+    throw error;
+  }
   if (!addresses.length || addresses.some(isPrivateAddress)) throw new FetchBlockedError("private_address");
 }
 
@@ -68,6 +97,8 @@ export interface SafeFetchOptions {
   accept?: string;
   /** Checked on the first URL and every redirect target, e.g. the site policy. */
   allow?: (url: URL) => boolean;
+  /** Requests go through a proxy (default: when one is configured and no fetchImpl is given). */
+  viaProxy?: boolean;
 }
 
 export interface SafeFetchResult {
@@ -78,7 +109,8 @@ export interface SafeFetchResult {
 }
 
 export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}): Promise<SafeFetchResult> {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = options.fetchImpl ?? outboundFetch();
+  const viaProxy = options.viaProxy ?? (!options.fetchImpl && proxyConfigured());
   const resolve = options.resolve ?? defaultResolver;
   const maxBytes = options.maxBytes ?? 2 * 1024 * 1024;
   let url: URL;
@@ -90,7 +122,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
 
   for (let hop = 0; hop <= (options.maxRedirects ?? 3); hop++) {
     if (options.allow && !options.allow(url)) throw new FetchBlockedError("restricted", `Not allowed to read ${url.hostname}`, url.toString());
-    await assertPublic(url, resolve);
+    await assertPublic(url, resolve, viaProxy);
     let res: Response;
     try {
       res = await fetchImpl(url, {
@@ -110,7 +142,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
       url = new URL(res.headers.get("location")!, url);
       continue;
     }
-    if (!res.ok) throw new FetchBlockedError("http_error", `HTTP ${res.status}`);
+    if (!res.ok) throw new FetchBlockedError("http_error", `HTTP ${res.status}`, url.toString(), res.status);
 
     const reader = res.body?.getReader();
     const chunks: Uint8Array[] = [];

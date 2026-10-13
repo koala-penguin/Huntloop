@@ -195,7 +195,11 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
             ? await searchBrowserSite(ctx, source, filters, { signal: ctx.signal, waitForUser: options.waitForUser, note })
             : source === "browser_agent"
               ? await searchOtherSites(ctx, filters, { signal: ctx.signal, waitForUser: options.waitForUser, note })
-              : (await searchWithAgent(ctx, { filters, candidate }, note, now)).leads;
+              : await (async () => {
+                  const found = await searchWithAgent(ctx, { filters, candidate }, note, now, { fetchImpl: options.fetchImpl, fetchJson: options.fetchJson });
+                  if (found.closed) summary.filtered.closed = (summary.filtered.closed ?? 0) + found.closed;
+                  return found.leads;
+                })();
       leads.push(...found);
       summary.sources[source] = { leads: found.length, error: null };
     } catch (error) {
@@ -277,11 +281,11 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
   }
   summary.screened = screenedIds.length;
 
-  // 6. Deep pass: fetch the full posting for the best few and analyse them properly.
+  // 6. Deep pass: analyse the best few properly, fetching the full posting where only a snippet came in.
   const enrich = options.enrich ?? (await currentAiMode(ctx)) !== "fake";
   const ranked = screenedIds
     .map((id) => getJob(ctx.db, ctx.userId, id)!)
-    .filter((j) => j.eligibility !== "ineligible" && !j.descriptionIsFull && j.sourceUrl)
+    .filter((j) => j.eligibility !== "ineligible" && (j.descriptionIsFull || j.sourceUrl))
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
     .slice(0, enrich && !summary.stoppedBy ? caps.deepTopN : 0);
   progress.stage = "deep";
@@ -290,6 +294,11 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
   for (const job of ranked) {
     if (summary.stoppedBy) break;
     try {
+      if (job.descriptionIsFull) {
+        await processJob(ctx, job, {});
+        summary.deep++;
+        continue;
+      }
       const content = await readJobUrl(job.sourceUrl!, { fetchImpl: options.fetchImpl, fetchJson: options.fetchJson });
       if (content.kind === "content" && content.text.length > 200) {
         const updated = updateJob(ctx.db, job.id, {

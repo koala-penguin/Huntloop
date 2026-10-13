@@ -4,11 +4,13 @@ import type { SearchFilters } from "@/shared/schemas/search";
 import { resolveTaskModel } from "@/shared/ai-settings";
 import { marketPack } from "@/shared/markets";
 import { stableStringify } from "@/shared/stable-json";
-import { settingsFor, type AiContext } from "../client";
+import { modeFor, settingsFor, type AiContext } from "../client";
 import { webTools } from "../request";
 import { normalizeUrl, runSubmitLoop, sourceSet } from "../agent-loop";
 import { domainPolicy, restrictedDomains } from "../../ingest/domain-policy";
 import type { JobLead } from "../../sources/types";
+import { checkPostingOpen, type LivenessOptions } from "../../search/liveness";
+import { mapLimit } from "../../search/limit";
 
 export const SEARCH_AGENT_PROMPT_VERSION = 1;
 
@@ -42,7 +44,21 @@ export interface AgentInput {
   candidate: { recentTitles: string[]; topSkills: string[] } | null;
 }
 
-export async function searchWithAgent(ctx: AiContext, input: AgentInput, onProgress?: (note: string) => void, now = new Date()): Promise<{ leads: JobLead[]; dropped: number }> {
+export interface AgentSearchResult {
+  leads: JobLead[];
+  /** Reported with a URL Claude never saw, or on a site Huntloop doesn't read. */
+  dropped: number;
+  /** Opened and found closed (gone, expired notice, past closing date). */
+  closed: number;
+}
+
+export async function searchWithAgent(
+  ctx: AiContext,
+  input: AgentInput,
+  onProgress?: (note: string) => void,
+  now = new Date(),
+  liveness: LivenessOptions = {},
+): Promise<AgentSearchResult> {
   const { model } = resolveTaskModel(settingsFor(ctx), "searchAgent");
   const country = input.filters.locations[0]?.country ?? null;
   const messages: Anthropic.Beta.Messages.BetaMessageParam[] = [
@@ -72,7 +88,7 @@ export async function searchWithAgent(ctx: AiContext, input: AgentInput, onProgr
     onProgress,
   });
   const seen = sourceSet(result.sources);
-  const leads: JobLead[] = [];
+  const candidates: JobLead[] = [];
   let dropped = 0;
   for (const lead of result.data.leads) {
     const normalized = normalizeUrl(lead.url);
@@ -86,7 +102,7 @@ export async function searchWithAgent(ctx: AiContext, input: AgentInput, onProgr
       dropped++;
       continue;
     }
-    leads.push({
+    candidates.push({
       source: "web_agent",
       sourceId: null,
       url: lead.url,
@@ -100,5 +116,31 @@ export async function searchWithAgent(ctx: AiContext, input: AgentInput, onProgr
       salaryText: null,
     });
   }
-  return { leads, dropped };
+
+  // Web search often surfaces postings that have since closed: open each one first. (Demo-mode
+  // leads are made up, so there is nothing to open unless a test supplies the pages.)
+  const demo = modeFor(resolveTaskModel(settingsFor(ctx), "searchAgent").connection) === "fake";
+  const check = !demo || !!liveness.fetchImpl || !!liveness.fetchJson;
+  const checked = check ? await mapLimit(candidates, 4, (lead) => checkPostingOpen(lead.url, { now, ...liveness })) : candidates.map(() => ({ status: "unknown" as const }));
+  const leads: JobLead[] = [];
+  let closed = 0;
+  candidates.forEach((lead, i) => {
+    const state = checked[i];
+    if (state.status === "closed") closed++;
+    else if (state.status === "unknown" || state.text.length < 200) leads.push(lead);
+    else {
+      // What the posting itself says beats what the search result suggested.
+      leads.push({
+        ...lead,
+        title: state.hints.title || lead.title,
+        company: state.hints.company || lead.company,
+        location: state.hints.locationText || lead.location,
+        text: state.text,
+        full: true,
+        postedAt: state.hints.postedAt ?? null,
+        salaryText: state.hints.salaryText ?? null,
+      });
+    }
+  });
+  return { leads, dropped, closed };
 }

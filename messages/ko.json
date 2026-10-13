@@ -1015,7 +1015,8 @@
       "excluded_keyword": "제외한 단어 포함",
       "too_old": "오래된 공고",
       "outside_markets": "구직 국가 밖",
-      "title_mismatch": "관련 없는 직무"
+      "title_mismatch": "관련 없는 직무",
+      "closed": "이미 마감됨(공고 페이지에서 확인)"
     },
     "stoppedByBudget": "AI 지출 한도에 도달해 일찍 멈췄습니다. 더 평가하려면 설정에서 한도를 올리세요.",
     "noResults": "아직 공고가 없습니다. 조건을 넓히거나 나중에 다시 검색해 보세요.",

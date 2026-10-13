@@ -3,7 +3,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { canonicalizeUrl, domainPolicy } from "@/server/ingest/domain-policy";
-import { FetchBlockedError, isPrivateAddress, safeFetch } from "@/server/ingest/safe-fetch";
+import { FetchBlockedError, isPrivateAddress, safeFetch, proxyConfigured } from "@/server/ingest/safe-fetch";
 import { extractFromHtml, htmlToText } from "@/server/ingest/html";
 import { detectAtsUrl, fetchAtsBoardSummary, fetchAtsPosting } from "@/server/sources/ats";
 import { prepareScreenshot } from "@/server/ingest/images";
@@ -61,9 +61,32 @@ describe("safe fetch", () => {
   it("enforces the size cap and reports HTTP errors", async () => {
     const resolve = async () => ["93.184.216.34"];
     await expect(safeFetch("https://jobs.example/", { fetchImpl: okFetch("x".repeat(5000)), resolve, maxBytes: 1000 })).rejects.toMatchObject({ reason: "too_large" });
-    await expect(safeFetch("https://jobs.example/", { fetchImpl: okFetch("gone", { status: 404 }), resolve })).rejects.toMatchObject({ reason: "http_error" });
+    await expect(safeFetch("https://jobs.example/", { fetchImpl: okFetch("gone", { status: 404 }), resolve })).rejects.toMatchObject({ reason: "http_error", status: 404 });
     const ok = await safeFetch("https://jobs.example/", { fetchImpl: okFetch("<p>hello</p>", { headers: { "content-type": "text/html" } }), resolve });
     expect(ok).toMatchObject({ status: 200, body: "<p>hello</p>", contentType: "text/html" });
+  });
+});
+
+describe("safe fetch behind a proxy", () => {
+  const okFetch = (body: string) => (async () => new Response(body, { status: 200 })) as unknown as typeof fetch;
+  const notFound = async () => {
+    throw Object.assign(new Error("getaddrinfo ENOTFOUND jobs.example"), { code: "ENOTFOUND" });
+  };
+
+  it("lets the proxy resolve names this machine can't, but still refuses local addresses", async () => {
+    const ok = await safeFetch("https://jobs.example/", { fetchImpl: okFetch("<p>open</p>"), resolve: notFound, viaProxy: true });
+    expect(ok.body).toBe("<p>open</p>");
+    await expect(safeFetch("https://jobs.example/", { fetchImpl: okFetch("x"), resolve: notFound, viaProxy: false })).rejects.toMatchObject({ code: "ENOTFOUND" });
+    await expect(safeFetch("http://10.0.0.5/", { fetchImpl: okFetch("x"), viaProxy: true })).rejects.toMatchObject({ reason: "private_address" });
+    await expect(safeFetch("http://metadata.internal/", { fetchImpl: okFetch("x"), viaProxy: true })).rejects.toMatchObject({ reason: "private_address" });
+    // A name that does resolve is still checked.
+    await expect(safeFetch("https://jobs.example/", { fetchImpl: okFetch("x"), resolve: async () => ["192.168.1.2"], viaProxy: true })).rejects.toMatchObject({ reason: "private_address" });
+  });
+
+  it("knows when a proxy is configured", () => {
+    expect(proxyConfigured({ HTTPS_PROXY: "http://proxy:8080" } as unknown as NodeJS.ProcessEnv)).toBe(true);
+    expect(proxyConfigured({ http_proxy: "http://proxy:8080" } as unknown as NodeJS.ProcessEnv)).toBe(true);
+    expect(proxyConfigured({} as NodeJS.ProcessEnv)).toBe(false);
   });
 });
 
