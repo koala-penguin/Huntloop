@@ -1222,7 +1222,7 @@
     "atsTitle": "Posting keywords on your CV",
     "atsValue": "{before}% → {after}%",
     "lengthTitle": "Length",
-    "lengthValue": "About {pages} pages (usual here: {min}–{max})",
+    "lengthValue": "About {pages, plural, one {# page} other {# pages}} (usual here: {min}–{max})",
     "languageFallback": "The posting is in a language Huntloop doesn't write CVs in yet, so this CV is in English.",
     "checkTitle": "Lines to check",
     "checkDescription": "Huntloop couldn't trace these to your CV or confirmed facts. Remove them, rewrite them in your own words, or confirm they're true — confirmed lines are added to your profile as facts.",
@@ -1260,7 +1260,7 @@
       "do_not_claim": "Claims {term}, which your profile doesn't show.",
       "term": "Mentions {term}, which isn't shown for this role.",
       "over_limit": "Too long for LinkedIn: {length} of {limit} characters.",
-      "length": "About {pages} pages; CVs here are usually {min}–{max}."
+      "length": "About {pages, plural, one {# page} other {# pages}}; CVs here are usually {min}–{max}."
     },
     "sources": "Sources ({count})",
     "sourceFound": "Found in your {source}: “{quote}”",

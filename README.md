@@ -1,256 +1,246 @@
 # Huntloop
 
-Land a new job with your personal AI Agent.
+English | [한국어](README.ko.md)
 
-Huntloop is a local, single-user web app that works with you through the whole job hunt. The first module is **job search**:
-find the postings where you have the best chance of getting an interview, understand them, research the employer, and
-— once you decide to go for one — tailor your CV to it. It's built for Australia first (also NZ, Singapore, the US, and any
-other country you configure), with the UI fully in **English and Korean**.
+Huntloop is a job-hunting app that runs on your own computer. Give it your CV and the jobs you're looking at, and it
+tells you which ones you have a real shot at and why. When you decide to apply for one, it writes a version of your CV
+for that job, and every line in it has to trace back to something you actually wrote.
 
-## Quick start
+It's set up for Australia first. New Zealand, Singapore and the US work too, and you can add other countries in
+Settings. The whole app is in English and Korean. Claude does the reading and writing, either through an Anthropic API
+key or through your own Claude subscription (via Claude Code).
 
-Requirements: Node.js 20.9 or newer.
+![Interview Chance report for a Head of Data role](docs/screenshots/en/01-interview-chance.png)
+
+<sub>The candidate (Morgan Ellis) and the employers in these screenshots are made up. They were taken with Claude Opus
+5.5 running on a Claude subscription, except the search page, which is in demo mode.</sub>
+
+## Getting started
+
+You need Node.js 20.9 or newer.
 
 ```bash
 npm install
-cp .env.example .env.local   # then add your ANTHROPIC_API_KEY — or use your Claude subscription (below)
-npm run build && npm start   # http://127.0.0.1:3000
+cp .env.example .env.local
+npm run build && npm start
 ```
 
-- Huntloop reaches Claude through an **Anthropic API key** or your own **Claude subscription** (via Claude Code); see
-  [Claude connection](#claude-connection-api-key-or-your-claude-subscription).
-- When the chosen connection isn't set up yet, the app runs in **demo mode**: every AI feature works with simulated
-  responses, so you can click through everything without spending anything.
-- `npm run dev` is fine for development, but use `npm run build && npm start` for real use: long background tasks
-  (searches, research) restart when the dev server hot-reloads.
-- The server binds to `127.0.0.1` only. Huntloop has no login and stores your CV and job data locally in `./data`
-  (change with `HUNTLOOP_DATA_DIR`). CVs, postings and screenshots are sent only to the Anthropic API.
+Then open http://127.0.0.1:3000.
 
-## Adding a job
+Until you connect Claude (see [Connecting Claude](#connecting-claude)), the app runs in demo mode with simulated
+answers, so you can click around without spending anything. For real use, stick with `npm run build && npm start`
+rather than `npm run dev`. The dev server restarts long background jobs like searches every time it hot-reloads.
 
-On **Jobs**, paste a job link or the posting's text, or drop in screenshots (several parts of one long posting are fine) or
-a PDF. Huntloop:
+Everything is stored locally in `./data` (or wherever `HUNTLOOP_DATA_DIR` points). There's no login, and the server only
+listens on 127.0.0.1. Your CV and the postings go to Anthropic and nowhere else.
 
-- reads the posting — Greenhouse, Lever and Ashby links through their public job APIs; other links through a guarded fetch
-  (structured page data first, then the readable text). SEEK, LinkedIn, Indeed and similar sites aren't read automatically;
-  Huntloop asks for the text or screenshots instead. Screenshots are transcribed by Claude, and you can correct the text;
-- lists every requirement with a verbatim quote from the posting (quotes that can't be found are dropped);
-- compares each requirement with your profile, quoting your CV as evidence (also checked word for word);
-- works out your **Interview Chance** in code: hard requirements first (work rights, citizenship, clearance, location,
-  posting age), then a tier — **Strong, Good, Stretch or Long shot** — with what would move you up a tier.
+## A quick tour
 
-Answering a Yes/No question or your work rights for that country re-tiers the job instantly, without another AI call.
-Results are cached, so reopening a job costs nothing.
+### Your profile
 
-Each job also has:
+Upload your CV (PDF, Word or plain text) or paste it in. Claude turns it into a profile: each role with its dates,
+skills, education, languages, and your work rights in each country. You can correct anything it got wrong. The Job
+preferences tab is where you set the titles, cities, salary floor and kind of workplace you're after.
 
-- **Ask AI** — a conversation with Claude about that job. It knows your profile, the posting and the analysis, can
-  search the web, save notes and update the job's status. It can *propose* adding a fact to your profile or going ahead
-  with the application; those only happen when you click to confirm.
-- **Employer** — deep research on the company (what it does, recent activity, growth, leadership changes, hiring,
-  culture, red flags) with a source link and date for every claim, open-role counts from the employer's own job board
-  where available, and advice for your application. Reports are kept for 30 days and shared with the chat.
+![Profile built from a CV](docs/screenshots/en/02-profile.png)
 
-## Going for a job: tailored CV and LinkedIn
+### Adding a job
 
-When you decide to apply — with **Proceed & tailor my CV** on the job, or by accepting the AI's proposal in the chat —
-the job moves to *Applying*, employer research starts if there's none yet, and the **CV** tab drafts a version of your CV
-aimed at that job:
+Paste a link or the text of an ad, or drop in screenshots or a PDF of it. Greenhouse, Lever and Ashby links are read
+through their public APIs, and other links are fetched carefully (structured data first, then the readable text). SEEK
+and LinkedIn aren't read unless you turn them on ([see below](#seek-and-linkedin)), so for those you paste the text or
+a screenshot.
 
-- Claude plans what to emphasise (the requirements you meet, the posting's own keywords for them, what to leave out,
-  questions whose answers would strengthen the CV), then writes the summary, bullets and skills in the posting's language
-  and the market's spelling (e.g. en-AU).
-- **Your name, contact details, job titles, employers, dates, education and work rights come straight from your profile**
-  — the AI can't change them. Market conventions are applied in code: no photo or date of birth anywhere; in Australia and
-  New Zealand a work-rights line and "References available on request"; US Letter paper, and so on.
-- **Every line is checked in code.** It must rest on quotes that really are in your CV (or in facts you confirmed), from
-  the right role; numbers must appear in those quotes; requirements you don't meet must not be claimed, and posting
-  skills the role doesn't show are caught. A line that fails is flagged: **remove** it, **rewrite it in your own words**,
-  or **confirm it's true** (it's added to your profile as a fact). Downloads stay disabled until nothing is flagged.
-- You get a preview, the share of posting keywords on your CV before → after, a length estimate, and **Word (.docx) and
-  PDF** downloads — single column with standard headings, which applicant-tracking systems read best. Ask for changes in
-  the CV tab or in the chat; each new version is checked again, and older versions stay available.
-- Your **Interview Chance never uses the tailored CV**: it is computed from your verified profile only. Answers you give
-  and lines you confirm become facts; reassess the job to use them.
+Huntloop splits the posting into requirements, each with the exact sentence it came from, and checks your profile
+against every one, quoting your CV as evidence. All the quotes are checked word for word against the posting and your
+CV. If one can't be found, it's dropped.
 
-**Profile → LinkedIn** writes your LinkedIn headline, About section and role descriptions once, for the target roles in
-your job preferences, with the same checks plus LinkedIn's character limits (headline 220, About 2,600, each role 2,000).
-Copy each section into LinkedIn yourself; Huntloop never signs in to or edits your LinkedIn. Each job's CV tab also lists
-the points worth making prominent on LinkedIn for that job.
+The rating itself is worked out in code, not by asking the model for a number. Hard requirements come first: work
+rights, citizenship, security clearance, location, and how old the ad is. Then the job gets a tier: **Strong**,
+**Good**, **Stretch** or **Long shot**. There's no percentage on purpose. The report (the screenshot at the top) shows
+what would move you up a tier, and where your CV doesn't say, it asks a yes/no question. Answer it and the job is
+re-rated on the spot, without another AI call. Results are cached, so opening a job again costs nothing.
 
-A tailored CV costs about $0.40–0.90 with Opus (plan + draft), a revision about $0.20–0.40, and LinkedIn text about
-$0.20–0.40.
+### Asking about a job
 
-## Searching for jobs
+Every job has an **Ask AI** tab. It's a chat with Claude that already knows your profile, the posting and the analysis.
+It can search the web, save notes and change the job's status. It can also suggest adding a fact to your profile, or
+suggest going ahead with the application, but neither happens until you click to confirm.
 
-On **Search**, describe what you want in your own words (any language), or leave it empty to use your job
-preferences. Huntloop turns the request into filters you can edit, then:
+![Asking Claude about a job](docs/screenshots/en/03-chat.png)
 
-1. gathers jobs from the **Adzuna** job API (free key — add `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` to `.env.local`;
-   AU, NZ, SG, US and more) and a **Claude web-search agent** that looks for postings on employers' own career and
-   applicant-tracking pages (only links it actually saw in search results are kept);
-2. removes duplicates and jobs already in your list, and rules out clear mismatches in code (excluded companies or
-   words, too old, outside your countries, unrelated titles) before any AI call;
-3. gives the most relevant ones a quick Interview Chance check (marked **Provisional**, since search results are
-   short excerpts), and reads the full posting of the best few for a complete assessment.
+The **Employer** tab researches the company: what it does, what it has been up to over the past year, growth,
+leadership changes, hiring, culture, red flags, and what all that means for your application. Every claim links to a
+dated source. If the employer uses Greenhouse, Lever or Ashby, the open-role counts come straight from its job board.
+Reports are kept for 30 days and the chat can see them. (No screenshot of this one, since the employers above don't
+exist.)
 
-Results are grouped by tier, with what's **new since the last run**. Adzuna's limits (25 calls a minute, 250 a day,
-2,500 a month) are enforced. How many jobs each run assesses is set in **Settings → Search limits**.
+### Tailoring your CV
 
-### SEEK and LinkedIn
+When you decide to apply, press **Proceed & tailor my CV**, or accept the chat's suggestion. The job moves to
+*Applying* and the CV tab starts a draft for it.
 
-Neither site offers a job-search API, so Huntloop can read them in its **own, visible Chrome window** on your computer
-(a separate profile in `data/browser-profile`). Both are **off until you turn them on** in **Settings → Job sources**,
-after a risk notice: their terms of use don't allow automated access, and LinkedIn may restrict accounts it thinks are
-automated. When on:
+Claude first plans what to lead with: the requirements you meet, the posting's own keywords for them, what to leave out,
+and a few questions whose answers would make the CV stronger. Then it writes the summary, bullets and skills in the
+posting's language and the local spelling. Your name, contact details, job titles, employers, dates, education and work
+rights are filled in from your profile, so the model can't touch them. Local conventions are handled in code too: no
+photo or date of birth, a work-rights line and "References available on request" in Australia and New Zealand, Letter
+paper in the US, and so on.
 
-- searches open the site's search pages, collect job links, and read each job in full (no "Provisional" excerpts);
-  pasted SEEK/LinkedIn links are read the same way;
-- it only runs when you start a search or add a link, slowly (3–8 s between pages, at most the number of job pages you
-  set per site);
-- if a site shows a CAPTCHA, a sign-in wall or a checkpoint, the run **pauses** and asks you to deal with it in the
-  window, then Continue — or skip that site. Huntloop never solves CAPTCHAs, hides that it's automated, or uses tricks to
-  avoid detection;
-- LinkedIn runs in **guest mode** by default. With "Use my LinkedIn login" you sign in yourself in the window; Huntloop
-  never sees your password (guest mode is safer for your account).
+Then every line gets checked. It has to rest on a quote that's really in your CV (or a fact you confirmed), from the
+right role. Any number has to appear in that quote. Requirements you don't meet can't be claimed. A line that fails is
+flagged, and you either remove it, rewrite it yourself, or confirm it's true, which adds it to your profile. Downloads
+stay locked until nothing is flagged.
 
-It uses your installed Google Chrome; set `HUNTLOOP_BROWSER_PATH` in `.env.local` to use another Chrome/Chromium. Use
-**Test the browser window** in Settings to check it opens.
+![A tailored CV with its plan, checks and keyword match](docs/screenshots/en/04-tailored-cv.png)
 
-### AI browsing agent (Chrome DevTools MCP)
+You get a preview, the share of the posting's keywords your CV covers before and after, a length estimate, and Word and
+PDF downloads (single column with standard headings, which applicant-tracking systems read best). You can ask for
+changes in the CV tab or in the chat. Each new version is checked again, and the old ones are kept.
 
-For sites without a built-in reader, Claude can browse in the same visible window itself. Huntloop starts the
-[Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) server, attached only to its own window
-through a local port, and gives Claude a small set of its tools: open and switch pages, read the page, click, type, press
-keys, wait. Turn it on in **Settings → Job sources** (after a notice). It's used for:
+Your Interview Chance is never worked out from the tailored CV, only from your verified profile.
 
-- **other job sites** you list there (e.g. a government jobs site): searches include them;
-- **SEEK or LinkedIn when their pages change** and the built-in reader finds nothing (optional);
-- **"Find on the employer's site"** on a job's Posting tab: looks for the job on the employer's careers pages and, if
-  found, re-analyses it from the employer's full posting.
+**Profile → LinkedIn** writes a headline, an About section and role descriptions for the jobs you're targeting, with the
+same checks plus LinkedIn's length limits (220 characters for the headline, 2,600 for About, 2,000 per role). You copy
+them over yourself. Huntloop never logs in to LinkedIn.
 
-Safeguards, enforced in code before each action reaches the browser:
+### Pipeline and dashboard
 
-- it can only search and read. Clicks on "Apply", "Sign in", "Message", "Connect", "Save", "Share" and similar (in English
-  and Korean) are refused, and it can only type short search terms into search fields;
-- it stays on the sites allowed for the task: the site you listed; or, when looking for a job on the employer's site,
-  that site, sites it found through web search, and applicant-tracking systems such as Greenhouse, Lever or Workday (never
-  SEEK, LinkedIn or other job boards Huntloop doesn't read). Other links are refused;
-- it has no script execution, file upload, network or performance tools. Chrome DevTools MCP's usage statistics are
-  turned off;
-- a job is kept only if the agent actually opened its page, and Huntloop reads that page itself;
-- a CAPTCHA or sign-in wall pauses the run for you, as above. Runs are capped in steps and jobs, and cost about
-  $0.50–2 each with Opus (counted towards your spending cap).
+The **Pipeline** board shows every job you're pursuing by stage and how long it has sat there, and reminds you to follow
+up after two quiet weeks. When you move a job to Applied, Interviewing, Offer or Rejected, you can jot down a few details
+(the date, how you applied, which interview round). Over time it shows how often each tier actually led to an
+interview, which is a first step towards checking Huntloop's ratings against what really happens.
 
-## Keeping the hunt going
+![Pipeline board](docs/screenshots/en/05-pipeline.png)
 
-- **Pipeline** — every job you're pursuing by stage (Shortlisted → Applying → Applied → Interviewing → Offer), with days in
-  each stage and a nudge to follow up after two quiet weeks. Moving a job to Applied, Interviewing, Offer or Rejected (on
-  the board or the job page) lets you record a few optional details: the date, how you applied, the interview round,
-  where it ended. Each job's **History** tab lists everything that happened. "What your outcomes say" shows, for each
-  Interview Chance tier at the time you applied, how many applications reached an interview or an offer — the start of
-  checking Huntloop's tiers against your real results.
-- **Saved searches** — save a search (with a name) to keep it at the top of Search with what's new since its last run.
-  "Check daily" re-runs it once a day while Huntloop is running, with **Adzuna and the web-search agent only**: SEEK,
-  LinkedIn and the browsing agent only ever run when you start them. Daily checks cost about $1–1.50 with Opus and are
-  skipped when your spending is near its cap.
-- **Employer watchlist** (Search → Employers you watch) — watch your target employers' own Greenhouse, Lever or Ashby job
-  boards: paste a link to the board or any job on it, or use "Watch this employer's job board" on a job. Boards are
-  checked daily through their free public APIs; new roles are matched against your preferences in code (place, age,
-  exclusions, and a distinctive title word in common), so watching costs nothing until you **Add & assess** a role.
-- **Coach** — one conversation about your whole hunt: what to focus on this week, which jobs to compare, what needs a
-  follow-up. It sees your profile, preferences and every job, can list, read and compare jobs, start a search or add a
-  job by link when you ask, update a job's status when you tell it, and propose profile facts for you to confirm. It's
-  told when searches finish, jobs are scored or statuses change.
-- **AI usage** (from the dashboard or Settings) — spend today and this month against your caps, a 30-day chart, and
-  breakdowns by task and by model (calls, tokens, cached input, web searches, cost).
+The dashboard lists your best bets: jobs you haven't applied to yet, strongest first.
 
-Set `HUNTLOOP_SCHEDULER=off` to turn off the daily checks.
+![Dashboard](docs/screenshots/en/07-dashboard.png)
 
-## Claude connection: API key or your Claude subscription
+There's also a **Coach** page, one chat about your whole search: what to focus on this week, which jobs to compare,
+what needs a follow-up. It can see every job in Huntloop.
 
-**Settings → Claude connection** switches between two ways of reaching Claude, at any time (there's also a quick switch at
-the bottom of the sidebar). Each has its own settings profile — models, effort, caps — so you can, say, run Opus on your
-subscription and Sonnet on the API key.
+### Searching
 
-- **Anthropic API key** — `ANTHROPIC_API_KEY` in `.env.local` (or your environment's secrets). Billed per token to your
-  Claude Console account; the spending caps apply. Max and Team plans include
-  [monthly API credits](https://support.claude.com/en/articles/17154008-monthly-api-credits-for-max-and-team-plans):
-  create the key in the Console organisation linked to your plan and those credits are used first.
-- **Claude subscription (Claude Code)** — Huntloop runs your own signed-in [Claude Code](https://code.claude.com) CLI
-  (`claude -p`), so calls count against your Pro or Max plan's usage limits instead of being billed per token.
-  1. Install Claude Code: `npm install -g @anthropic-ai/claude-code`
-  2. Sign in with your Claude account in a terminal: `claude auth login`
-  3. In Settings, press **Check again**, then **Use this** on the subscription card.
+On **Search** you describe what you want in plain words (any language), or leave it empty to use your preferences.
+Huntloop turns that into filters you can edit, then gathers jobs from the [Adzuna](https://developer.adzuna.com/) API
+(free key: set `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`) and from a Claude web-search agent that looks at employers' own
+careers pages. It only keeps links the agent actually saw in its search results, and drops ads that have closed.
 
-  Huntloop never sees, stores or forwards your sign-in: it starts the unmodified `claude` binary (Anthropic's own
-  sign-in flow) and only asks `claude auth status` whether it's signed in. Each run is isolated — an empty working
-  directory (`data/claude-code/`), no settings, hooks or MCP servers of yours, only the tools that task needs, no
-  permission prompts — and never gets Huntloop's `ANTHROPIC_API_KEY`. Chats and the browsing agent reach Huntloop's own
-  tools (notes, status changes, the guarded browser) over MCP at `/api/claude-code/mcp`, with a random token that only
-  lives for that turn. Set `HUNTLOOP_CLAUDE_PATH` if `claude` isn't on your PATH, and `HUNTLOOP_ORIGIN` if Huntloop isn't
-  served on `http://127.0.0.1:$PORT`.
+Duplicates, jobs already in your list and obvious mismatches (excluded companies, too old, wrong country, unrelated
+titles) are filtered out in code before any AI call. The most relevant jobs get a quick rating, marked *Provisional*
+because search results are only excerpts, and the best few are read in full. How many is up to you in **Settings →
+Search limits**.
 
-  Subscription calls show on the **AI usage** page with what they would have cost on the API (not billed), next to your
-  plan's 5-hour and weekly limits as Claude Code reports them. When a limit is reached, background work and daily checks
-  wait for the reset; chats tell you when you can continue. Your plan's limits assume ordinary personal use — bulk
-  searches use them up quickly, so you can pin individual tasks (e.g. screening) to the API key in the model table.
+![Search results grouped by tier (demo mode)](docs/screenshots/en/06-search.png)
 
-A chat thread keeps the connection it started with; start a new conversation after switching to move it over.
+You can save a search and have it re-run every day while Huntloop is running. You can also watch employers' Greenhouse,
+Lever or Ashby job boards for new roles. Watching is free (public APIs, matched against your preferences in code) until
+you choose to assess a role. Daily runs only use Adzuna and the web-search agent. Set `HUNTLOOP_SCHEDULER=off` to turn
+them off.
 
-## Models and cost
+#### SEEK and LinkedIn
 
-Every AI task uses **Claude Opus 5.5** by default. In **Settings → AI models** you can pick a different default model and
-override the model and effort level per task (CV reading, posting analysis, interview-chance assessment, screening, chat,
-search agent, employer research, CV tailoring, …). Settings also has daily/monthly spending caps; background work pauses
-when a cap is reached. Spend is computed from the API's usage data (including refusal-fallback attempts and web searches)
-and shown on the dashboard and the **AI usage** page.
+Neither site has a job-search API. If you want them anyway, Huntloop can read them in its own visible Chrome window on
+your machine, using a separate profile in `data/browser-profile`. Both are off until you turn them on in **Settings →
+Job sources**, and you'll see a warning first: their terms don't allow automated access, and LinkedIn may restrict
+accounts it thinks are automated. It's meant for your own job hunt, at your own risk.
 
-Refusal fallbacks (`fallbacks: "default"`) are enabled on models that support them, so a false-positive safety decline is
-retried on another model instead of failing.
+When they're on, Huntloop only visits them when you start a search or add a link, and it goes slowly (3 to 8 seconds
+between pages, capped per site). If a CAPTCHA, sign-in wall or checkpoint shows up, the run pauses until you deal with
+it in the window or skip the site. It doesn't hide that it's automated or try to get around detection. LinkedIn runs in
+guest mode unless you choose to sign in yourself in that window.
 
-## Scripts
+It uses your installed Chrome. Set `HUNTLOOP_BROWSER_PATH` to use another Chrome or Chromium, and use **Test the browser
+window** in Settings to check it opens.
+
+#### The browsing agent
+
+For job sites with no built-in reader, Claude can drive that same window itself through
+[Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp). It's off by default. Once on, it's used
+for other job sites you list (a government jobs board, say), as a fallback when SEEK or LinkedIn change their pages,
+and for **Find on the employer's site** on a job.
+
+It can only search and read. Every action is checked in code before it reaches the browser: clicks on things like
+Apply, Sign in, Message or Connect are refused, it can only type short search terms, and it can't wander off the sites
+allowed for that task. It has no script, upload or network tools. A job only counts if the agent really opened its page,
+and Huntloop then reads that page itself. A run costs roughly $0.50 to $2 with Opus.
+
+### Connecting Claude
+
+**Settings → Claude connection** switches between an API key and your Claude subscription whenever you like, and
+there's a small switch at the bottom of the sidebar too. Each connection keeps its own models, effort levels and limits,
+so you could run Opus on the subscription and something cheaper on the API key.
+
+![Claude connection settings](docs/screenshots/en/08-settings-connection.png)
+
+**API key.** Put `ANTHROPIC_API_KEY` in `.env.local`. You're billed per token on your Claude Console account, and
+Huntloop's daily and monthly spending caps apply. Max and Team plans include
+[monthly API credits](https://support.claude.com/en/articles/17154008-monthly-api-credits-for-max-and-team-plans): create
+the key in the Console organisation linked to your plan and those credits are used first.
+
+**Claude subscription.** Huntloop runs your own signed-in [Claude Code](https://code.claude.com) (`claude -p`), so usage
+comes out of your Pro or Max plan's limits instead of a bill.
+
+1. Install Claude Code: `npm install -g @anthropic-ai/claude-code`
+2. Sign in from a terminal: `claude auth login`
+3. In Settings, press **Check again**, then **Use this** on the subscription card.
+
+Huntloop never sees, stores or passes on your sign-in. It starts the unmodified `claude` binary and only asks
+`claude auth status` whether you're signed in. Each run is kept apart from the rest of your setup: an empty working
+folder (`data/claude-code/`), none of your own settings, hooks or MCP servers, only the tools that task needs, and no
+access to Huntloop's API key. Chats and the browsing agent reach Huntloop's own tools over MCP at
+`/api/claude-code/mcp`, with a random token that's only valid for that turn. If `claude` isn't on your PATH, set
+`HUNTLOOP_CLAUDE_PATH`. If Huntloop isn't served on `http://127.0.0.1:$PORT`, set `HUNTLOOP_ORIGIN`.
+
+A plan's limits are meant for ordinary personal use, and big searches eat into them quickly. You can pin individual
+tasks (screening, say) to the API key in the model table. When a limit is reached, background work and daily checks wait
+for the reset, and chats tell you when you can carry on. A chat thread stays on the connection it started with, so start
+a new one after switching.
+
+### Usage and cost
+
+Every task uses Claude Opus 5.5 by default. In **Settings → AI models** you can change the default and set a different
+model or effort level for each task. The **AI usage** page shows what you've spent today and this month against your
+caps, a 30-day chart, and a breakdown by task and model. Subscription calls are listed separately, with what they would
+have cost on the API (you aren't billed for them) and your plan's 5-hour and weekly usage as Claude Code reports it.
+
+![AI usage page](docs/screenshots/en/09-usage.png)
+
+For a sense of cost: everything behind the English screenshots (reading the CV, three jobs analysed and rated, two chat
+answers, one tailored CV and a short research run) took 12 calls, about $1.10 at API prices. With Opus that's roughly
+$0.08 to read a CV, $0.16 per job, $0.10 per chat answer and $0.30 per tailored CV. Employer research depends on how
+much there is to read. The browsing agent is the expensive one at $0.50 to $2 a run, and a daily saved search is about
+$1 to $1.50. Results are cached, so you only pay again for new work. On models that support it, a false refusal is
+retried on another model instead of failing (`fallbacks: "default"`).
+
+## Development
 
 | Command | What it does |
 |---|---|
 | `npm run dev` | Development server on 127.0.0.1:3000 |
-| `npm run build` / `npm start` | Production build / server |
-| `npm run lint` | ESLint (includes a rule that every UI string comes from `messages/*.json`) |
-| `npm run typecheck` | Route type generation + `tsc` |
-| `npm test` | Unit tests (Vitest, demo-mode AI and a stand-in Claude Code CLI) |
-| `npm run test:live` | Opt-in checks against your signed-in Claude Code (uses a little of your plan's limits) |
+| `npm run build` / `npm start` | Production build and server |
+| `npm run lint` | ESLint, including a rule that every UI string comes from `messages/*.json` |
+| `npm run typecheck` | Route type generation and `tsc` |
+| `npm test` | Unit tests (Vitest, with simulated AI and a stand-in Claude Code CLI) |
+| `npm run test:live` | Opt-in checks against your signed-in Claude Code (uses a little of your plan) |
 | `npm run test:e2e` | Browser tests (Playwright) against a production build with simulated AI |
 | `npm run db:generate` | Generate a migration after changing `src/server/db/schema.ts` |
 
-## Project layout
-
 ```
-src/app/          pages, route handlers, server actions (Next.js App Router)
-src/components/   UI (ui/ primitives, feature components)
-src/shared/       code used by both server and browser (model registry, AI settings schema, Zod schemas)
-src/server/       server-only: database, repositories, Claude client, AI tasks, background task runner
-messages/         en.json and ko.json — every user-visible string
-drizzle/          SQL migrations (applied automatically at startup)
-tests/            unit/ (Vitest), e2e/ (Playwright)
+src/app/          pages, route handlers and server actions (Next.js App Router)
+src/components/   UI
+src/shared/       code used on both server and client (model registry, settings, Zod schemas)
+src/server/       server only: database, Claude client, AI tasks, background tasks, scoring
+messages/         en.json and ko.json, every string the UI shows
+drizzle/          SQL migrations, applied at startup
+tests/            unit/ (Vitest), e2e/ (Playwright), live/ (opt-in)
 ```
 
-## Roadmap
+## What's next
 
-1. **Foundation** — app shell, English/Korean, settings for models/effort/budget, Claude client, background tasks. ✅
-2. **Profile** — CV upload → structured profile, work rights per country, preferences. ✅
-3. **Bring your own job** — add postings by URL, long pasted text, screenshots or PDF; "Interview Chance" tier with
-   evidence; per-job AI chat; employer deep research. ✅
-4. **AI search** — Adzuna and a Claude web-search agent ✅; SEEK and LinkedIn through a visible (headed) browser ✅;
-   an AI browsing agent through Chrome DevTools MCP ✅.
-5. **Proceed → CV tailoring** — once you and the AI agree to go for a job, a tailored CV (DOCX/PDF) where every claim is
-   traceable to your real experience, and LinkedIn profile text for your target roles. ✅
-6. **The loop** — pipeline board with outcomes, saved searches with daily checks, an employer watchlist, a coach chat
-   across all jobs, and an AI usage page. ✅
-7. **Your Claude subscription** — switch between an API key and your own Claude subscription (Claude Code), each with its
-   own models and limits. ✅
-
-Next ideas: calibrating Interview Chance weights from your outcomes, cover letters, interview preparation, technical-test
-practice.
+Checking the tiers against real outcomes and adjusting the weights, cover letters, interview prep, and practice for
+technical tests.
 
 ## License
 
