@@ -58,6 +58,9 @@
     "bestBetsTitle": "Your best bets",
     "bestBetsDescription": "Jobs you haven't applied to yet, with your strongest Interview Chance first.",
     "bestBetsEmpty": "No jobs yet. Add one to see your chances.",
+    "bestBetsUnranked": "{count, plural, one {Your new job doesn't} other {Your # new jobs don't}} have an Interview Chance yet. It appears once a job is analysed and your CV is in your profile.",
+    "bestBetsInPipeline": "No new jobs to rank. {count, plural, one {The job you're working on is} other {The # jobs you're working on are}} in your pipeline.",
+    "openPipeline": "Open the pipeline",
     "spendDetails": "See where it went"
   },
   "settings": {

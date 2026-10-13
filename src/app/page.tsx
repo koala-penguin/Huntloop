@@ -35,7 +35,9 @@ export default async function DashboardPage() {
   const live = (await currentAiMode(ai)) !== "fake";
   const budget = budgetStatus(ai);
   const jobs = listJobs(db, user.id, { status: "active" });
-  const bestBets = jobs.filter((j) => j.tier && ["new", "shortlisted"].includes(j.status)).slice(0, 5);
+  // Jobs not applied to yet; the rest are being worked on in the pipeline.
+  const open = jobs.filter((j) => ["new", "shortlisted"].includes(j.status));
+  const bestBets = open.filter((j) => j.tier).slice(0, 5);
 
   return (
     <>
@@ -112,8 +114,17 @@ export default async function DashboardPage() {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : !jobs.length ? (
           <p className="text-sm text-muted">{t("bestBetsEmpty")}</p>
+        ) : open.length ? (
+          <p className="text-sm text-muted">{t("bestBetsUnranked", { count: open.length })}</p>
+        ) : (
+          <p className="text-sm text-muted">
+            {t("bestBetsInPipeline", { count: jobs.length })}{" "}
+            <Link href="/pipeline" className="underline">
+              {t("openPipeline")}
+            </Link>
+          </p>
         )}
       </Card>
     </>

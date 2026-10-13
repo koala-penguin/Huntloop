@@ -11,9 +11,15 @@ interface Day {
 
 const W = 720;
 const H = 200;
-const PAD = { left: 48, right: 8, top: 12, bottom: 24 };
-const PLOT_W = W - PAD.left - PAD.right;
+const PAD = { right: 8, top: 12, bottom: 24 };
 const PLOT_H = H - PAD.top - PAD.bottom;
+const TICK_FONT = 11;
+
+/** Room for the y-axis labels: they vary by locale ("$1", "US$0.50", "1,00 $US"). */
+function labelColumn(labels: string[]): number {
+  const longest = Math.max(...labels.map((l) => l.length));
+  return Math.max(36, Math.ceil(longest * TICK_FONT * 0.62) + 10);
+}
 
 /** 0 → 1; 0.37 → 0.5; 3.2 → 5; 12 → 20: a clean top for the y axis. */
 function niceMax(value: number): number {
@@ -41,8 +47,10 @@ export function SpendChart({ days }: { days: Day[] }) {
     new Intl.DateTimeFormat(locale, style === "short" ? { month: "short", day: "numeric", timeZone: "UTC" } : { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 
   const top = niceMax(Math.max(...days.map((d) => d.costUsd)));
-  const ticks = [0, top / 2, top];
-  const band = PLOT_W / days.length;
+  const ticks = [0, top / 2, top].map((v) => ({ v, label: money(v, Number.isInteger(v) ? 0 : 2) }));
+  const left = labelColumn(ticks.map((tick) => tick.label));
+  const plotW = W - left - PAD.right;
+  const band = plotW / days.length;
   const barW = Math.min(24, Math.max(2, band - 4));
   const labelEvery = Math.ceil(days.length / 6);
   const hovered = active !== null ? days[active] : null;
@@ -50,19 +58,19 @@ export function SpendChart({ days }: { days: Day[] }) {
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={t("aria", { days: days.length })}>
-        {ticks.map((v) => {
+        {ticks.map(({ v, label }) => {
           const y = PAD.top + PLOT_H - (v / top) * PLOT_H;
           return (
             <g key={v}>
-              <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y} stroke="var(--border)" strokeWidth={1} />
-              <text x={PAD.left - 6} y={y} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--muted)" style={{ fontVariantNumeric: "tabular-nums" }}>
-                {money(v, Number.isInteger(v) ? 0 : 2)}
+              <line x1={left} x2={W - PAD.right} y1={y} y2={y} stroke="var(--border)" strokeWidth={1} />
+              <text x={left - 6} y={y} dy="0.32em" textAnchor="end" fontSize={TICK_FONT} fill="var(--muted)" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {label}
               </text>
             </g>
           );
         })}
         {days.map((d, i) => {
-          const x = PAD.left + i * band + (band - barW) / 2;
+          const x = left + i * band + (band - barW) / 2;
           const h = (d.costUsd / top) * PLOT_H;
           return (
             <g
@@ -77,10 +85,10 @@ export function SpendChart({ days }: { days: Day[] }) {
               data-day={d.date}
             >
               {/* The hit target is the whole band, not just the painted column. */}
-              <rect x={PAD.left + i * band} y={PAD.top} width={band} height={PLOT_H} fill="transparent" />
+              <rect x={left + i * band} y={PAD.top} width={band} height={PLOT_H} fill="transparent" />
               {h > 0.5 && <path d={column(x, barW, h)} fill="var(--chart-series)" opacity={active === null || active === i ? 1 : 0.55} />}
               {i % labelEvery === 0 && (
-                <text x={PAD.left + i * band + band / 2} y={H - 6} textAnchor="middle" fontSize={11} fill="var(--muted)">
+                <text x={left + i * band + band / 2} y={H - 6} textAnchor="middle" fontSize={11} fill="var(--muted)">
                   {day(d.date, "short")}
                 </text>
               )}
@@ -91,7 +99,7 @@ export function SpendChart({ days }: { days: Day[] }) {
       {hovered && active !== null && (
         <div
           className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-sm"
-          style={{ left: `${Math.min(88, Math.max(12, ((PAD.left + active * band + band / 2) / W) * 100))}%` }}
+          style={{ left: `${Math.min(88, Math.max(12, ((left + active * band + band / 2) / W) * 100))}%` }}
           role="status"
         >
           <p className="text-sm font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>

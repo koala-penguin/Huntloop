@@ -58,6 +58,9 @@
     "bestBetsTitle": "가장 승산 있는 공고",
     "bestBetsDescription": "아직 지원하지 않은 공고 중 인터뷰 가능성이 높은 순서입니다.",
     "bestBetsEmpty": "아직 공고가 없습니다. 공고를 추가하면 가능성을 보여 드립니다.",
+    "bestBetsUnranked": "새 공고 {count}개에 아직 인터뷰 가능성이 없습니다. 공고 분석이 끝나고 프로필에 CV가 있으면 표시됩니다.",
+    "bestBetsInPipeline": "평가할 새 공고가 없습니다. 진행 중인 지원 {count}건은 지원 현황에 있습니다.",
+    "openPipeline": "지원 현황 열기",
     "spendDetails": "어디에 썼는지 보기"
   },
   "settings": {
