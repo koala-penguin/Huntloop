@@ -1,0 +1,21 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "0b9a8c7d-1e2f-4a3b-8c9d-0e1f2a3b4c5d",
+      "title": "Data Engineer",
+      "department": "Data",
+      "location": "Singapore",
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "employmentType": "FullTime",
+      "publishedAt": "2026-10-05T00:00:00.000Z",
+      "jobUrl": "https://jobs.ashbyhq.com/grab-like/0b9a8c7d-1e2f-4a3b-8c9d-0e1f2a3b4c5d",
+      "applyUrl": "https://jobs.ashbyhq.com/grab-like/0b9a8c7d-1e2f-4a3b-8c9d-0e1f2a3b4c5d/application",
+      "descriptionPlain": "Build batch and streaming pipelines with Spark and Kafka. 4+ years of data engineering experience.",
+      "address": { "postalAddress": { "addressLocality": "Singapore", "addressCountry": "SG" } },
+      "compensation": { "compensationTierSummary": "SGD 8K – 11K per month" }
+    },
+    { "id": "other", "title": "Recruiter", "department": "People", "location": "Singapore" }
+  ]
+}

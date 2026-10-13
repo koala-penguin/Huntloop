@@ -1,0 +1,19 @@
+김하늘
+백엔드 개발자
+서울 · haneul.kim@example.com
+
+경력
+시니어 백엔드 개발자, 바다물류 — 2020.04 - 현재
+- Java와 Spring으로 주문 처리 시스템을 설계하고 일일 50만 건을 처리함
+- Kafka 기반 이벤트 파이프라인 도입으로 지연 시간 30% 단축
+- AWS와 Kubernetes로 서비스 운영
+
+백엔드 개발자, 하늘커머스 — 2017.03 - 2020.03
+- Python과 Django로 정산 API 개발
+- PostgreSQL 쿼리 최적화로 리포트 생성 시간 단축
+
+학력
+서울대학교 컴퓨터공학 학사, 2017
+
+기술
+Java, Spring, Kafka, AWS, Kubernetes, Python, Django, PostgreSQL, Redis
