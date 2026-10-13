@@ -105,7 +105,8 @@ export interface CvDocument {
   certifications: Array<{ name: string; issuer: string | null; year: string | null }>;
   languages: Array<{ language: string; level: string }>;
   clearances: Array<{ level: string; status: string }>;
-  workRight: { status: WorkRightStatus; country: string } | null;
+  /** `option` is the profile's work-right choice (e.g. "au_citizen"), for the market's own wording; older drafts lack it. */
+  workRight: { status: WorkRightStatus; country: string; option?: string | null } | null;
   referees: boolean;
 }
 

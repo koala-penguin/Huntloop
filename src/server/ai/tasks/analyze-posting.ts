@@ -9,7 +9,7 @@ import { buildQuoteIndex, quoteFound, sliceBetweenAnchors } from "../../scoring/
 import { hashJson } from "../../hash";
 import type { PostingHints } from "../../ingest/html";
 
-export const ANALYZE_POSTING_PROMPT_VERSION = 1;
+export const ANALYZE_POSTING_PROMPT_VERSION = 2;
 
 const SYSTEM = `You analyse one job advertisement for Huntloop, a job-search assistant whose goal is to find the jobs where the user has the best chance of getting an interview. Your output is profile-independent: describe the job, not the candidate.
 
@@ -20,6 +20,7 @@ Requirements — the most important part:
 - "gate": the gate type for gate requirements, otherwise "none". Use "citizenship" when only citizens qualify, "pr" when citizens or permanent residents qualify, "no_sponsorship" for "must have full working rights" / "unable to sponsor".
 - "category": what kind of requirement it is. Use "years" when it states a minimum number of years and put the number in "minYears".
 - "normalized": a short canonical label in English (e.g. "React", "5+ years frontend", "Baseline clearance", "Driver licence").
+- "keywords": 0–3 exact terms an applicant-tracking system would scan a CV for to match this requirement, in the posting's own wording and language: tools, technologies, methods, certifications, domains, role titles (e.g. "Databricks", "vendor management", "managed service provider", "cybersecurity", "data governance", "PMP"). Short noun phrases of 1–3 words, no filler such as "experience" or "strong". Use [] for soft qualities no keyword captures (e.g. "excellent communication") and for gates.
 - Ignore company boilerplate (benefits, EEO statements, "about us") unless it states a requirement.
 
 Other fields:

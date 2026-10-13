@@ -160,7 +160,13 @@ export function fakePostingAnalysis(text: string, hints: Record<string, unknown>
     .map((l) => l.trim())
     .filter((l) => l.length > 3 && !/^how to apply/i.test(l) && /must|required|experience|skills|years|citizen|clearance|rights|sponsor|knowledge|degree|ability|familiar|proficien|licen|plus|desirable|bonus|\b[A-Z][a-zA-Z.+#]+\b/.test(l))
     .slice(0, 20);
-  const requirements = candidates.map((line) => ({ postingQuote: words(line, 25), ...classify(line) }));
+  const requirements = candidates.map((line) => {
+    const c = classify(line);
+    // ATS keywords: the named skill or certification; nothing for gates and soft lines.
+    const skill = KNOWN_SKILLS.find(([name]) => mentions(line, name))?.[0];
+    const keywords = c.kind === "gate" ? [] : skill ? [skill] : c.category === "certification" ? [c.normalized] : [];
+    return { postingQuote: words(line, 25), ...c, keywords };
+  });
 
   return {
     isJobPosting: requirements.length > 0 || /responsibilit|requirement|apply|role|position|자격|담당/i.test(text),

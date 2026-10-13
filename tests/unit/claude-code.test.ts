@@ -155,7 +155,9 @@ describe("Claude Code CLI (subscription connection)", () => {
     ]);
     setCliSpawner(spawner);
     const notes: string[] = [];
-    const result = await runSubmitLoop(subscriptionCtx(), "searchAgent", {
+    const ctx = subscriptionCtx();
+    const ctxDb = ctx.db;
+    const result = await runSubmitLoop(ctx, "searchAgent", {
       system: "Find jobs, then call report_job_leads.",
       messages: [{ role: "user", content: "frontend, Sydney" }],
       tools: webTools("claude-opus-5-5", { blockedDomains: restrictedDomains() }),
@@ -165,6 +167,8 @@ describe("Claude Code CLI (subscription connection)", () => {
     expect(result.data.leads).toHaveLength(1);
     expect(result.sources.map((s) => s.url)).toEqual(["https://boards.greenhouse.io/acme/jobs/1", "https://acme.com/careers"]);
     expect(notes).toEqual(["Searching for frontend roles in Sydney"]);
+    // Claude Code's web searches count in the usage log (and its API-equivalent value).
+    expect(ctxDb.select().from(usageLog).all()[0]).toMatchObject({ via: "claude_code", webSearches: 1 });
 
     const call = calls[0];
     expect(call.arg("--tools")).toBe("WebSearch,WebFetch");

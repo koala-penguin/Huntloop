@@ -1162,6 +1162,22 @@
       "permanent_resident": "{country} 영주권자",
       "unrestricted_visa": "{country} 취업 제한 없음"
     },
+    "workRightOption": {
+      "au_citizen": "호주 시민권자",
+      "au_pr": "호주 영주권자",
+      "au_nz_citizen": "뉴질랜드 시민권자, 호주 취업 제한 없음 (subclass 444)",
+      "au_partner": "호주 취업 제한 없음 (파트너 비자)",
+      "au_485": "호주 취업 제한 없음 (subclass 485)",
+      "nz_citizen": "뉴질랜드 시민권자",
+      "nz_resident": "뉴질랜드 영주권자",
+      "nz_au_citizen": "호주 시민권자, 뉴질랜드 취업 제한 없음",
+      "nz_open_work_visa": "뉴질랜드 취업 제한 없음 (오픈 워크 비자)",
+      "sg_citizen": "싱가포르 시민권자",
+      "sg_pr": "싱가포르 영주권자",
+      "us_citizen": "미국 시민권자",
+      "us_green_card": "미국 영주권자 (그린카드)",
+      "us_ead": "미국 취업 허가 보유 (EAD)"
+    },
     "languageLevel": {
       "native": "원어민",
       "fluent": "유창",

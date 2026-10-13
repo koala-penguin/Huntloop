@@ -19,6 +19,13 @@ export type CvBlock =
 
 const join = (parts: Array<string | null | undefined>, sep: string) => parts.filter((p) => p && p.trim()).join(sep);
 
+/** "Australian citizen" for a known market option; otherwise "Citizen of {country}" and similar. */
+function workRightText(right: NonNullable<CvDocument["workRight"]>, t: CvTranslator, locale: string): string {
+  const key = `workRightOption.${right.option}`;
+  if (right.option && t.has(key as "workRightOption.au_citizen")) return t(key as "workRightOption.au_citizen");
+  return t(`workRight.${right.status as "citizen"}`, { country: countryName(right.country, locale) ?? right.country });
+}
+
 export function cvBlocks(doc: CvDocument, t: CvTranslator): CvBlock[] {
   const locale = doc.locale;
   const blocks: CvBlock[] = [];
@@ -27,7 +34,7 @@ export function cvBlocks(doc: CvDocument, t: CvTranslator): CvBlock[] {
   if (h.headline) blocks.push({ kind: "headline", text: h.headline });
   const contact = join([join([h.city, countryName(h.country, locale)], ", "), h.email, h.phone, ...h.links], " · ");
   if (contact) blocks.push({ kind: "contact", text: contact });
-  if (doc.workRight) blocks.push({ kind: "rights", text: t(`workRight.${doc.workRight.status as "citizen"}`, { country: countryName(doc.workRight.country, locale) ?? doc.workRight.country }) });
+  if (doc.workRight) blocks.push({ kind: "rights", text: workRightText(doc.workRight, t, locale) });
 
   if (doc.summary.length) {
     blocks.push({ kind: "heading", text: t("summary") }, { kind: "paragraph", parts: doc.summary.map((l) => ({ text: l.text, lineId: l.id })) });

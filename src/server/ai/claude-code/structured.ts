@@ -6,7 +6,7 @@ import { computeCost, type UsageCost } from "../cost";
 import { AiError } from "../errors";
 import type { AiContext, ResolvedCall, StructuredRequest, StructuredResult } from "../client";
 import { runClaudeCode, type CliEvent, type CliRunOptions, type CliRunResult } from "./cli";
-import { cliInput, runUsage, servedModel, systemText } from "./messages";
+import { cliInput, runUsage, servedModel, systemText, toolCalls } from "./messages";
 
 type BetaMessage = Anthropic.Beta.Messages.BetaMessage;
 
@@ -17,7 +17,11 @@ export function cliJsonSchema(schema: z.ZodType): object {
 
 /** Logs a finished run like an API call (via "claude_code": the cost is what it would have been on the API). */
 export function logCliUsage(ctx: AiContext, task: AiTask, model: string, run: CliRunResult): UsageCost {
-  const cost = computeCost(model, runUsage(run.result));
+  const usage = runUsage(run.result);
+  // Claude Code's WebSearch runs as its own request and isn't in the run's usage; count the calls.
+  const searches = toolCalls(run.messages).filter((c) => c.name === "WebSearch" && !c.isError).length;
+  if (searches > (usage.server_tool_use?.web_search_requests ?? 0)) usage.server_tool_use = { ...(usage.server_tool_use ?? {}), web_search_requests: searches };
+  const cost = computeCost(model, usage);
   logUsage(ctx.db, { ...cost, userId: ctx.userId, task, model, servedModel: servedModel(run.result, run.messages), simulated: false, via: "claude_code" });
   return cost;
 }

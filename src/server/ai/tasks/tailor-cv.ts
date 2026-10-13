@@ -87,6 +87,7 @@ function jobView(input: TailorInput) {
         category: r.category,
         postingQuote: r.postingQuote,
         term: r.normalized,
+        keywords: r.keywords ?? [],
         status: items.get(r.id)?.status ?? "unknown",
         evidence: items.get(r.id)?.verifiedEvidence ?? [],
         gapType: assessed.get(r.id)?.gapType ?? null,

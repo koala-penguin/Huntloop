@@ -1158,9 +1158,25 @@
     "present": "Present",
     "referees": "References available on request",
     "workRight": {
-      "citizen": "{country} citizen",
-      "permanent_resident": "{country} permanent resident",
+      "citizen": "Citizen of {country}",
+      "permanent_resident": "Permanent resident of {country}",
       "unrestricted_visa": "Full working rights in {country}"
+    },
+    "workRightOption": {
+      "au_citizen": "Australian citizen",
+      "au_pr": "Australian permanent resident",
+      "au_nz_citizen": "New Zealand citizen with full working rights in Australia (subclass 444)",
+      "au_partner": "Full working rights in Australia (partner visa)",
+      "au_485": "Full working rights in Australia (subclass 485)",
+      "nz_citizen": "New Zealand citizen",
+      "nz_resident": "New Zealand resident",
+      "nz_au_citizen": "Australian citizen with full working rights in New Zealand",
+      "nz_open_work_visa": "Full working rights in New Zealand (open work visa)",
+      "sg_citizen": "Singapore citizen",
+      "sg_pr": "Singapore permanent resident",
+      "us_citizen": "US citizen",
+      "us_green_card": "US permanent resident (green card)",
+      "us_ead": "Authorized to work in the US (EAD)"
     },
     "languageLevel": {
       "native": "native",

@@ -71,6 +71,8 @@ export const postingAnalysisSchema = z.object({
       minYears: z.number().nullable(),
       /** Short canonical name, e.g. "React", "5+ years frontend", "Baseline clearance". */
       normalized: z.string(),
+      /** Exact terms an applicant-tracking system would look for on a CV, in the posting's wording. */
+      keywords: z.array(z.string()),
     }),
   ),
   ghostSignals: z.array(z.string()),
@@ -85,6 +87,8 @@ export interface Requirement {
   gate: (typeof GATE_TYPES)[number];
   minYears: number | null;
   normalized: string;
+  /** ATS terms (analyses made before prompt version 2 don't have them). */
+  keywords?: string[];
 }
 
 /** Stored analysis: the LLM output plus verified requirements with ids. */

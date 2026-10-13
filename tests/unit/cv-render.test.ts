@@ -53,7 +53,7 @@ describe("CV rendering", () => {
     expect(formatCvDate("2021-03", "ko-KR")).toBe("2021년 3월");
     expect(formatCvDate("2016", "en-AU")).toBe("2016");
     const text = cvPlainText(sampleCv(), cvTranslator("en"));
-    expect(text).toContain("Australia permanent resident");
+    expect(text).toContain("Permanent resident of Australia");
     expect(text).toContain("Senior Frontend Engineer — Harbour Payments\nSydney · Mar 2021 – Present");
     expect(text).toContain("Korean (native) · English (fluent)");
     expect(text).toContain("References available on request");
@@ -62,6 +62,16 @@ describe("CV rendering", () => {
     expect(ko).toContain("2021년 3월 – 현재");
     expect(ko).toContain("오스트레일리아 영주권자");
     expect(ko).not.toContain("추천인");
+  });
+
+  it("states work rights the way the market says them", () => {
+    const au = sampleCv({ workRight: { status: "citizen", country: "AU", option: "au_citizen" } });
+    expect(cvPlainText(au, cvTranslator("en"))).toContain("Australian citizen");
+    expect(cvPlainText(au, cvTranslator("en"))).not.toContain("Australia citizen");
+    expect(cvPlainText({ ...au, language: "ko", locale: "ko-KR" }, cvTranslator("ko"))).toContain("호주 시민권자");
+    // Drafts made before the option was kept, and countries without a market pack.
+    expect(cvPlainText(sampleCv({ workRight: { status: "citizen", country: "SG" } }), cvTranslator("en"))).toContain("Citizen of Singapore");
+    expect(cvPlainText(sampleCv({ workRight: { status: "unrestricted_visa", country: "CA", option: "open_work_permit" } }), cvTranslator("en"))).toContain("Full working rights in Canada");
   });
 
   it("escapes every value in the HTML and highlights only the lines asked for", () => {

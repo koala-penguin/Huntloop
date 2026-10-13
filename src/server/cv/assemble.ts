@@ -88,7 +88,7 @@ export function assembleCv({ profile, job, plan, output }: AssembleCvInput): { d
 
   const right = job.country ? data.workRights.find((w) => w.country === job.country) : undefined;
   const workRight =
-    pack.cv.workRightsLine && right && ["citizen", "permanent_resident", "unrestricted_visa"].includes(right.status) ? { status: right.status, country: right.country } : null;
+    pack.cv.workRightsLine && right && ["citizen", "permanent_resident", "unrestricted_visa"].includes(right.status) ? { status: right.status, country: right.country, option: right.option ?? null } : null;
 
   const latest = data.experience[0];
   const doc: CvDocument = {

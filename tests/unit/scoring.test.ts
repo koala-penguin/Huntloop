@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { scoreJob } from "@/server/scoring/aggregate";
 import { buildQuoteIndex, quoteFound, sliceBetweenAnchors } from "@/server/scoring/quotes";
 import { tierRank } from "@/server/scoring/rubric";
+import { keywordCoverage, postingKeywords, termPresent } from "@/server/scoring/keywords";
 import { ASSESSMENT_STATUSES, type AssessmentStatus } from "@/shared/schemas/job";
 import { analysis, assessment, profile, req, right, scoreInput } from "../helpers/scoring";
 
@@ -155,5 +156,46 @@ describe("Interview Chance — properties", () => {
       }),
       { numRuns: 200 },
     );
+  });
+});
+
+describe("ATS keywords", () => {
+  it("matches spaced, hyphenated and closed spellings, and plurals", () => {
+    expect(termPresent("Strengthened cyber security controls", "cybersecurity")).toBe(true);
+    expect(termPresent("cyber-security governance", "cyber security")).toBe(true);
+    expect(termPresent("Managed three vendors and their contracts", "vendor")).toBe(true);
+    expect(termPresent("Built data pipelines", "data pipeline")).toBe(true);
+    expect(termPresent("Reactive systems", "React")).toBe(false);
+    expect(termPresent("Wrote C++ services", "C++")).toBe(true);
+  });
+
+  it("measures the posting's keywords term by term, ignoring gates", () => {
+    const a = analysis([
+      req("r1", { normalized: "MSP and vendor management", keywords: ["managed service provider", "vendor management"] }),
+      req("r2", { normalized: "Data strategy, governance and analytics", category: "domain", keywords: ["data strategy", "data governance"] }),
+      req("r3", { normalized: "Excellent stakeholder engagement", keywords: [] }),
+      req("r4", { kind: "gate", category: "work_rights", gate: "no_sponsorship", normalized: "Full working rights", keywords: ["working rights"] }),
+    ]);
+    expect(postingKeywords(a)).toEqual(["managed service provider", "vendor management", "data strategy", "data governance"]);
+    const coverage = keywordCoverage(a, "Set the data strategy and a data governance framework; vendor management for three platform partners.");
+    expect(coverage.present).toEqual(["vendor management", "data strategy", "data governance"]);
+    expect(coverage.missing).toEqual(["managed service provider"]);
+    expect(coverage.share).toBe(0.75);
+  });
+
+  it("falls back to skill labels for analyses made before keywords existed", () => {
+    const legacy = analysis([req("React"), req("Kubernetes"), req("r3", { category: "domain", normalized: "Fintech" })]);
+    expect(postingKeywords(legacy)).toEqual(["React", "Kubernetes"]);
+    expect(keywordCoverage(legacy, "React and TypeScript").share).toBe(0.5);
+  });
+
+  it("counts towards Interview Chance when the CV has the posting's terms", () => {
+    const a = analysis([req("r1", { normalized: "Databricks lakehouse", keywords: ["Databricks"] }), req("r2", { normalized: "AI governance", keywords: ["AI governance"] })]);
+    const as = assessment({ r1: "met", r2: "met" });
+    const without = scoreJob(scoreInput(a, as, { cvText: "Led analytics teams." }));
+    const withTerms = scoreJob(scoreInput(a, as, { cvText: "Moved reporting to Databricks and set up AI governance." }));
+    expect(without.components.keywords).toBe(0);
+    expect(withTerms.components.keywords).toBe(1);
+    expect(withTerms.score).toBeGreaterThan(without.score);
   });
 });
