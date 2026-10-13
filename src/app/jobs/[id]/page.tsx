@@ -338,7 +338,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
                       <CardTitle>{t("chatTitle")}</CardTitle>
                       <CardDescription>{t("chatDescription")}</CardDescription>
                     </CardHeader>
-                    <ChatPanel jobId={job.id} items={chatItems} hasConversation={!!conversation} />
+                    <ChatPanel scope={{ kind: "job", jobId: job.id }} items={chatItems} hasConversation={!!conversation} />
                   </Card>
                 ),
               },

@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { resolveTaskModel } from "@/shared/ai-settings";
+import { resolveTaskModel, type AiTask } from "@/shared/ai-settings";
 import type { JobStatus } from "@/shared/schemas/job";
 import { stableStringify } from "@/shared/stable-json";
 import type { Effort, ModelId } from "@/shared/models";
@@ -205,11 +205,51 @@ async function runTool(ctx: AiContext, conversation: ConversationRow, job: JobRo
 }
 
 /**
+ * What differs between kinds of conversation (one job, or the coach across all jobs): the state
+ * the model is kept up to date about, the context-update text, and the client tools.
+ */
+export interface ChatScope {
+  task: AiTask;
+  digest(): Record<string, unknown>;
+  contextUpdate(previous: Record<string, unknown> | null, digest: Record<string, unknown>): string | null;
+  runTool(block: { id: string; name: string; input: unknown }, emit: (e: ChatEvent) => void, messageId: number): Promise<ToolResult>;
+}
+
+type ScopeFactory = (ctx: AiContext, conversation: ConversationRow) => ChatScope;
+const scopes = ((globalThis as unknown as { huntloopChatScopes?: Map<string, ScopeFactory> }).huntloopChatScopes ??= new Map());
+
+export function registerChatScope(kind: string, factory: ScopeFactory): void {
+  scopes.set(kind, factory);
+}
+
+function jobScope(ctx: AiContext, conversation: ConversationRow): ChatScope {
+  if (!conversation.jobId) throw new UserFacingError("not_found");
+  let job = getJob(ctx.db, ctx.userId, conversation.jobId);
+  if (!job) throw new UserFacingError("not_found");
+  return {
+    task: "chat",
+    digest: () => {
+      job = getJob(ctx.db, ctx.userId, job!.id) ?? job!;
+      return currentDigest(ctx, job, conversation.id).digest;
+    },
+    contextUpdate: (previous, digest) => {
+      const update = describeStateChange(previous, digest, listChatActions(ctx, conversation.id));
+      if (!update) return null;
+      const research = digest.researchReady && previous && !previous.researchReady ? companyResearchHooks.summaryFor(ctx, job!) : null;
+      return `${update}${research ? `\n<employer_research>\n${research}\n</employer_research>` : ""}`;
+    },
+    runTool: (block, emit, messageId) => runTool(ctx, conversation, job!, block, emit, messageId),
+  };
+}
+
+registerChatScope("job", jobScope);
+
+/**
  * One user turn: append the message, call Claude (streaming), run client tools, repeat until the
  * turn ends. Every response is stored verbatim before the next request, so each request extends
  * the previous one. On a refusal or error, nothing from this turn is kept.
  */
-export async function runJobChatTurn(ctx: AiContext, conversationId: number, userText: string, emit: (e: ChatEvent) => void): Promise<void> {
+export async function runChatTurn(ctx: AiContext, conversationId: number, userText: string, emit: (e: ChatEvent) => void): Promise<void> {
   if (busy.has(conversationId)) throw new UserFacingError("chat_busy");
   busy.add(conversationId);
   const turnRows: number[] = [];
@@ -232,9 +272,9 @@ export async function runJobChatTurn(ctx: AiContext, conversationId: number, use
 
   try {
     const conversation = ctx.db.select().from(conversations).where(and(eq(conversations.id, conversationId), eq(conversations.userId, ctx.userId))).get();
-    if (!conversation?.jobId) throw new UserFacingError("not_found");
-    const job = getJob(ctx.db, ctx.userId, conversation.jobId);
-    if (!job) throw new UserFacingError("not_found");
+    const factory = conversation ? scopes.get(conversation.kind) : undefined;
+    if (!conversation || !factory) throw new UserFacingError("not_found");
+    const scope = factory(ctx, conversation);
     emit({ type: "start", conversationId });
 
     // The user's message: results for any dangling tool calls, then context updates, then their text.
@@ -245,13 +285,10 @@ export async function runJobChatTurn(ctx: AiContext, conversationId: number, use
       content: "Not run: the previous response was cut off before this tool could run.",
       is_error: true,
     }));
-    const { digest } = currentDigest(ctx, job, conversationId);
+    const digest = scope.digest();
     const previous = conversation.stateDigest ? (JSON.parse(conversation.stateDigest) as Record<string, unknown>) : null;
-    const update = describeStateChange(previous, digest, listChatActions(ctx, conversationId));
-    if (update) {
-      const research = digest.researchReady && previous && !previous.researchReady ? companyResearchHooks.summaryFor(ctx, job) : null;
-      content.push({ type: "text", text: `<context_update>\n${update}${research ? `\n<employer_research>\n${research}\n</employer_research>` : ""}\n</context_update>` });
-    }
+    const update = scope.contextUpdate(previous, digest);
+    if (update) content.push({ type: "text", text: `<context_update>\n${update}\n</context_update>` });
     content.push({ type: "text", text: userText });
     insertRow({ role: "user", kind: "user", content, text: userText });
 
@@ -261,7 +298,7 @@ export async function runJobChatTurn(ctx: AiContext, conversationId: number, use
       const blocks = new Map<number, { type: string; name?: string; json: string }>();
       const { message } = await callModel(
         ctx,
-        "chat",
+        scope.task,
         {
           system: conversation.system,
           messages: toApiMessages(listChatMessages(ctx, conversationId)),
@@ -320,7 +357,7 @@ export async function runJobChatTurn(ctx: AiContext, conversationId: number, use
       if (message.stop_reason === "tool_use") {
         const toolUses = message.content.filter((b): b is Anthropic.Beta.Messages.BetaToolUseBlock => b.type === "tool_use");
         const results: ToolResult[] = [];
-        for (const use of toolUses) results.push(await runTool(ctx, conversation, job, use, emit, assistant.id));
+        for (const use of toolUses) results.push(await scope.runTool(use, emit, assistant.id));
         insertRow({ role: "user", kind: "tool_results", content: results });
         continue;
       }
@@ -328,7 +365,7 @@ export async function runJobChatTurn(ctx: AiContext, conversationId: number, use
       break;
     }
 
-    const after = currentDigest(ctx, getJob(ctx.db, ctx.userId, job.id) ?? job, conversationId).digest;
+    const after = scope.digest();
     ctx.db.update(conversations).set({ stateDigest: stableStringify(after), updatedAt: new Date() }).where(eq(conversations.id, conversationId)).run();
     emit({ type: "done" });
   } catch (error) {
@@ -340,3 +377,6 @@ export async function runJobChatTurn(ctx: AiContext, conversationId: number, use
     busy.delete(conversationId);
   }
 }
+
+/** The per-job chat's entry point (kept for the job chat route and tests). */
+export const runJobChatTurn = runChatTurn;

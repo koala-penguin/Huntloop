@@ -4,17 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { BriefcaseBusiness, Kanban, LayoutDashboard, Menu, Search, Settings, UserRound, X, type LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, Kanban, LayoutDashboard, Menu, MessagesSquare, Search, Settings, UserRound, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 interface NavItem {
   href: string;
-  key: "dashboard" | "search" | "jobs" | "pipeline" | "profile" | "settings";
+  key: "dashboard" | "coach" | "search" | "jobs" | "pipeline" | "profile" | "settings";
   icon: LucideIcon;
 }
 
 const ITEMS: NavItem[] = [
   { href: "/", key: "dashboard", icon: LayoutDashboard },
+  { href: "/coach", key: "coach", icon: MessagesSquare },
   { href: "/search", key: "search", icon: Search },
   { href: "/jobs", key: "jobs", icon: BriefcaseBusiness },
   { href: "/pipeline", key: "pipeline", icon: Kanban },

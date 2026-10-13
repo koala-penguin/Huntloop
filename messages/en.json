@@ -25,7 +25,8 @@
     "profile": "Profile",
     "jobs": "Jobs",
     "search": "Search",
-    "pipeline": "Pipeline"
+    "pipeline": "Pipeline",
+    "coach": "Coach"
   },
   "dashboard": {
     "title": "Welcome to Huntloop",
@@ -215,6 +216,10 @@
     "linkedinProfile": {
       "name": "LinkedIn profile text",
       "description": "Writes your LinkedIn headline, About section and role descriptions."
+    },
+    "coach": {
+      "name": "Coach",
+      "description": "The conversation across your whole job hunt."
     }
   },
   "errors": {
@@ -811,7 +816,12 @@
       "save_job_note": "Saved a note: {detail}",
       "set_job_status": "Changed the job status: {detail}",
       "start_company_research": "Started researching the employer{detail}",
-      "revise_cv_draft": "Asked for a new CV version: {detail}"
+      "revise_cv_draft": "Asked for a new CV version: {detail}",
+      "list_jobs": "Looked through your jobs",
+      "get_job": "Read a job: {detail}",
+      "compare_jobs": "Compared jobs",
+      "search_jobs": "Started a search: {detail}",
+      "import_job_url": "Added a job: {detail}"
     },
     "card": {
       "factTitle": "Add this to your profile?",
@@ -822,6 +832,19 @@
       "factAdded": "Added to your profile",
       "proceeded": "Moving ahead: status set to Applying",
       "dismissed": "Dismissed"
+    },
+    "coach": {
+      "title": "Coach",
+      "subtitle": "One conversation about your whole hunt: what to focus on, which jobs to compare, what to follow up. It can look at every job, start searches and add jobs by link.",
+      "intro": "Ask about your pipeline, compare jobs, plan your week, or ask for a search. The coach sees your profile, preferences and every job you're tracking.",
+      "placeholder": "Ask your coach…",
+      "hint": "Enter to send, Shift+Enter for a new line. Searches and status changes only happen when you ask.",
+      "suggestion": {
+        "week": "What should I focus on this week?",
+        "compare": "Compare my top two jobs",
+        "followUp": "Which applications need a follow-up?",
+        "search": "Find me more jobs like my best match"
+      }
     }
   },
   "employer": {

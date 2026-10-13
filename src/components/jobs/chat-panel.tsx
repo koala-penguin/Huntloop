@@ -12,6 +12,7 @@ import { Label, Textarea } from "@/components/ui/form";
 import { Alert, Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import { newConversationAction, resolveChatActionAction } from "@/app/jobs/[id]/actions";
+import { newCoachConversationAction } from "@/app/coach/actions";
 
 export interface ChatItem {
   id: number;
@@ -34,6 +35,11 @@ interface Live {
 
 const KNOWN_ERRORS = ["refusal", "budget", "max_tokens", "chat_busy", "job_not_ready", "api"];
 const SUGGESTIONS = ["explain", "fit", "improve", "research"] as const;
+const COACH_SUGGESTIONS = ["week", "compare", "followUp", "search"] as const;
+const KNOWN_ACTIVITIES = ["web_search", "web_fetch", "save_job_note", "set_job_status", "start_company_research", "revise_cv_draft", "list_jobs", "get_job", "compare_jobs", "search_jobs", "import_job_url"];
+
+/** A job's own chat, or the coach across all jobs. */
+export type ChatScopeProp = { kind: "job"; jobId: number } | { kind: "coach" };
 
 function Markdown({ text }: { text: string }) {
   return (
@@ -58,7 +64,7 @@ function Markdown({ text }: { text: string }) {
 function Activity({ name, detail }: { name: string; detail: string | null }) {
   const t = useTranslations("chat.activity");
   const Icon = name === "web_search" ? Search : name === "web_fetch" ? Globe : name === "save_job_note" ? NotebookPen : Sparkles;
-  const known = ["web_search", "web_fetch", "save_job_note", "set_job_status", "start_company_research", "revise_cv_draft"].includes(name);
+  const known = KNOWN_ACTIVITIES.includes(name);
   return (
     <li className="flex items-center gap-1.5 text-xs text-muted">
       <Icon className="size-3.5 shrink-0" aria-hidden />
@@ -154,8 +160,8 @@ function UserBubble({ text }: { text: string }) {
   );
 }
 
-/** The per-job conversation with Claude: streamed replies, tool activity and confirmation cards. */
-export function ChatPanel({ jobId, items, hasConversation }: { jobId: number; items: ChatItem[]; hasConversation: boolean }) {
+/** A conversation with Claude (one job's, or the coach's): streamed replies, tool activity and confirmation cards. */
+export function ChatPanel({ scope, items, hasConversation }: { scope: ChatScopeProp; items: ChatItem[]; hasConversation: boolean }) {
   const t = useTranslations("chat");
   const tErrors = useTranslations("errors");
   const router = useRouter();
@@ -165,6 +171,7 @@ export function ChatPanel({ jobId, items, hasConversation }: { jobId: number; it
   const [resetting, startReset] = useTransition();
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  const inputId = scope.kind === "job" ? `chat-${scope.jobId}` : "chat-coach";
   const showLive = live && (!live.finished || items.length <= live.baseCount);
   const sending = !!live && !live.finished;
 
@@ -176,7 +183,7 @@ export function ChatPanel({ jobId, items, hasConversation }: { jobId: number; it
     setLive({ user: message, text: "", progress: null, activities: [], baseCount: items.length, finished: false });
     let failed: string | null = null;
     try {
-      const res = await fetch(`/api/jobs/${jobId}/chat`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: message }) });
+      const res = await fetch(scope.kind === "job" ? `/api/jobs/${scope.jobId}/chat` : "/api/coach/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: message }) });
       if (!res.ok || !res.body) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         failed = body.error ?? "api";
@@ -224,7 +231,7 @@ export function ChatPanel({ jobId, items, hasConversation }: { jobId: number; it
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-4" aria-live="polite">
-        {items.length === 0 && !showLive && <p className="text-sm text-muted">{t("intro")}</p>}
+        {items.length === 0 && !showLive && <p className="text-sm text-muted">{scope.kind === "job" ? t("intro") : t("coach.intro")}</p>}
         {items.map((item) => (item.role === "user" ? <UserBubble key={item.id} text={item.text} /> : <AssistantBubble key={item.id} item={item} />))}
         {showLive && (
           <>
@@ -244,9 +251,9 @@ export function ChatPanel({ jobId, items, hasConversation }: { jobId: number; it
 
       {items.length === 0 && !live && (
         <div className="flex flex-wrap gap-2">
-          {SUGGESTIONS.map((s) => (
-            <Button key={s} type="button" variant="secondary" size="sm" onClick={() => void send(t(`suggestion.${s}`))}>
-              {t(`suggestion.${s}`)}
+          {(scope.kind === "job" ? SUGGESTIONS.map((s) => t(`suggestion.${s}`)) : COACH_SUGGESTIONS.map((s) => t(`coach.suggestion.${s}`))).map((text) => (
+            <Button key={text} type="button" variant="secondary" size="sm" onClick={() => void send(text)}>
+              {text}
             </Button>
           ))}
         </div>
@@ -255,21 +262,21 @@ export function ChatPanel({ jobId, items, hasConversation }: { jobId: number; it
       {error && <Alert tone="danger">{error}</Alert>}
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor={`chat-${jobId}`} className="sr-only">
+        <Label htmlFor={inputId} className="sr-only">
           {t("inputLabel")}
         </Label>
         <Textarea
-          id={`chat-${jobId}`}
+          id={inputId}
           ref={inputRef}
           rows={3}
           value={input}
           disabled={sending}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={t("placeholder")}
+          placeholder={scope.kind === "job" ? t("placeholder") : t("coach.placeholder")}
         />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-muted">{t("hint")}</span>
+          <span className="text-xs text-muted">{scope.kind === "job" ? t("hint") : t("coach.hint")}</span>
           <div className="flex gap-2">
             {hasConversation && (
               <Button
@@ -279,7 +286,10 @@ export function ChatPanel({ jobId, items, hasConversation }: { jobId: number; it
                 disabled={sending || resetting}
                 onClick={() =>
                   startReset(async () => {
-                    await newConversationAction(jobId);
+                    await (scope.kind === "job" ? newConversationAction(scope.jobId) : newCoachConversationAction());
+                    // The last streamed reply belongs to the old conversation.
+                    setLive(null);
+                    setError(null);
                     router.refresh();
                   })
                 }

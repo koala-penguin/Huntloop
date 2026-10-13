@@ -25,7 +25,8 @@
     "profile": "프로필",
     "jobs": "채용 공고",
     "search": "검색",
-    "pipeline": "지원 현황"
+    "pipeline": "지원 현황",
+    "coach": "코치"
   },
   "dashboard": {
     "title": "Huntloop에 오신 것을 환영합니다",
@@ -215,6 +216,10 @@
     "linkedinProfile": {
       "name": "LinkedIn 프로필 문구",
       "description": "LinkedIn 헤드라인, 소개, 경력 설명을 작성합니다."
+    },
+    "coach": {
+      "name": "코치",
+      "description": "구직 활동 전체에 대한 대화입니다."
     }
   },
   "errors": {
@@ -811,7 +816,12 @@
       "save_job_note": "메모 저장: {detail}",
       "set_job_status": "공고 상태 변경: {detail}",
       "start_company_research": "회사 조사 시작{detail}",
-      "revise_cv_draft": "새 CV 버전을 요청했습니다: {detail}"
+      "revise_cv_draft": "새 CV 버전을 요청했습니다: {detail}",
+      "list_jobs": "내 공고를 살펴봄",
+      "get_job": "공고를 읽음: {detail}",
+      "compare_jobs": "공고를 비교함",
+      "search_jobs": "검색을 시작함: {detail}",
+      "import_job_url": "공고를 추가함: {detail}"
     },
     "card": {
       "factTitle": "프로필에 추가할까요?",
@@ -822,6 +832,19 @@
       "factAdded": "프로필에 추가했습니다",
       "proceeded": "진행합니다: 상태를 '지원 준비 중'으로 바꿨습니다",
       "dismissed": "닫음"
+    },
+    "coach": {
+      "title": "코치",
+      "subtitle": "구직 활동 전체에 대한 하나의 대화입니다. 무엇에 집중할지, 어떤 공고를 비교할지, 무엇을 후속 연락할지 함께 정합니다. 모든 공고를 보고, 검색을 시작하고, 링크로 공고를 추가할 수 있습니다.",
+      "intro": "지원 현황, 공고 비교, 이번 주 계획, 검색 요청 등 무엇이든 물어보세요. 코치는 내 프로필, 구직 선호, 추적 중인 모든 공고를 봅니다.",
+      "placeholder": "코치에게 물어보세요…",
+      "hint": "Enter로 보내고 Shift+Enter로 줄을 바꿉니다. 검색과 상태 변경은 요청할 때만 합니다.",
+      "suggestion": {
+        "week": "이번 주에는 무엇에 집중해야 할까요?",
+        "compare": "가장 좋은 공고 두 개를 비교해 주세요",
+        "followUp": "후속 연락이 필요한 지원은 어떤 건가요?",
+        "search": "가장 잘 맞는 공고와 비슷한 공고를 더 찾아 주세요"
+      }
     }
   },
   "employer": {
