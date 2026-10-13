@@ -7,6 +7,8 @@ import { AiSettingsForm } from "@/components/settings/ai-settings-form";
 import { appContext } from "@/server/context";
 import { spendSummary } from "@/server/repo/usage";
 import { readEnv } from "@/server/config/env";
+import { getSourceSettings } from "@/server/repo/settings";
+import { SourcesForm } from "@/components/settings/sources-form";
 
 export default async function SettingsPage() {
   const t = await getTranslations("settings");
@@ -37,6 +39,8 @@ export default async function SettingsPage() {
       </Card>
 
       <AiSettingsForm initial={settings} spentToday={formatUsd(spend.todayUsd, locale)} spentMonth={formatUsd(spend.monthUsd, locale)} />
+
+      <SourcesForm initial={getSourceSettings(db, user.id)} adzunaConfigured={!!(env.ADZUNA_APP_ID && env.ADZUNA_APP_KEY)} today={new Date().toISOString().slice(0, 10)} />
 
       <Card>
         <CardHeader>

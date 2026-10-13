@@ -1,6 +1,8 @@
 import type { AiContext } from "../ai/client";
 import type { JobRow, JobIntake } from "../db/schema";
-import { UserFacingError } from "../errors";
+import { errorCodeOf, UserFacingError } from "../errors";
+import { TaskCancelledError, type TaskContext } from "../tasks/runner";
+import { browserSiteFor, readJobInBrowser } from "../sources/browser";
 import { sha256 } from "../hash";
 import { canonicalizeUrl, domainPolicy } from "../ingest/domain-policy";
 import { extractFromHtml, type PostingHints } from "../ingest/html";
@@ -28,6 +30,8 @@ export interface ProcessJobOptions {
   screen?: boolean;
   /** Read the posting from its link first (to replace a snippet with the full posting). */
   preferUrl?: boolean;
+  /** From the task runner: pause for the user when the browser hits a CAPTCHA or sign-in. */
+  waitForUser?: TaskContext["waitForUser"];
   onStage?: (stage: JobStage) => void;
   /** Test seams. */
   fetchImpl?: typeof fetch;
@@ -63,11 +67,29 @@ async function readAttachments(ctx: AiContext, job: JobRow): Promise<{ text: str
   return { text: result.transcription, illegible: result.illegible };
 }
 
-/** Reads a posting from its link, following the site rules (API, guarded fetch, or "needs content"). */
-export async function readJobUrl(url: string, options: Pick<ProcessJobOptions, "fetchImpl" | "fetchJson"> = {}): Promise<Content> {
+export interface ReadUrlOptions extends Pick<ProcessJobOptions, "fetchImpl" | "fetchJson"> {
+  /** Enables reading SEEK/LinkedIn pages in the user's browser (when turned on in Settings). */
+  browser?: { ctx: Pick<AiContext, "db" | "userId">; signal?: AbortSignal; waitForUser?: TaskContext["waitForUser"] };
+}
+
+/** Reads a posting from its link, following the site rules (API, guarded fetch, browser, or "needs content"). */
+export async function readJobUrl(url: string, options: ReadUrlOptions = {}): Promise<Content> {
   const parsed = new URL(url);
   const policy = domainPolicy(parsed);
-  if (policy.mode === "browser" || policy.mode === "paste") return { kind: "needs_content", reason: `site_${policy.mode}`, site: policy.site };
+  if (policy.mode === "browser" || policy.mode === "paste") {
+    // SEEK/LinkedIn: read in the user's browser window when the site is turned on in Settings.
+    const site = options.browser ? browserSiteFor(options.browser.ctx, parsed) : null;
+    if (!site || !options.browser) return { kind: "needs_content", reason: `site_${policy.mode}`, site: policy.site };
+    try {
+      const captured = await readJobInBrowser(options.browser.ctx, site, parsed, { signal: options.browser.signal, waitForUser: options.browser.waitForUser });
+      return captured
+        ? { kind: "content", text: captured.text, hints: captured.hints, noisy: false, source: site }
+        : { kind: "needs_content", reason: "browser_blocked", site };
+    } catch (error) {
+      if (error instanceof TaskCancelledError) throw error;
+      return { kind: "needs_content", reason: errorCodeOf(error) === "browser_unavailable" ? "browser_unavailable" : "browser_blocked", site };
+    }
+  }
   try {
     const ats = detectAtsUrl(parsed);
     if (ats) {
@@ -110,7 +132,7 @@ export async function processJob(ctx: AiContext, job: JobRow, options: ProcessJo
     const pasted = job.rawText?.trim() ?? "";
 
     if (options.preferUrl && job.sourceUrl) {
-      const fromUrl = await readJobUrl(job.sourceUrl, options);
+      const fromUrl = await readJobUrl(job.sourceUrl, { ...options, browser: { ctx, signal: ctx.signal, waitForUser: options.waitForUser } });
       if (fromUrl.kind === "content") content = { ...fromUrl, partial: false };
       else if (job.analysisId) {
         // Keep the existing (provisional) report and say why the full posting couldn't be read.
@@ -130,7 +152,7 @@ export async function processJob(ctx: AiContext, job: JobRow, options: ProcessJo
       }
     }
     if (!content && pasted) content = { kind: "content", text: pasted, hints: (intake.hints as PostingHints) ?? {}, noisy: intake.noisy ?? true, partial: intake.partial };
-    if (!content && job.sourceUrl) content = await readJobUrl(job.sourceUrl, options);
+    if (!content && job.sourceUrl) content = await readJobUrl(job.sourceUrl, { ...options, browser: { ctx, signal: ctx.signal, waitForUser: options.waitForUser } });
     if (!content) throw new UserFacingError("missing_posting");
 
     if (content.kind === "needs_content") {

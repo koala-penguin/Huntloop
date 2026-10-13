@@ -6,7 +6,10 @@ import { aiSettingsSchema, type AiSettings } from "@/shared/ai-settings";
 import { MODEL_IDS, type ModelId } from "@/shared/models";
 import { isLocale, LOCALE_COOKIE } from "@/i18n/locales";
 import { appContext } from "@/server/context";
-import { saveAiSettings } from "@/server/repo/settings";
+import { saveAiSettings, saveSourceSettings } from "@/server/repo/settings";
+import { sourceSettingsSchema, type SourceSettings } from "@/shared/source-settings";
+import { withBrowserPage } from "@/server/browser/service";
+import { errorCodeOf } from "@/server/errors";
 import { setUserLocale } from "@/server/repo/users";
 import { currentAiMode, getAnthropic } from "@/server/ai/client";
 
@@ -42,5 +45,29 @@ export async function checkModelAccessAction(): Promise<ModelAccessResult> {
     return { ok: true, mode: currentAiMode(), available: MODEL_IDS.filter((id) => ids.has(id)) };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function saveSourceSettingsAction(input: unknown): Promise<{ ok: true; settings: SourceSettings } | { ok: false; error: string }> {
+  const parsed = sourceSettingsSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid" };
+  const { db, user } = appContext();
+  const settings = saveSourceSettings(db, user.id, parsed.data);
+  revalidatePath("/", "layout");
+  return { ok: true, settings };
+}
+
+/** Opens Huntloop's browser window briefly, to check it works on this computer. */
+export async function testBrowserAction(): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await withBrowserPage(async (page) => {
+      await page.setContent(
+        '<!doctype html><title>Huntloop</title><body style="font:16px system-ui;padding:2rem"><h1>Huntloop browser</h1><p>This window is where Huntloop reads SEEK and LinkedIn for you.</p></body>',
+      );
+      await page.waitForTimeout(1500);
+    });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorCodeOf(error) ?? "browser_unavailable" };
   }
 }

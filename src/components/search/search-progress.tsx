@@ -6,11 +6,13 @@ import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Alert } from "@/components/ui/badge";
 import { useTask } from "@/components/tasks/use-task";
+import { UserActionPrompt, type TaskUserAction } from "@/components/tasks/user-action-prompt";
 
 interface Progress {
   stage?: string;
   counts?: { leads: number; unique: number; screened: number; toScreen: number; deep: number; toDeep: number };
   notes?: string[];
+  action?: TaskUserAction;
 }
 
 const STAGES = ["planning", "sourcing", "filtering", "screening", "deep", "done"] as const;
@@ -30,6 +32,7 @@ export function SearchProgress({ taskId }: { taskId: number }) {
   const progress = (task?.progress ?? {}) as Progress;
   const stage = STAGES.find((s) => s === progress.stage) ?? "planning";
   const c = progress.counts;
+  if (task?.status === "needs_user_action" && progress.action) return <UserActionPrompt taskId={taskId} action={progress.action} />;
   return (
     <div className="flex flex-col gap-2" role="status" aria-live="polite">
       <p className="flex items-center gap-2 text-sm">

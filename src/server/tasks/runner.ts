@@ -13,6 +13,26 @@ export interface TaskContext {
   signal: AbortSignal;
   /** Persist progress for the UI (throttled). */
   progress: (value: unknown) => void;
+  /**
+   * Pause until the user deals with something (a CAPTCHA, a login) and presses Continue, or skips
+   * it. Polls `isResolved` meanwhile. Throws if the task is cancelled. Absent outside the runner.
+   */
+  waitForUser?: (reason: UserActionReason, isResolved: () => Promise<boolean>) => Promise<"resolved" | "skipped">;
+}
+
+export interface UserActionReason {
+  /** e.g. "captcha", "login", "checkpoint" */
+  kind: string;
+  /** e.g. "seek", "linkedin" */
+  site?: string | null;
+  url?: string | null;
+}
+
+export class TaskCancelledError extends Error {
+  constructor() {
+    super("Task cancelled");
+    this.name = "TaskCancelledError";
+  }
 }
 
 export interface TaskHandlerDefinition {
@@ -44,6 +64,54 @@ export function listTasks(db: Db, userId: number, kind?: string, limit = 20): Ta
     .orderBy(desc(tasks.createdAt))
     .limit(limit)
     .all();
+}
+
+/** The user's answer to a paused task: carry on (after fixing it in the browser) or skip that step. */
+export function answerTask(db: Db, id: number, action: "continue" | "skip"): boolean {
+  const row = db
+    .update(tasks)
+    .set({ userAction: action })
+    .where(and(eq(tasks.id, id), eq(tasks.status, "needs_user_action")))
+    .returning()
+    .get();
+  return !!row;
+}
+
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+
+/**
+ * Implementation of TaskContext.waitForUser for a task row. The progress shown to the UI gains an
+ * `action` describing what the user needs to do.
+ */
+export async function waitForUserOnTask(
+  db: Db,
+  taskId: number,
+  reason: UserActionReason,
+  isResolved: () => Promise<boolean>,
+  options: { signal?: AbortSignal; pollMs?: number; currentProgress?: unknown } = {},
+): Promise<"resolved" | "skipped"> {
+  const progress = { ...((options.currentProgress as object | undefined) ?? {}), action: reason };
+  db.update(tasks).set({ status: "needs_user_action", userAction: null, progress }).where(and(eq(tasks.id, taskId), eq(tasks.status, "running"))).run();
+  const back = (result: "resolved" | "skipped") => {
+    const { action: _drop, ...rest } = progress;
+    void _drop;
+    db.update(tasks).set({ status: "running", userAction: null, progress: rest }).where(and(eq(tasks.id, taskId), eq(tasks.status, "needs_user_action"))).run();
+    return result;
+  };
+  for (;;) {
+    const current = getTask(db, taskId);
+    if (!current || current.status === "cancelled" || options.signal?.aborted) throw new TaskCancelledError();
+    if (current.userAction === "skip") return back("skipped");
+    if (current.userAction === "continue" || (await isResolved().catch(() => false))) return back("resolved");
+    await sleep(options.pollMs ?? 2_000, options.signal);
+  }
 }
 
 export function cancelTask(db: Db, id: number): void {
@@ -90,13 +158,13 @@ export class TaskRunner {
     const stale = this.db
       .select()
       .from(tasks)
-      .where(and(eq(tasks.status, "running"), lt(tasks.heartbeatAt, new Date(now - STALE_AFTER_MS))))
+      .where(and(inArray(tasks.status, ["running", "needs_user_action"]), lt(tasks.heartbeatAt, new Date(now - STALE_AFTER_MS))))
       .all();
     for (const task of stale) {
       const max = handlers.get(task.kind)?.maxAttempts ?? 3;
       this.db
         .update(tasks)
-        .set(task.attempts >= max ? { status: "failed", error: "Interrupted too many times", finishedAt: new Date() } : { status: "queued" })
+        .set(task.attempts >= max ? { status: "failed", error: "Interrupted too many times", finishedAt: new Date() } : { status: "queued", userAction: null })
         .where(eq(tasks.id, task.id))
         .run();
     }
@@ -170,6 +238,10 @@ export class TaskRunner {
         progress: (value) => {
           pendingProgress = value;
           if (Date.now() - lastProgressWrite > 250) writeProgress();
+        },
+        waitForUser: (reason, isResolved) => {
+          if (pendingProgress !== undefined) writeProgress();
+          return waitForUserOnTask(this.db, task.id, reason, isResolved, { signal: controller.signal, currentProgress: pendingProgress });
         },
       });
       if (pendingProgress !== undefined) writeProgress();

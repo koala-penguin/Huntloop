@@ -14,7 +14,10 @@ import { canonicalizeUrl } from "../ingest/domain-policy";
 import { createJob, dedupeKeyFor, findJobByUrl, getJob, normalizeCompanyName, updateJob } from "../repo/jobs";
 import { getCurrentProfile, getPreferences } from "../repo/profile";
 import { processJob, readJobUrl } from "../jobs/pipeline";
-import { formatTaskError } from "../errors";
+import { errorCodeOf, formatTaskError } from "../errors";
+import { getSourceSettings } from "../repo/settings";
+import { TaskCancelledError, type TaskContext } from "../tasks/runner";
+import { searchBrowserSite } from "../sources/browser";
 import { mapLimit } from "./limit";
 
 export type SearchStage = "planning" | "sourcing" | "filtering" | "screening" | "deep" | "done";
@@ -27,6 +30,8 @@ export interface SearchProgress {
 
 export interface SearchRunOptions {
   taskId?: number | null;
+  /** Pause for the user (CAPTCHA, sign-in) in browser sources; from the task runner. */
+  waitForUser?: TaskContext["waitForUser"];
   onProgress?: (progress: SearchProgress) => void;
   /** Fetch full postings for the top results (off in demo mode: demo leads aren't real pages). */
   enrich?: boolean;
@@ -49,8 +54,15 @@ export function listSearches(db: Db, userId: number, limit = 20): SearchRow[] {
 }
 
 /** Sources that can run right now: Adzuna needs its keys; the web agent always can. */
-export function availableSources(): SearchSource[] {
-  return adzunaCredentials() ? ["adzuna", "web_agent"] : ["web_agent"];
+/** Sources that can run right now: Adzuna needs its keys; SEEK and LinkedIn must be turned on in Settings. */
+export function availableSources(db: Db, userId: number): SearchSource[] {
+  const sites = getSourceSettings(db, userId);
+  return [
+    ...(adzunaCredentials() ? (["adzuna"] as const) : []),
+    "web_agent" as const,
+    ...(sites.seek.enabled ? (["seek"] as const) : []),
+    ...(sites.linkedin.enabled ? (["linkedin"] as const) : []),
+  ];
 }
 
 const words = (s: string) =>
@@ -172,12 +184,18 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
       const found =
         source === "adzuna"
           ? await searchAdzuna(ctx.db, filters, options.adzunaFetcher)
-          : (await searchWithAgent(ctx, { filters, candidate }, note, now)).leads;
+          : source === "seek" || source === "linkedin"
+            ? await searchBrowserSite(ctx, source, filters, { signal: ctx.signal, waitForUser: options.waitForUser, note })
+            : (await searchWithAgent(ctx, { filters, candidate }, note, now)).leads;
       leads.push(...found);
       summary.sources[source] = { leads: found.length, error: null };
     } catch (error) {
       if (error instanceof AiError && error.code === "budget") summary.stoppedBy = "budget";
-      summary.sources[source] = { leads: 0, error: error instanceof SourceQuotaError ? "quota" : error instanceof AiError ? error.code : formatTaskError(error).slice(0, 200) };
+      if (error instanceof TaskCancelledError) throw error;
+      summary.sources[source] = {
+        leads: 0,
+        error: error instanceof SourceQuotaError ? "quota" : error instanceof AiError ? error.code : (errorCodeOf(error) ?? formatTaskError(error).slice(0, 200)),
+      };
     }
     progress.counts.leads = leads.length;
     emit();

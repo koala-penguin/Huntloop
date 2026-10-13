@@ -134,7 +134,7 @@ function fromNextData(html: string): string | null {
   }
 }
 
-const CHALLENGE = /just a moment|attention required|cf-chl|captcha|verify you are (a )?human|are you a robot|access denied|enable javascript and cookies|px-captcha|datadome|unusual traffic/i;
+export const CHALLENGE = /just a moment|attention required|cf-chl|captcha|verify you are (a )?human|are you a robot|access denied|enable javascript and cookies|px-captcha|datadome|unusual traffic/i;
 
 export function extractFromHtml(html: string): ExtractedPage {
   const $ = cheerio.load(html);

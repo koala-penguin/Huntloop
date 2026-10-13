@@ -61,6 +61,8 @@ export const tasks = sqliteTable(
     error: text("error"),
     attempts: integer("attempts").notNull().default(0),
     parentId: integer("parent_id"),
+    /** The user's answer while the task waits for them (needs_user_action): continue | skip. */
+    userAction: text("user_action"),
     heartbeatAt: integer("heartbeat_at", { mode: "timestamp_ms" }),
     startedAt: integer("started_at", { mode: "timestamp_ms" }),
     finishedAt: integer("finished_at", { mode: "timestamp_ms" }),

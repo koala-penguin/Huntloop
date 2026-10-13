@@ -70,7 +70,7 @@ test("SEEK link asks for the posting text, then analyses it", async ({ page }) =
   await page.getByRole("textbox", { name: "Job link or posting text" }).fill("https://www.seek.com.au/job/81234567?type=standard&ref=search");
   await page.getByRole("button", { name: "Add job" }).click();
   await expect(page.getByRole("heading", { name: "Add the posting text" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Huntloop can't open SEEK pages by itself yet.")).toBeVisible();
+  await expect(page.getByText(/Turn on SEEK in Settings → Job sources/)).toBeVisible();
   await page.getByRole("textbox", { name: "Posting text or screenshots" }).fill(POSTING);
   await page.getByRole("button", { name: "Read this posting" }).click();
   await expect(page.getByRole("tab", { name: "Interview Chance" })).toBeVisible({ timeout: 30_000 });

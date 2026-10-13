@@ -25,7 +25,7 @@ export function latestSearchTask(db: Db, userId: number, searchId: number): numb
 }
 
 export function createSearch(db: Db, userId: number, query: string): { searchId: number; taskId: number } {
-  const search = db.insert(searches).values({ userId, query: query.trim(), sources: availableSources() }).returning().get();
+  const search = db.insert(searches).values({ userId, query: query.trim(), sources: availableSources(db, userId) }).returning().get();
   return { searchId: search.id, taskId: enqueueTask(db, userId, SEARCH_TASK, { searchId: search.id }).id };
 }
 
@@ -34,7 +34,7 @@ export function rerunSearch(db: Db, userId: number, searchId: number, filters?: 
   const running = activeSearchTask(db, userId, searchId);
   if (running) return running;
   db.update(searches)
-    .set({ ...(filters ? { filters } : {}), sources: availableSources() })
+    .set({ ...(filters ? { filters } : {}), sources: availableSources(db, userId) })
     .where(and(eq(searches.id, searchId), eq(searches.userId, userId)))
     .run();
   return enqueueTask(db, userId, SEARCH_TASK, { searchId }).id;

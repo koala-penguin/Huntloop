@@ -95,7 +95,40 @@
     "screenTopN": "Jobs to assess per run",
     "screenTopNHint": "The most relevant new jobs get a quick Interview Chance check (about $0.02–0.05 each with Opus).",
     "deepTopN": "Best matches to read in full",
-    "deepTopNHint": "The top results are re-read from the full posting and analysed in depth (about $0.15–0.30 each)."
+    "deepTopNHint": "The top results are re-read from the full posting and analysed in depth (about $0.15–0.30 each).",
+    "sources": {
+      "title": "Job sources",
+      "description": "Where searches look for jobs. SEEK and LinkedIn have no job-search API, so Huntloop reads them in its own visible browser window on this computer — only if you turn them on.",
+      "webAgent": "AI web search (employer career pages)",
+      "adzuna": "Adzuna job API",
+      "adzunaNeedsKeys": "Needs API keys",
+      "on": "On",
+      "off": "Off",
+      "useSite": "Use {site}",
+      "riskTitle": "Before you turn this on",
+      "riskPacing": "Huntloop only reads the site when you start a search or add a link, slowly (a few seconds between pages, at most the number of job pages you set).",
+      "riskVisible": "Everything happens in a visible browser window you can watch. If the site asks for a check or a sign-in, Huntloop stops and waits for you.",
+      "riskNoEvasion": "Huntloop never hides that it's automated, solves CAPTCHAs, or uses tricks to avoid detection.",
+      "acceptAndTurnOn": "I understand — turn it on",
+      "maxPages": "Job pages per search",
+      "maxPagesHint": "The most job pages Huntloop opens on this site in one search.",
+      "testBrowser": "Test the browser window",
+      "browserOk": "The browser window works.",
+      "browserFailed": "Huntloop couldn't open a browser. Install Google Chrome, or set HUNTLOOP_BROWSER_PATH in .env.local to a Chrome or Chromium executable.",
+      "saved": "Saved",
+      "seek": {
+        "name": "SEEK (Australia and New Zealand)",
+        "description": "Searches seek.com.au and seek.co.nz and reads each job in full.",
+        "risk": "SEEK's terms of use don't allow automated access. Using it this way is for your personal job search only, at your own risk."
+      },
+      "linkedin": {
+        "name": "LinkedIn Jobs",
+        "description": "Searches LinkedIn's public job listings (guest mode, no account needed) and reads each job in full.",
+        "risk": "LinkedIn's terms of use don't allow automated access, and LinkedIn may restrict accounts it believes are automated. Guest mode keeps your account out of it. Use at your own risk, for your personal job search only.",
+        "useLogin": "Use my LinkedIn login",
+        "useLoginHint": "You sign in yourself in Huntloop's browser window; Huntloop never sees your password. This puts your account at risk if LinkedIn flags the activity — guest mode is safer."
+      }
+    }
   },
   "effort": {
     "low": "Low",
@@ -173,7 +206,8 @@
     "not_found": "This job no longer exists.",
     "url_blocked": "Huntloop doesn't open links to local or private network addresses.",
     "not_a_job_posting": "This doesn't look like a job posting. Check the text or screenshots and try again.",
-    "chat_busy": "Claude is still answering your last message."
+    "chat_busy": "Claude is still answering your last message.",
+    "browser_unavailable": "Huntloop couldn't open its browser window. Install Google Chrome, or set HUNTLOOP_BROWSER_PATH in .env.local."
   },
   "profile": {
     "title": "Your profile",
@@ -435,11 +469,13 @@
     },
     "needsContentTitle": "Add the posting text",
     "needsContent": {
-      "site_browser": "Huntloop can't open {site} pages by itself yet. Paste the posting text or add screenshots of it.",
+      "site_browser": "Turn on {site} in Settings → Job sources to let Huntloop read it in its browser window — or paste the posting text or add screenshots.",
       "site_paste": "{site} doesn't allow apps to read its pages. Paste the posting text or add screenshots of it.",
       "challenge": "The site asked for a human check, so Huntloop couldn't read it. Paste the posting text or add screenshots.",
       "shell": "That page loads its content with scripts Huntloop can't run. Paste the posting text or add screenshots.",
-      "fetch_failed": "Huntloop couldn't open that link. Paste the posting text or add screenshots."
+      "fetch_failed": "Huntloop couldn't open that link. Paste the posting text or add screenshots.",
+      "browser_blocked": "{site} didn't show the job (it may have closed, or the check was skipped). Paste the posting text or add screenshots.",
+      "browser_unavailable": "Huntloop couldn't open its browser window to read {site}. Check Settings → Job sources, or paste the posting text or add screenshots."
     },
     "failedTitle": "Huntloop couldn't read this posting",
     "rerunFailed": "The last update didn't finish: {error}",
@@ -818,7 +854,8 @@
       "quota": "the daily or monthly limit has been reached; try again later",
       "budget": "stopped because your AI spending cap was reached",
       "refusal": "Claude declined this search",
-      "other": "couldn't be reached this time"
+      "other": "couldn't be reached this time",
+      "browser_unavailable": "Huntloop couldn't open its browser window (see Settings → Job sources)"
     },
     "summaryCounts": "{unique} unique · {known} already in your list · {screened} newly assessed · {deep} with the full posting",
     "filteredOut": "Left out before any AI call:",
@@ -842,7 +879,9 @@
     "failed": "Couldn't assess",
     "source": {
       "adzuna": "Adzuna",
-      "web_agent": "Web search"
+      "web_agent": "Web search",
+      "seek": "SEEK",
+      "linkedin": "LinkedIn"
     },
     "progress": {
       "stage": {
@@ -878,6 +917,23 @@
       "excludeKeywords": "Leave out jobs that mention",
       "saveAndRun": "Save and run",
       "cancel": "Cancel"
+    }
+  },
+  "userAction": {
+    "title": "Action needed in Huntloop's browser window",
+    "kind": {
+      "captcha": "{site} is showing a check to confirm you're a person. Complete it in the browser window, then press Continue.",
+      "login": "{site} is asking you to sign in. Sign in yourself in the browser window, then press Continue — or skip {site} for this search.",
+      "checkpoint": "{site} is showing a security checkpoint. Deal with it in the browser window, then press Continue.",
+      "other": "{site} needs your attention in the browser window. Press Continue when you're done."
+    },
+    "continue": "Continue",
+    "skip": "Skip {site}",
+    "stop": "Stop",
+    "site": {
+      "seek": "SEEK",
+      "linkedin": "LinkedIn",
+      "other": "The site"
     }
   }
 }

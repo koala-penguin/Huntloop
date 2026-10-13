@@ -63,8 +63,27 @@ preferences. Huntloop turns the request into filters you can edit, then:
    short excerpts), and reads the full posting of the best few for a complete assessment.
 
 Results are grouped by tier, with what's **new since the last run**. Adzuna's limits (25 calls a minute, 250 a day,
-2,500 a month) are enforced. How many jobs each run assesses is set in **Settings → Search limits**. SEEK and LinkedIn
-come next, through a visible browser window on your computer.
+2,500 a month) are enforced. How many jobs each run assesses is set in **Settings → Search limits**.
+
+### SEEK and LinkedIn
+
+Neither site offers a job-search API, so Huntloop can read them in its **own, visible Chrome window** on your computer
+(a separate profile in `data/browser-profile`). Both are **off until you turn them on** in **Settings → Job sources**,
+after a risk notice: their terms of use don't allow automated access, and LinkedIn may restrict accounts it thinks are
+automated. When on:
+
+- searches open the site's search pages, collect job links, and read each job in full (no "Provisional" excerpts);
+  pasted SEEK/LinkedIn links are read the same way;
+- it only runs when you start a search or add a link, slowly (3–8 s between pages, at most the number of job pages you
+  set per site);
+- if a site shows a CAPTCHA, a sign-in wall or a checkpoint, the run **pauses** and asks you to deal with it in the
+  window, then Continue — or skip that site. Huntloop never solves CAPTCHAs, hides that it's automated, or uses tricks to
+  avoid detection;
+- LinkedIn runs in **guest mode** by default. With "Use my LinkedIn login" you sign in yourself in the window; Huntloop
+  never sees your password (guest mode is safer for your account).
+
+It uses your installed Google Chrome; set `HUNTLOOP_BROWSER_PATH` in `.env.local` to use another Chrome/Chromium. Use
+**Test the browser window** in Settings to check it opens.
 
 ## Models and cost
 
@@ -107,7 +126,7 @@ tests/            unit/ (Vitest), e2e/ (Playwright)
 2. **Profile** — CV upload → structured profile, work rights per country, preferences. ✅
 3. **Bring your own job** — add postings by URL, long pasted text, screenshots or PDF; "Interview Chance" tier with
    evidence; per-job AI chat; employer deep research. ✅
-4. **AI search** — Adzuna and a Claude web-search agent ✅; SEEK and LinkedIn through a visible (headed) browser, and
+4. **AI search** — Adzuna and a Claude web-search agent ✅; SEEK and LinkedIn through a visible (headed) browser ✅;
    Chrome DevTools MCP for AI-driven browsing.
 5. **Proceed → CV tailoring** — once you and the AI agree to go for a job, a tailored CV (DOCX/PDF) where every claim is
    traceable to your real experience.

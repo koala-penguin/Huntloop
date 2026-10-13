@@ -23,6 +23,7 @@ export async function runProcessJob(ctx: TaskContext): Promise<{ jobId: number; 
       transcribe: payload.transcribe,
       assessOnly: payload.assessOnly,
       preferUrl: payload.preferUrl,
+      waitForUser: ctx.waitForUser,
       onStage: (stage) => ctx.progress({ stage }),
     });
     return { jobId: result.id, intakeStatus: result.intakeStatus };

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SENIORITY_LEVELS } from "./profile";
 import { EMPLOYMENT_TYPES, WORKPLACE_TYPES, type Preferences } from "./preferences";
 
-export const SEARCH_SOURCES = ["adzuna", "web_agent"] as const;
+export const SEARCH_SOURCES = ["adzuna", "web_agent", "seek", "linkedin"] as const;
 export type SearchSource = (typeof SEARCH_SOURCES)[number];
 
 /** What a search looks for. Shown as editable chips; also the output of the parse-search task. */

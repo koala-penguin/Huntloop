@@ -7,7 +7,7 @@ const payloadSchema = z.object({ searchId: z.number().int() });
 
 export async function runSearchTask(ctx: TaskContext) {
   const { searchId } = payloadSchema.parse(ctx.payload);
-  return runSearch({ db: ctx.db, userId: ctx.userId, signal: ctx.signal }, searchId, { taskId: ctx.task.id, onProgress: ctx.progress });
+  return runSearch({ db: ctx.db, userId: ctx.userId, signal: ctx.signal }, searchId, { taskId: ctx.task.id, onProgress: ctx.progress, waitForUser: ctx.waitForUser });
 }
 
 // A second attempt after a crash is cheap: finished jobs are recognised and cached analyses reused.

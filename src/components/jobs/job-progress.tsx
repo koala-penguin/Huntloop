@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useTask } from "@/components/tasks/use-task";
+import { UserActionPrompt, type TaskUserAction } from "@/components/tasks/user-action-prompt";
 
 const STAGES = ["reading", "transcribing", "analyzing", "assessing", "scoring", "done"] as const;
 
@@ -20,6 +21,8 @@ export function JobProgress({ taskId }: { taskId: number }) {
     if (finished) router.refresh();
   }, [finished, router]);
 
+  const action = (task?.progress as { action?: TaskUserAction } | null)?.action;
+  if (task?.status === "needs_user_action" && action) return <UserActionPrompt taskId={taskId} action={action} />;
   const known = STAGES.find((s) => s === stage) ?? "queued";
   return (
     <p className="flex items-center gap-2 text-sm text-muted" role="status" aria-live="polite">
