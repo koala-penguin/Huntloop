@@ -11,6 +11,8 @@ export interface FakeCliCall {
   input: { type: string; message: { role: string; content: Array<Record<string, unknown>> } };
   /** Value following a flag, e.g. arg("--model"). */
   arg(flag: string): string | undefined;
+  /** Print an event right away (before the scripted rest), e.g. an assistant tool_use ahead of an MCP call. */
+  write(event: CliEvent): void;
 }
 
 export type FakeCliScript = (call: FakeCliCall) => CliEvent[] | { events: CliEvent[]; stderr?: string; exitCode?: number } | Promise<CliEvent[]>;
@@ -35,6 +37,9 @@ export function fakeCli(script: FakeCliScript): { spawner: CliSpawner; calls: Fa
         arg: (flag) => {
           const i = args.indexOf(flag);
           return i >= 0 ? args[i + 1] : undefined;
+        },
+        write: (event) => {
+          stdout.write(`${JSON.stringify(event)}\n`);
         },
       };
       calls.push(call);

@@ -5,10 +5,11 @@ import { listChatActions, listChatMessages } from "@/server/ai/chat/harness";
 import { transcript } from "@/server/ai/chat/render";
 import { Card } from "@/components/ui/card";
 import { ChatPanel } from "@/components/jobs/chat-panel";
+import { resolveTaskModel, type Connection } from "@/shared/ai-settings";
 
 export default async function CoachPage() {
   const t = await getTranslations("chat.coach");
-  const { db, ai } = appContext();
+  const { db, ai, settings } = appContext();
   const conversation = getCoachConversation(ai);
   const items = conversation ? transcript(listChatMessages({ db }, conversation.id), listChatActions({ db }, conversation.id)) : [];
   return (
@@ -18,7 +19,12 @@ export default async function CoachPage() {
         <p className="text-muted">{t("subtitle")}</p>
       </header>
       <Card>
-        <ChatPanel scope={{ kind: "coach" }} items={items} hasConversation={!!conversation} />
+        <ChatPanel
+          scope={{ kind: "coach" }}
+          items={items}
+          hasConversation={!!conversation}
+          otherProvider={conversation && conversation.provider !== resolveTaskModel(settings, "coach").connection ? (conversation.provider as Connection) : null}
+        />
       </Card>
     </>
   );

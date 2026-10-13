@@ -36,6 +36,7 @@ import { cvWorkspaceData } from "@/server/cv/view";
 import { CvWorkspace, ProceedButton } from "@/components/cv/cv-workspace";
 
 import { AI_ERROR_CODES } from "@/shared/ai-errors";
+import { resolveTaskModel, type Connection } from "@/shared/ai-settings";
 const KNOWN_ERRORS = ["not_a_job_posting", "url_blocked", "missing_posting", "refusal", "budget", "invalid_output", "max_tokens", ...AI_ERROR_CODES];
 
 export default async function JobPage({ params, searchParams }: PageProps<"/jobs/[id]">) {
@@ -45,7 +46,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
   const tErrors = await getTranslations("errors");
   const tEnum = await getTranslations("jobEnums");
   const locale = await getLocale();
-  const { db, user } = appContext();
+  const { db, user, settings } = appContext();
   const job = getJob(db, user.id, Number(id));
   if (!job) notFound();
   const conversation = getJobConversation({ db, userId: user.id }, job.id);
@@ -339,7 +340,12 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
                       <CardTitle>{t("chatTitle")}</CardTitle>
                       <CardDescription>{t("chatDescription")}</CardDescription>
                     </CardHeader>
-                    <ChatPanel scope={{ kind: "job", jobId: job.id }} items={chatItems} hasConversation={!!conversation} />
+                    <ChatPanel
+                      scope={{ kind: "job", jobId: job.id }}
+                      items={chatItems}
+                      hasConversation={!!conversation}
+                      otherProvider={conversation && conversation.provider !== resolveTaskModel(settings, "chat").connection ? (conversation.provider as Connection) : null}
+                    />
                   </Card>
                 ),
               },

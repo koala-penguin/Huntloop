@@ -1,11 +1,12 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { resolveTaskModel, type AiTask } from "@/shared/ai-settings";
+import { resolveTaskModel, type AiTask, type Connection } from "@/shared/ai-settings";
 import type { JobStatus } from "@/shared/schemas/job";
 import { stableStringify } from "@/shared/stable-json";
 import type { Effort, ModelId } from "@/shared/models";
 import { chatActions, chatMessages, conversations, type ChatActionRow, type ChatMessageRow, type ConversationRow, type JobRow } from "../../db/schema";
-import { AiError, callModel, settingsFor, type AiContext } from "../client";
+import { AiError, callModel, resolveMode, settingsFor, type AiContext } from "../client";
+import { runCliChatTurn } from "../claude-code/chat";
 import { getJob, setJobStatus, updateJob } from "../../repo/jobs";
 import { getCurrentProfile, getPreferences } from "../../repo/profile";
 import { getLocalUser, userLocale } from "../../repo/users";
@@ -79,7 +80,7 @@ function currentDigest(ctx: AiContext, job: JobRow, conversationId: number | nul
 
 /** Starts a conversation about a job, freezing its system prompt, tools, model, effort and context. */
 export function createJobConversation(ctx: AiContext, job: JobRow, now = new Date()): ConversationRow {
-  const { model, effort } = resolveTaskModel(settingsFor(ctx), "chat");
+  const { model, effort, connection } = resolveTaskModel(settingsFor(ctx), "chat");
   const language = userLocale(getLocalUser(ctx.db));
   const { fit, digest } = currentDigest(ctx, job, null);
   const conversation = ctx.db
@@ -90,6 +91,7 @@ export function createJobConversation(ctx: AiContext, job: JobRow, now = new Dat
       kind: "job",
       model,
       effort,
+      provider: connection,
       toolsetVersion: JOB_CHAT_TOOLSET_VERSION,
       system: jobChatSystem(job, language, now.toISOString().slice(0, 10)),
       tools: jobChatTools(model, job.country),
@@ -294,7 +296,23 @@ export async function runChatTurn(ctx: AiContext, conversationId: number, userTe
 
     const model = conversation.model as ModelId;
     const effort = conversation.effort as Effort;
-    for (let step = 0; step < MAX_STEPS; step++) {
+    const provider = conversation.provider as Connection;
+    const viaCli = (await resolveMode(provider)) === "claude_code";
+    if (viaCli) {
+      // The user's Claude subscription: Claude Code runs the turn; the thread continues its session.
+      const sessionId = await runCliChatTurn({
+        ctx,
+        conversation,
+        task: scope.task,
+        context: conversation.providerSession ? null : rows.filter((r) => r.kind === "context").flatMap((r) => r.content as ContentBlockParam[]),
+        user: content,
+        emit,
+        insertRow,
+        runTool: (block, messageId) => scope.runTool(block, emit, messageId),
+      });
+      ctx.db.update(conversations).set({ providerSession: sessionId }).where(eq(conversations.id, conversationId)).run();
+    }
+    for (let step = 0; step < MAX_STEPS && !viaCli; step++) {
       const blocks = new Map<number, { type: string; name?: string; json: string }>();
       const { message } = await callModel(
         ctx,
@@ -308,6 +326,7 @@ export async function runChatTurn(ctx: AiContext, conversationId: number, userTe
         {
           model,
           effort,
+          connection: provider,
           maxTokens: 16_000,
           progressUpdates: true,
           prefixMismatch: process.env.NODE_ENV === "test" ? "error" : "drop_block",

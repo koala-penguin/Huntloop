@@ -167,7 +167,7 @@ function coachDigest(ctx: AiContext, conversationId: number | null): Record<stri
 }
 
 export function createCoachConversation(ctx: AiContext, now = new Date()): ConversationRow {
-  const { model, effort } = resolveTaskModel(settingsFor(ctx), "coach");
+  const { model, effort, connection } = resolveTaskModel(settingsFor(ctx), "coach");
   const language = userLocale(getLocalUser(ctx.db));
   const primary = getPreferences(ctx.db, ctx.userId).markets.find((m) => m.primary)?.country ?? null;
   const conversation = ctx.db
@@ -178,6 +178,7 @@ export function createCoachConversation(ctx: AiContext, now = new Date()): Conve
       kind: "coach",
       model,
       effort,
+      provider: connection,
       toolsetVersion: COACH_TOOLSET_VERSION,
       system: coachSystem(language, now.toISOString().slice(0, 10)),
       tools: coachTools(model, primary),

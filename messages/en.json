@@ -913,6 +913,10 @@
         "followUp": "Which applications need a follow-up?",
         "search": "Find me more jobs like my best match"
       }
+    },
+    "providerNote": {
+      "api": "This conversation runs on your API key (it keeps the connection it started with). Start a new conversation to use your Claude subscription.",
+      "subscription": "This conversation runs on your Claude subscription (it keeps the connection it started with). Start a new conversation to use your API key."
     }
   },
   "employer": {

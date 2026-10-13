@@ -162,7 +162,18 @@ function UserBubble({ text }: { text: string }) {
 }
 
 /** A conversation with Claude (one job's, or the coach's): streamed replies, tool activity and confirmation cards. */
-export function ChatPanel({ scope, items, hasConversation }: { scope: ChatScopeProp; items: ChatItem[]; hasConversation: boolean }) {
+export function ChatPanel({
+  scope,
+  items,
+  hasConversation,
+  otherProvider = null,
+}: {
+  scope: ChatScopeProp;
+  items: ChatItem[];
+  hasConversation: boolean;
+  /** Set when this thread runs on a different connection than the one now selected (threads keep theirs). */
+  otherProvider?: "api" | "subscription" | null;
+}) {
   const t = useTranslations("chat");
   const tErrors = useTranslations("errors");
   const router = useRouter();
@@ -276,6 +287,7 @@ export function ChatPanel({ scope, items, hasConversation }: { scope: ChatScopeP
           onKeyDown={onKeyDown}
           placeholder={scope.kind === "job" ? t("placeholder") : t("coach.placeholder")}
         />
+        {otherProvider && hasConversation && <p className="text-xs text-muted">{t(`providerNote.${otherProvider}`)}</p>}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted">{scope.kind === "job" ? t("hint") : t("coach.hint")}</span>
           <div className="flex gap-2">
