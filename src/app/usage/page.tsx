@@ -9,7 +9,7 @@ import { MODELS, isModelId } from "@/shared/models";
 import { formatUsd } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SpendChart } from "@/components/usage/spend-chart";
+import { SpendChart, type SpendMetric } from "@/components/usage/spend-chart";
 
 const DAYS = 30;
 
@@ -26,6 +26,39 @@ export default async function UsagePage() {
   const when = (d: Date) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(d);
   const percent = (n: number) => new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(n);
   const showSubscription = report.subscriptionCalls > 0 || !!limits;
+  // Someone who only uses the subscription gets its chart instead of an empty spend chart.
+  const showSpendChart = report.totalUsd > 0 || report.subscriptionCalls === 0;
+
+  const dailyCard = (metric: SpendMetric) => (
+    <Card data-chart={metric}>
+      <CardHeader>
+        <CardTitle>{t(metric === "api" ? "chartTitle" : "subscriptionChartTitle")}</CardTitle>
+        <CardDescription>{t(metric === "api" ? "chartDescription" : "subscriptionChartDescription")}</CardDescription>
+      </CardHeader>
+      <SpendChart days={report.days} metric={metric} />
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer text-muted">{t("showTable")}</summary>
+        <table className="mt-2 w-full text-left text-sm">
+          <thead className="text-xs text-muted">
+            <tr>
+              <th className="py-1 font-medium">{t("table.date")}</th>
+              <th className="py-1 text-right font-medium">{t("table.calls")}</th>
+              <th className="py-1 text-right font-medium">{t(metric === "api" ? "table.cost" : "table.apiValue")}</th>
+            </tr>
+          </thead>
+          <tbody style={{ fontVariantNumeric: "tabular-nums" }}>
+            {[...report.days].reverse().map((d) => (
+              <tr key={d.date} className="border-t border-border">
+                <td className="py-1">{d.date}</td>
+                <td className="py-1 text-right">{metric === "api" ? d.calls : d.subscriptionCalls}</td>
+                <td className="py-1 text-right">{formatUsd(metric === "api" ? d.costUsd : d.subscriptionUsd, locale)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </Card>
+  );
 
   const table = (rows: UsageRow[], label: (key: string) => string, caption: string) => (
     <table className="w-full text-left text-sm">
@@ -126,34 +159,8 @@ export default async function UsagePage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("chartTitle")}</CardTitle>
-          <CardDescription>{t("chartDescription")}</CardDescription>
-        </CardHeader>
-        <SpendChart days={report.days} />
-        <details className="mt-3 text-sm">
-          <summary className="cursor-pointer text-muted">{t("showTable")}</summary>
-          <table className="mt-2 w-full text-left text-sm">
-            <thead className="text-xs text-muted">
-              <tr>
-                <th className="py-1 font-medium">{t("table.date")}</th>
-                <th className="py-1 text-right font-medium">{t("table.calls")}</th>
-                <th className="py-1 text-right font-medium">{t("table.cost")}</th>
-              </tr>
-            </thead>
-            <tbody style={{ fontVariantNumeric: "tabular-nums" }}>
-              {[...report.days].reverse().map((d) => (
-                <tr key={d.date} className="border-t border-border">
-                  <td className="py-1">{d.date}</td>
-                  <td className="py-1 text-right">{d.calls}</td>
-                  <td className="py-1 text-right">{formatUsd(d.costUsd, locale)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </details>
-      </Card>
+      {showSpendChart && dailyCard("api")}
+      {report.subscriptionCalls > 0 && dailyCard("subscription")}
 
       <Card>
         <CardHeader>

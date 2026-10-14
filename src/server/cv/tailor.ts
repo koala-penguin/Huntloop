@@ -4,7 +4,8 @@ import { getJob } from "../repo/jobs";
 import { getCurrentProfile, getPreferences, type ProfileVersion } from "../repo/profile";
 import { cvProfileHash, getCvDocument, insertCvDocument, updateCvDocument, type StoredCv, type StoredCvDocument, type StoredLinkedin } from "../repo/cv-documents";
 import { loadJobFit, type JobFit } from "../jobs/fit";
-import { keywordCoverage } from "../scoring/keywords";
+import { keywordCoverage, postingKeywords } from "../scoring/keywords";
+import { getLocalUser, userLocale } from "../repo/users";
 import { UserFacingError } from "../errors";
 import type { AiContext } from "../ai/client";
 import { planTailoring, writeTailoredCv, TAILOR_PROMPT_VERSION, type TailorInput } from "../ai/tasks/tailor-cv";
@@ -67,6 +68,7 @@ export async function tailorCvForJob(ctx: AiContext, jobId: number, options: Tai
     assessment: c.fit.assessment,
     score: c.fit.score,
     language,
+    notesLanguage: userLocale(getLocalUser(ctx.db)),
     doNotClaim: base.doNotClaim,
   };
 
@@ -83,7 +85,12 @@ export async function tailorCvForJob(ctx: AiContext, jobId: number, options: Tai
   const { output, model } = await writeTailoredCv(ctx, input, plan, previous && options.revise ? { draft: previous.content, instructions: options.revise.instructions } : undefined);
 
   options.onStage?.("checking");
-  const { doc, dropped, languageFallback } = assembleCv({ profile: c.profile, job: { country: c.job.country, postingLanguage: c.fit.analysis.language }, plan, output });
+  const { doc, dropped, languageFallback } = assembleCv({
+    profile: c.profile,
+    job: { country: c.job.country, postingLanguage: c.fit.analysis.language, keywords: postingKeywords(c.fit.analysis) },
+    plan,
+    output,
+  });
   keepUserLines(doc, previous?.content ?? null);
   const { flags, pageEstimate, text } = checkCv(doc, c, plan);
   const checks: CvChecks = {

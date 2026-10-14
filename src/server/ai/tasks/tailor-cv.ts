@@ -8,7 +8,7 @@ import { tailoredCvSchema, tailoringPlanSchema, type CvDocument, type CvLanguage
 import { callStructured, settingsFor, type AiContext } from "../client";
 import { redactContacts } from "./assess";
 
-export const TAILOR_PROMPT_VERSION = 1;
+export const TAILOR_PROMPT_VERSION = 2;
 
 const LANGUAGE_NAMES: Record<string, string> = { en: "English", ko: "Korean" };
 
@@ -33,6 +33,8 @@ Return:
 - "linkedinEmphasis": up to 3 points the candidate should make prominent on LinkedIn for this job, each with sourceRefs.
 - "advice": up to 3 short tips for this application (e.g. what to address in a cover letter).
 
+The summaryAngle, doNotClaim reasons, questions, linkedinEmphasis text and advice are notes the candidate reads in Huntloop: write them in the notes language given below. Keywords and quotes keep the posting's and the CV's own wording.
+
 ${TRUTH_RULES}`;
 
 const WRITE_SYSTEM = `You write the content of a candidate's CV tailored to one job, for Huntloop, a job-search assistant, following an agreed plan.
@@ -40,8 +42,10 @@ const WRITE_SYSTEM = `You write the content of a candidate's CV tailored to one 
 Code adds the name, contact details, job titles, companies, dates, education, certifications, languages, work rights and referees from the candidate's profile — do not write those. You write:
 - "summary": 2–4 short lines for the top of the CV, aimed at this job.
 - "roles": for each included role id, bullets in the order that best fits the job. Lead roles 4–6 bullets, normal 2–4, brief 1–2. Achievement-first, concise, no first person.
-- "skills": up to 20 skill names the candidate has, most relevant to this job first.
+- "skills": up to 20 skill names copied exactly from the candidate's skill lists (their skills and each role's skills), most relevant to this job first.
 Each line lists the requirement ids it speaks to.
+
+Applicant-tracking systems match exact phrases. Each requirement in the job lists its posting "keywords". Where the candidate really has one (the evidence, the plan's keywords or their own skill names show it), use that exact wording at least once: in a bullet, the summary, or by picking the skill name that matches it (prefer "Vendor management" over a combined "Vendor and budget management" when both exist).
 
 ${TRUTH_RULES}`;
 
@@ -65,6 +69,8 @@ export interface TailorInput {
   assessment: Assessment | null;
   score: ScoreResult | null;
   language: CvLanguage;
+  /** The language of Huntloop's interface: the plan's notes for the candidate are written in it. */
+  notesLanguage: string;
   /** Terms code says the CV must not claim. */
   doNotClaim: string[];
 }
@@ -126,7 +132,15 @@ function languageLine(input: TailorInput): string {
 export function buildPlanMessages(input: TailorInput): Messages {
   return {
     system: [{ type: "text", text: PLAN_SYSTEM }],
-    messages: [{ role: "user", content: [...baseBlocks(input), { type: "text", text: `${languageLine(input)}\n\nPlan the tailored CV.` }] }],
+    messages: [
+      {
+        role: "user",
+        content: [
+          ...baseBlocks(input),
+          { type: "text", text: `${languageLine(input)}\nNotes language: ${LANGUAGE_NAMES[input.notesLanguage] ?? input.notesLanguage} (${input.notesLanguage}).\n\nPlan the tailored CV.` },
+        ],
+      },
+    ],
   };
 }
 

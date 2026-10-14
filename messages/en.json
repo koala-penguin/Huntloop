@@ -332,7 +332,7 @@
       "fileHint": "PDF, Word (.docx) or plain text, up to 10 MB.",
       "pasteLabel": "…or paste your CV text",
       "pastePlaceholder": "Paste the full text of your CV here",
-      "privacy": "Your CV is stored on this computer and sent only to the Claude API to be read.",
+      "privacy": "Your CV is stored on this computer and sent only to Anthropic's Claude (through your API key or your Claude subscription) to be read.",
       "submit": "Read my CV",
       "working": "Reading…",
       "stageReading": "Opening your CV…",
@@ -1392,6 +1392,8 @@
     "simulated": "{count, plural, one {# call was} other {# calls were}} answered in demo mode and cost nothing.",
     "chartTitle": "Daily spend",
     "chartDescription": "The last 30 days. Hover or focus a day for details.",
+    "subscriptionChartTitle": "Subscription use per day",
+    "subscriptionChartDescription": "What the calls on your Claude subscription would have cost on the API. Not billed. Hover or focus a day for details.",
     "showTable": "Show as a table",
     "byTaskTitle": "By task",
     "byTaskDescription": "Each kind of AI work, last 30 days. Cached input is reused prompt text, billed at a fraction of the price.",
@@ -1411,12 +1413,17 @@
       "searches": "Web searches",
       "cost": "Cost",
       "subscription": "Subscription",
-      "subscriptionValue": "{calls} · ≈{value}"
+      "subscriptionValue": "{calls} · ≈{value}",
+      "apiValue": "At API prices"
     },
     "chart": {
       "aria": "Daily AI spend over the last {days} days",
       "bar": "{date}: {cost}, {calls} calls",
-      "calls": "{count, plural, one {# call} other {# calls}}"
+      "calls": "{count, plural, one {# call} other {# calls}}",
+      "subscriptionAria": "Daily Claude subscription use over the last {days} days, at API prices",
+      "subscriptionBar": "{date}: {cost} at API prices, {calls} calls",
+      "approx": "≈ {value}",
+      "notBilled": "Not billed"
     },
     "subscriptionTitle": "Claude subscription",
     "subscriptionDescription": "Calls made through your Claude subscription (Claude Code). They count against your plan's usage limits and aren't billed; the value shows what they would have cost on the API.",

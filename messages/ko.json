@@ -332,7 +332,7 @@
       "fileHint": "PDF, Word(.docx), 텍스트 파일, 최대 10MB.",
       "pasteLabel": "…또는 CV 내용을 붙여 넣기",
       "pastePlaceholder": "CV 전체 내용을 여기에 붙여 넣으세요",
-      "privacy": "CV는 이 컴퓨터에 저장되며, 읽기 위해 Claude API로만 전송됩니다.",
+      "privacy": "CV는 이 컴퓨터에 저장되며, 읽기 위해 Anthropic의 Claude(API 키 또는 Claude 구독)로만 전송됩니다.",
       "submit": "CV 읽기",
       "working": "읽는 중…",
       "stageReading": "CV를 여는 중…",
@@ -1392,6 +1392,8 @@
     "simulated": "{count}회는 데모 모드로 응답해 비용이 들지 않았습니다.",
     "chartTitle": "일별 지출",
     "chartDescription": "최근 30일입니다. 날짜에 마우스를 올리거나 포커스하면 자세히 볼 수 있습니다.",
+    "subscriptionChartTitle": "일별 구독 사용량",
+    "subscriptionChartDescription": "Claude 구독으로 한 호출을 API로 했다면 들었을 비용입니다. 실제로 청구되지는 않습니다. 날짜에 마우스를 올리거나 포커스하면 자세히 볼 수 있습니다.",
     "showTable": "표로 보기",
     "byTaskTitle": "작업별",
     "byTaskDescription": "최근 30일 동안의 AI 작업 종류별 사용량입니다. 캐시된 입력은 다시 쓴 프롬프트로, 훨씬 싸게 청구됩니다.",
@@ -1411,12 +1413,17 @@
       "searches": "웹 검색",
       "cost": "비용",
       "subscription": "구독",
-      "subscriptionValue": "{calls}회 · ≈{value}"
+      "subscriptionValue": "{calls}회 · ≈{value}",
+      "apiValue": "API 가격 기준"
     },
     "chart": {
       "aria": "최근 {days}일 동안의 일별 AI 지출",
       "bar": "{date}: {cost}, 호출 {calls}회",
-      "calls": "호출 {count}회"
+      "calls": "호출 {count}회",
+      "subscriptionAria": "최근 {days}일 동안의 일별 Claude 구독 사용량(API 가격 기준)",
+      "subscriptionBar": "{date}: API 가격으로 {cost}, 호출 {calls}회",
+      "approx": "≈ {value}",
+      "notBilled": "청구되지 않음"
     },
     "subscriptionTitle": "Claude 구독",
     "subscriptionDescription": "Claude 구독(Claude Code)으로 한 호출입니다. 과금되지 않고 플랜의 사용 한도에서 차감되며, 금액은 API로 했을 때의 비용입니다.",

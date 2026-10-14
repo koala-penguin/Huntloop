@@ -21,7 +21,7 @@ describe("usage report", () => {
 
     const report = usageReport(db, userId, 30, now);
     expect(report.days).toHaveLength(30);
-    expect(report.days.at(-1)).toEqual({ date: "2026-10-13", costUsd: 0.2, calls: 2 });
+    expect(report.days.at(-1)).toEqual({ date: "2026-10-13", costUsd: 0.2, calls: 2, subscriptionUsd: 0, subscriptionCalls: 0 });
     expect(report.days.at(-3)).toMatchObject({ date: "2026-10-11", calls: 2 });
     expect(report.days.at(-3)!.costUsd).toBeCloseTo(0.15);
     expect(report.totalUsd).toBeCloseTo(0.35);

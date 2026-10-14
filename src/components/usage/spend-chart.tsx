@@ -7,7 +7,12 @@ interface Day {
   date: string;
   costUsd: number;
   calls: number;
+  subscriptionUsd: number;
+  subscriptionCalls: number;
 }
+
+/** "api": billed spend through the API key. "subscription": what Claude subscription calls would have cost on the API. */
+export type SpendMetric = "api" | "subscription";
 
 const W = 720;
 const H = 200;
@@ -38,15 +43,17 @@ function column(x: number, w: number, h: number): string {
 }
 
 /** Daily AI spend: one series, so no legend — the card title names it. Values are also in the table view. */
-export function SpendChart({ days }: { days: Day[] }) {
+export function SpendChart({ days, metric = "api" }: { days: Day[]; metric?: SpendMetric }) {
   const t = useTranslations("usage.chart");
+  const valueOf = (d: Day) => (metric === "api" ? d.costUsd : d.subscriptionUsd);
+  const callsOf = (d: Day) => (metric === "api" ? d.calls : d.subscriptionCalls);
   const locale = useLocale();
   const [active, setActive] = useState<number | null>(null);
   const money = (v: number, digits = 2) => new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
   const day = (iso: string, style: "short" | "long") =>
     new Intl.DateTimeFormat(locale, style === "short" ? { month: "short", day: "numeric", timeZone: "UTC" } : { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 
-  const top = niceMax(Math.max(...days.map((d) => d.costUsd)));
+  const top = niceMax(Math.max(...days.map(valueOf)));
   const ticks = [0, top / 2, top].map((v) => ({ v, label: money(v, Number.isInteger(v) ? 0 : 2) }));
   const left = labelColumn(ticks.map((tick) => tick.label));
   const plotW = W - left - PAD.right;
@@ -57,7 +64,7 @@ export function SpendChart({ days }: { days: Day[] }) {
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={t("aria", { days: days.length })}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={t(metric === "api" ? "aria" : "subscriptionAria", { days: days.length })}>
         {ticks.map(({ v, label }) => {
           const y = PAD.top + PLOT_H - (v / top) * PLOT_H;
           return (
@@ -71,12 +78,12 @@ export function SpendChart({ days }: { days: Day[] }) {
         })}
         {days.map((d, i) => {
           const x = left + i * band + (band - barW) / 2;
-          const h = (d.costUsd / top) * PLOT_H;
+          const h = (valueOf(d) / top) * PLOT_H;
           return (
             <g
               key={d.date}
               tabIndex={0}
-              aria-label={t("bar", { date: day(d.date, "long"), cost: money(d.costUsd), calls: d.calls })}
+              aria-label={t(metric === "api" ? "bar" : "subscriptionBar", { date: day(d.date, "long"), cost: money(valueOf(d)), calls: callsOf(d) })}
               onPointerEnter={() => setActive(i)}
               onPointerLeave={() => setActive((a) => (a === i ? null : a))}
               onFocus={() => setActive(i)}
@@ -102,11 +109,12 @@ export function SpendChart({ days }: { days: Day[] }) {
           style={{ left: `${Math.min(88, Math.max(12, ((left + active * band + band / 2) / W) * 100))}%` }}
           role="status"
         >
-          <p className="text-sm font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>
-            {money(hovered.costUsd)}
+          <p className="whitespace-nowrap text-sm font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>
+            {metric === "api" ? money(valueOf(hovered)) : t("approx", { value: money(valueOf(hovered)) })}
           </p>
-          <p className="text-muted">{day(hovered.date, "long")}</p>
-          <p className="text-muted">{t("calls", { count: hovered.calls })}</p>
+          {metric === "subscription" && <p className="whitespace-nowrap text-muted">{t("notBilled")}</p>}
+          <p className="whitespace-nowrap text-muted">{day(hovered.date, "long")}</p>
+          <p className="text-muted">{t("calls", { count: callsOf(hovered) })}</p>
         </div>
       )}
     </div>

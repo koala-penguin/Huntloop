@@ -91,6 +91,10 @@ describe("Claude Code CLI (subscription connection)", () => {
     expect(report.totalUsd).toBe(0);
     expect(report.subscriptionCalls).toBe(1);
     expect(report.subscriptionUsd).toBeGreaterThan(0);
+    // The daily chart shows it as subscription use, apart from billed spend.
+    const today = report.days[report.days.length - 1];
+    expect(today).toMatchObject({ calls: 0, costUsd: 0, subscriptionCalls: 1 });
+    expect(today.subscriptionUsd).toBe(report.subscriptionUsd);
     // The plan's usage windows, as the CLI reported them.
     expect(subscriptionUsage()).toMatchObject({ status: "allowed", fiveHour: { utilization: 0.25 }, sevenDay: { utilization: 0.4 } });
   });
