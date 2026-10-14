@@ -43,7 +43,10 @@ function context(req: FakeRequest) {
   const profile = parse<Profile>(text, "candidate_profile", { cvText: "", experience: [], skills: [] });
   const job = parse<{ requirements: JobReq[] }>(text, "job", { requirements: [] });
   const language: "en" | "ko" = /(?:CV language|Language): [^(]*\((\w+)\)/.exec(text)?.[1] === "ko" ? "ko" : "en";
-  return { text, profile, job, language };
+  // The plan's notes follow the interface language; older prompts without it use the CV language.
+  const notes = /Notes language: [^(]*\((\w+)\)/.exec(text)?.[1];
+  const notesLanguage: "en" | "ko" = notes ? (notes === "ko" ? "ko" : "en") : language;
+  return { text, profile, job, language, notesLanguage };
 }
 
 const termOf = (r: JobReq) => r.term.replace(/^\d+\+?\s*(years?|yrs?)\s*(of\s+)?/i, "").trim();
@@ -63,8 +66,8 @@ function roleLine(profile: Profile, role: Role): string {
 }
 
 registerFakeGenerator("planTailoring", (req) => {
-  const { profile, job, language } = context(req);
-  const ko = language === "ko";
+  const { profile, job, notesLanguage } = context(req);
+  const ko = notesLanguage === "ko";
   const relevant = job.requirements.filter((r) => r.kind !== "gate" && r.category !== "years");
   const met = relevant.filter((r) => r.status === "met" || r.status === "partial");
   const notMet = relevant.filter((r) => r.status === "unmet" || r.status === "unknown");

@@ -79,7 +79,8 @@ export interface UsageRow {
 }
 
 export interface UsageReport {
-  days: Array<{ date: string; costUsd: number; calls: number }>;
+  /** Per day: billed API spend and its calls (demo calls included); subscription calls and their API-equivalent value. */
+  days: Array<{ date: string; costUsd: number; calls: number; subscriptionUsd: number; subscriptionCalls: number }>;
   byTask: UsageRow[];
   byModel: UsageRow[];
   totalUsd: number;
@@ -101,9 +102,9 @@ export function usageReport(db: Db, userId: number, days = 30, now = new Date())
     .from(usageLog)
     .where(and(eq(usageLog.userId, userId), gte(usageLog.createdAt, since)))
     .all();
-  const perDay = new Map<string, { costUsd: number; calls: number }>();
+  const perDay = new Map<string, { costUsd: number; calls: number; subscriptionUsd: number; subscriptionCalls: number }>();
   for (let i = 0; i < days; i++) {
-    perDay.set(localDate(new Date(since.getFullYear(), since.getMonth(), since.getDate() + i)), { costUsd: 0, calls: 0 });
+    perDay.set(localDate(new Date(since.getFullYear(), since.getMonth(), since.getDate() + i)), { costUsd: 0, calls: 0, subscriptionUsd: 0, subscriptionCalls: 0 });
   }
   const group = (keyOf: (r: (typeof rows)[number]) => string) => {
     const map = new Map<string, UsageRow>();
@@ -129,6 +130,11 @@ export function usageReport(db: Db, userId: number, days = 30, now = new Date())
   for (const r of rows) {
     const day = perDay.get(localDate(r.createdAt));
     if (!day) continue;
+    if (!r.simulated && r.via === "claude_code") {
+      day.subscriptionCalls++;
+      day.subscriptionUsd += r.costUsd;
+      continue;
+    }
     day.calls++;
     if (billed(r)) day.costUsd += r.costUsd;
   }

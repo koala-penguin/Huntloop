@@ -9,7 +9,7 @@ import { activeJobTask, activeTaskForJob } from "@/server/jobs/intake";
 import { FIND_EMPLOYER_POSTING_TASK } from "@/server/tasks/handlers/find-employer-posting";
 import { getSourceSettings } from "@/server/repo/settings";
 import { FindOnEmployerSite } from "@/components/jobs/find-on-employer";
-import { applyProse, getCachedTranslation, missingGlosses } from "@/server/jobs/prose";
+import { applyCompanyReportProse, applyProse, getCachedReportTranslation, getCachedTranslation, missingGlosses } from "@/server/jobs/prose";
 import { parseTaskError } from "@/server/errors";
 import { placeLabel } from "@/shared/countries";
 import { Alert, Badge } from "@/components/ui/badge";
@@ -73,6 +73,15 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
       if (cached) assessment = applyProse(fit.assessment, cached);
       else translating = true;
     }
+  }
+
+  // The employer report too, when it was written in another language.
+  let employerReport = report?.report ?? null;
+  let translatingEmployer = false;
+  if (report && report.report.language !== locale) {
+    const cached = getCachedReportTranslation(db, report.id, locale);
+    if (cached) employerReport = applyCompanyReportProse(report.report, cached);
+    else translatingEmployer = true;
   }
 
   const company = job.companyId ? getCompany(db, user.id, job.companyId) : undefined;
@@ -321,9 +330,10 @@ export default async function JobPage({ params, searchParams }: PageProps<"/jobs
                         <ResearchControls jobId={job.id} runningTaskId={researchTask} hasReport={false} />
                       </Card>
                     )}
-                    {report && (
+                    {report && employerReport && (
                       <>
-                        <EmployerReport report={report.report} companyName={job.companyName ?? ""} stale={report.stale} />
+                        {translatingEmployer && <TranslateReport jobId={job.id} what="employer" />}
+                        <EmployerReport report={employerReport} companyName={job.companyName ?? ""} stale={report.stale} />
                         <ResearchControls key={report.id} jobId={job.id} runningTaskId={researchTask} hasReport />
                       </>
                     )}

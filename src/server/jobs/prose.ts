@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Assessment, PostingAnalysis } from "@/shared/schemas/job";
+import type { CompanyReport } from "@/shared/schemas/company";
 import { aiTexts } from "../db/schema";
 import type { Db } from "../db/database";
 import { translateTexts } from "../ai/tasks/translate";
@@ -46,14 +47,20 @@ export function applyProse(assessment: Assessment, prose: Record<string, string>
   };
 }
 
-export function getCachedTranslation(db: Db, assessmentId: number, language: string): Record<string, string> | null {
+type ProseOwner = "assessment" | "company_report";
+
+function cachedProse(db: Db, ownerType: ProseOwner, ownerId: number, language: string): Record<string, string> | null {
   const row = db
     .select()
     .from(aiTexts)
-    .where(and(eq(aiTexts.ownerType, "assessment"), eq(aiTexts.ownerId, assessmentId), eq(aiTexts.lang, language)))
+    .where(and(eq(aiTexts.ownerType, ownerType), eq(aiTexts.ownerId, ownerId), eq(aiTexts.lang, language)))
     .orderBy(desc(aiTexts.id))
     .get();
   return row ? (row.data as Record<string, string>) : null;
+}
+
+export function getCachedTranslation(db: Db, assessmentId: number, language: string): Record<string, string> | null {
+  return cachedProse(db, "assessment", assessmentId, language);
 }
 
 /** Whether some requirement quotes (e.g. work-rights gates, which aren't assessed) still need a gloss. */
@@ -84,5 +91,46 @@ export async function translateAssessment(
       : prose;
   const translated = await translateTexts(ctx, texts, language);
   ctx.db.insert(aiTexts).values({ ownerType: "assessment", ownerId: assessmentId, lang: language, data: translated }).run();
+  return translated;
+}
+
+// ---- Employer research ----
+
+const FOR_YOU = ["talkingPoints", "cvAngles", "questionsToAsk", "referralAngles"] as const;
+
+/** An employer report's prose (summary, claims, advice, a few facts); URLs, dates and enums stay as they are. */
+export function companyReportProse(report: CompanyReport): Record<string, string> {
+  const out: Record<string, string> = { summary: report.summary };
+  for (const key of ["headquarters", "size", "industry"] as const) {
+    const value = report.facts[key];
+    if (value) out[`fact.${key}`] = value;
+  }
+  report.sections.forEach((section, s) => section.claims.forEach((claim, c) => (out[`claim.${s}.${c}`] = claim.text)));
+  for (const key of FOR_YOU) report.forYou[key].forEach((text, i) => (out[`forYou.${key}.${i}`] = text));
+  return out;
+}
+
+export function applyCompanyReportProse(report: CompanyReport, prose: Record<string, string>): CompanyReport {
+  const pick = (key: string, fallback: string) => prose[key] ?? fallback;
+  const fact = (key: "headquarters" | "size" | "industry") => (report.facts[key] ? pick(`fact.${key}`, report.facts[key]) : null);
+  return {
+    ...report,
+    summary: pick("summary", report.summary),
+    facts: { ...report.facts, headquarters: fact("headquarters"), size: fact("size"), industry: fact("industry") },
+    sections: report.sections.map((section, s) => ({ ...section, claims: section.claims.map((claim, c) => ({ ...claim, text: pick(`claim.${s}.${c}`, claim.text) })) })),
+    forYou: Object.fromEntries(FOR_YOU.map((key) => [key, report.forYou[key].map((text, i) => pick(`forYou.${key}.${i}`, text))])) as CompanyReport["forYou"],
+  };
+}
+
+export function getCachedReportTranslation(db: Db, reportId: number, language: string): Record<string, string> | null {
+  return cachedProse(db, "company_report", reportId, language);
+}
+
+/** An employer report in the reader's language (translated once, cached per report and language). */
+export async function translateCompanyReport(ctx: AiContext, reportId: number, report: CompanyReport, language: string) {
+  const cached = getCachedReportTranslation(ctx.db, reportId, language);
+  if (cached) return cached;
+  const translated = await translateTexts(ctx, companyReportProse(report), language);
+  ctx.db.insert(aiTexts).values({ ownerType: "company_report", ownerId: reportId, lang: language, data: translated }).run();
   return translated;
 }

@@ -7,6 +7,7 @@ import { saveProfileVersion, savePreferences } from "@/server/repo/profile";
 import { createJob, getJob } from "@/server/repo/jobs";
 import { processJob } from "@/server/jobs/pipeline";
 import { getFreshReport, reportDigest, startCompanyResearch } from "@/server/research/company";
+import { applyCompanyReportProse, getCachedReportTranslation, translateCompanyReport } from "@/server/jobs/prose";
 import { runCompanyResearch } from "@/server/tasks/handlers/company-research";
 import { normalizeUrl, verifyReport } from "@/server/ai/tasks/company-research";
 import { createJobConversation, listChatMessages, runJobChatTurn, type ChatEvent } from "@/server/ai/chat/harness";
@@ -64,6 +65,28 @@ describe("employer research", () => {
     expect(db.select().from(usageLog).all()).toHaveLength(calls);
     // Refresh forces a new run.
     expect(startCompanyResearch(db, userId, job, { force: true })).toMatchObject({ ok: true, reused: false });
+  });
+
+  it("is translated once into the reader's language, keeping sources and dates", async () => {
+    const { db, userId, ctx, job } = await setup();
+    const started = startCompanyResearch(db, userId, job);
+    await runTask(db, userId, (started as { taskId: number }).taskId);
+    const stored = getFreshReport(db, job.companyId!)!;
+    expect(stored.report.language).toBe("en");
+
+    const prose = await translateCompanyReport(ctx, stored.id, stored.report, "ko");
+    const ko = applyCompanyReportProse(stored.report, prose);
+    expect(ko.summary).toBe(`[ko] ${stored.report.summary}`);
+    const claims = (r: typeof ko) => r.sections.flatMap((s) => s.claims);
+    expect(claims(ko).every((c) => c.text.startsWith("[ko] "))).toBe(true);
+    expect(claims(ko).map((c) => [c.sourceUrl, c.date])).toEqual(claims(stored.report).map((c) => [c.sourceUrl, c.date]));
+    expect(ko.forYou.talkingPoints.every((p) => p.startsWith("[ko] "))).toBe(true);
+
+    // Cached: reading it again costs nothing.
+    const calls = db.select().from(usageLog).all().length;
+    expect(await translateCompanyReport(ctx, stored.id, stored.report, "ko")).toEqual(prose);
+    expect(getCachedReportTranslation(db, stored.id, "ko")).toEqual(prose);
+    expect(db.select().from(usageLog).all()).toHaveLength(calls);
   });
 
   it("does not start twice while a run is queued", async () => {

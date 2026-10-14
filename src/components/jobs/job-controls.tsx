@@ -218,14 +218,14 @@ export function DeleteJobButton({ jobId }: { jobId: number }) {
 }
 
 /** Translates the report's prose into the UI language once, then refreshes. */
-export function TranslateReport({ jobId }: { jobId: number }) {
+export function TranslateReport({ jobId, what = "fit" }: { jobId: number; what?: "fit" | "employer" }) {
   const t = useTranslations("fit");
   const locale = useLocale();
   const router = useRouter();
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/jobs/${jobId}/translate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ language: locale }) })
+    fetch(`/api/jobs/${jobId}/translate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ language: locale, what }) })
       .then((res) => {
         if (cancelled) return;
         if (res.ok) router.refresh();
@@ -235,7 +235,7 @@ export function TranslateReport({ jobId }: { jobId: number }) {
     return () => {
       cancelled = true;
     };
-  }, [jobId, locale, router]);
+  }, [jobId, locale, router, what]);
   return (
     <p className="flex items-center gap-2 text-xs text-muted" role="status">
       {failed ? (

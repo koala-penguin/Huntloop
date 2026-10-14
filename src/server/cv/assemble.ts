@@ -1,4 +1,5 @@
 import { marketPack } from "@/shared/markets";
+import { termPresent } from "../scoring/keywords";
 import type { ProfileData } from "@/shared/schemas/profile";
 import {
   CV_LANGUAGES,
@@ -40,12 +41,17 @@ function profileLine(text: string, id: string): CvLine {
   return { id, text, sourceRefs: [{ source: "cv", quote: text, factId: null, verified: false }], requirementIds: [], origin: "profile" };
 }
 
-/** Skill names the candidate actually has, in the model's order, with the profile's spelling. */
-function knownSkills(names: string[], data: ProfileData, max: number): { skills: string[]; dropped: number } {
+function profileSkills(data: ProfileData): Map<string, string> {
   const known = new Map<string, string>();
   for (const s of [...data.skills.map((x) => x.name), ...data.experience.flatMap((e) => e.skills)]) {
     if (!known.has(s.toLowerCase())) known.set(s.toLowerCase(), s);
   }
+  return known;
+}
+
+/** Skill names the candidate actually has, in the model's order, with the profile's spelling. */
+function knownSkills(names: string[], data: ProfileData, max: number): { skills: string[]; dropped: number } {
+  const known = profileSkills(data);
   const out: string[] = [];
   let dropped = 0;
   for (const name of names) {
@@ -56,9 +62,25 @@ function knownSkills(names: string[], data: ProfileData, max: number): { skills:
   return { skills: out.slice(0, max), dropped };
 }
 
+/**
+ * Profile skills that spell out a posting keyword the CV doesn't use yet. Applicant-tracking systems
+ * match exact phrases, so "Vendor management" counts where "Vendor and budget management" doesn't.
+ */
+function keywordSkills(keywords: string[], text: string, chosen: string[], data: ProfileData): string[] {
+  const known = [...profileSkills(data).values()];
+  const added: string[] = [];
+  for (const keyword of keywords) {
+    if (termPresent(text, keyword) || [...chosen, ...added].some((s) => termPresent(s, keyword))) continue;
+    const match = known.find((s) => termPresent(s, keyword));
+    if (match && !chosen.includes(match)) added.push(match);
+  }
+  return added;
+}
+
 export interface AssembleCvInput {
   profile: { cvText: string; data: ProfileData };
-  job: { country: string | null; postingLanguage: string | null };
+  /** keywords: the posting's ATS terms (postingKeywords). */
+  job: { country: string | null; postingLanguage: string | null; keywords?: string[] };
   plan: TailoringPlan;
   output: TailoredCvOutput;
 }
@@ -85,6 +107,11 @@ export function assembleCv({ profile, job, plan, output }: AssembleCvInput): { d
 
   const skills = knownSkills(output.skills, data, 24);
   dropped += skills.dropped;
+  const summary = output.summary.filter((l) => l.text.trim()).map((l, i) => toLine(l, `summary-${i}`, "ai"));
+  const written = [...summary, ...roles.flatMap((r) => r.bullets)].map((l) => l.text).join("\n");
+  const chosen = skills.skills.length ? skills.skills : data.skills.map((s) => s.name).slice(0, 24);
+  // Matching skills go first so the cap never cuts them.
+  const skillLine = [...keywordSkills(job.keywords ?? [], written, chosen, data), ...chosen].slice(0, 24);
 
   const right = job.country ? data.workRights.find((w) => w.country === job.country) : undefined;
   const workRight =
@@ -106,8 +133,8 @@ export function assembleCv({ profile, job, plan, output }: AssembleCvInput): { d
       country: data.basics.country,
       links: data.basics.links,
     },
-    summary: output.summary.filter((l) => l.text.trim()).map((l, i) => toLine(l, `summary-${i}`, "ai")),
-    skills: skills.skills.length ? skills.skills : data.skills.map((s) => s.name).slice(0, 24),
+    summary,
+    skills: skillLine,
     roles,
     education: data.education.map(({ institution, degree, field, start, end }) => ({ institution, degree, field, start, end })),
     certifications: data.certifications,

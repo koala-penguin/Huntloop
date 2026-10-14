@@ -11,6 +11,8 @@ import { latestCvDocument } from "@/server/repo/cv-documents";
 import { processJob } from "@/server/jobs/pipeline";
 import { proceedWithJob, startTailoring } from "@/server/jobs/proceed";
 import { isCvStale, tailorCvForJob, writeLinkedinForUser } from "@/server/cv/tailor";
+import { assembleCv } from "@/server/cv/assemble";
+import { setUserLocale } from "@/server/repo/users";
 import { answerCvQuestion, resolveCvLine } from "@/server/cv/resolve";
 import { loadJobFit } from "@/server/jobs/fit";
 import { exportCv } from "@/server/cv/export";
@@ -159,6 +161,35 @@ describe("tailored CV (demo mode)", () => {
     expect(proceedWithJob(db, userId, job.id, "chat").taskId).toBe(taskId);
     const raw = createJob(db, userId, { source: "paste", rawText: "x" });
     expect(startTailoring(db, userId, raw.id)).toBeNull();
+  });
+
+  it("adds the profile skill that spells out a posting keyword the draft doesn't use", () => {
+    const data = tailoringProfile();
+    data.skills = [...data.skills, { name: "Vendor and budget management", category: "domain" }, { name: "Vendor management", category: "domain" }];
+    const plan = { summaryAngle: "", targetRequirementIds: [], roles: [], keywords: [], doNotClaim: [], questions: [], linkedinEmphasis: [], advice: [] };
+    const output = { summary: [], roles: [], skills: ["React", "Vendor and budget management"] };
+    const assemble = (keywords: string[], summary = "Frontend engineer.") =>
+      assembleCv({
+        profile: { cvText: CV_TEXT, data },
+        job: { country: "AU", postingLanguage: "en", keywords },
+        plan,
+        output: { ...output, summary: [{ text: summary, sourceRefs: [], requirementIds: [] }] },
+      }).doc.skills;
+
+    expect(assemble(["vendor management", "Kubernetes"])).toEqual(["Vendor management", "React", "Vendor and budget management"]);
+    // Already in the wording, or no matching skill: nothing to add.
+    expect(assemble(["vendor management"], "Strong vendor management.")).toEqual(["React", "Vendor and budget management"]);
+    expect(assemble([])).toEqual(["React", "Vendor and budget management"]);
+  });
+
+  it("writes the plan's notes in the interface language and the CV in the posting's", async () => {
+    const { db, userId, ctx, job } = await setup();
+    setUserLocale(db, userId, "ko");
+    const doc = await tailorCvForJob(ctx, job.id);
+    expect(doc.content.language).toBe("en");
+    expect(doc.plan!.summaryAngle).toMatch(/[가-힣]/);
+    for (const q of doc.plan!.questions) expect(q.text).toMatch(/[가-힣]/);
+    expect(doc.content.roles[0].bullets.some((b) => b.text === DEMO_UNSUPPORTED_BULLET.en)).toBe(true);
   });
 
   it("Korean postings get a Korean CV; US jobs use Letter paper without referees or a rights line", async () => {
