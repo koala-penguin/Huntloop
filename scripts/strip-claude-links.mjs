@@ -7,8 +7,9 @@ import { fileURLToPath } from "node:url";
 const ATTRIBUTION = [
   /^\s*Claude-Session:/i,
   /^\s*Co-Authored-By:.*\bClaude\b/i,
-  /claude\.ai\/code/i,
-  /claude\.com\/claude-code/i,
+  // Links only: a plain mention of the address in prose stays.
+  /https?:\/\/claude\.ai\/code/i,
+  /https?:\/\/(www\.)?claude\.com\/claude-code/i,
 ];
 
 /** The text without attribution lines (and the "---" rule above a footer). Unchanged when there's nothing to remove. */

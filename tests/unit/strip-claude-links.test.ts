@@ -25,6 +25,9 @@ describe("stripClaudeLinks", () => {
     const text = "Runs your signed-in Claude Code CLI (`claude -p`).\n\n---\n\nSee https://code.claude.com for setup.\n";
     expect(stripClaudeLinks(text)).toBe(text);
     expect(stripClaudeLinks("")).toBe("");
+    // The address written out as text (not a link) is kept.
+    const prose = "- strips any claude.ai/code or claude.com/claude-code link from commit messages.";
+    expect(stripClaudeLinks(prose)).toBe(prose);
   });
 
   it("keeps the paragraphs around a link in the middle", () => {
