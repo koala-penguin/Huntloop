@@ -13,6 +13,9 @@ npm run dev   # http://127.0.0.1:3000
 You don't need an API key. Without one the app runs in demo mode with simulated AI answers, and that's also what the
 tests use.
 
+`npm install` also turns on a commit hook (`.githooks/commit-msg`) that strips AI-tool session links and attribution
+lines from commit messages. A workflow does the same for pull request descriptions and comments.
+
 ## Before you push
 
 ```bash
