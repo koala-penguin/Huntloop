@@ -1,0 +1,46 @@
+# Removes Claude Code session links and attribution footers from PR descriptions and comments,
+# whoever posts them. Only the base branch's copy of the script runs; nothing from a pull request is checked out.
+name: Strip Claude links
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  strip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/strip-claude-links.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { stripClaudeLinks } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/strip-claude-links.mjs`);
+            const { owner, repo } = context.repo;
+            if (context.eventName === "pull_request_target") {
+              const pr = context.payload.pull_request;
+              const body = pr.body ?? "";
+              const cleaned = stripClaudeLinks(body);
+              if (cleaned !== body) {
+                await github.rest.pulls.update({ owner, repo, pull_number: pr.number, body: cleaned });
+                core.info(`Cleaned the description of #${pr.number}`);
+              }
+            } else {
+              const comment = context.payload.comment;
+              const body = comment.body ?? "";
+              const cleaned = stripClaudeLinks(body);
+              if (cleaned !== body) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: comment.id, body: cleaned });
+                core.info(`Cleaned comment ${comment.id}`);
+              }
+            }

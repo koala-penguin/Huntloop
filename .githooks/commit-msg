@@ -1,0 +1,4 @@
+#!/bin/sh
+# Keeps Claude Code session links and attribution lines out of commit messages.
+# Enabled by `npm install` (prepare script) or: git config core.hooksPath .githooks
+node "$(git rev-parse --show-toplevel)/scripts/strip-claude-links.mjs" "$1"
