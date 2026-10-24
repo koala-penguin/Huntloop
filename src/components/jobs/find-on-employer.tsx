@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/badge";
 import { useTask } from "@/components/tasks/use-task";
 import { UserActionPrompt, type TaskUserAction } from "@/components/tasks/user-action-prompt";
+import { useProgressNoteText } from "@/components/tasks/progress-note";
+import type { ProgressNoteLike } from "@/shared/progress-note";
 import { findOnEmployerSiteAction } from "@/app/jobs/[id]/actions";
 
 import { AI_ERROR_CODES } from "@/shared/ai-errors";
@@ -17,6 +19,7 @@ const KNOWN_ERRORS = ["agent_disabled", "no_company", "budget", "refusal", "brow
 export function FindOnEmployerSite({ jobId, runningTaskId, enabled }: { jobId: number; runningTaskId: number | null; enabled: boolean }) {
   const t = useTranslations("job.findOnEmployer");
   const tErrors = useTranslations("errors");
+  const noteText = useProgressNoteText();
   const router = useRouter();
   const [taskId, setTaskId] = useState<number | null>(runningTaskId);
   const [pending, start] = useTransition();
@@ -29,7 +32,7 @@ export function FindOnEmployerSite({ jobId, runningTaskId, enabled }: { jobId: n
   }, [result?.found, router]);
 
   if (!enabled) return <p className="text-xs text-muted">{t("disabled")}</p>;
-  const progress = (task?.progress ?? {}) as { notes?: string[]; action?: TaskUserAction };
+  const progress = (task?.progress ?? {}) as { notes?: ProgressNoteLike[]; action?: TaskUserAction };
   if (taskId && task?.status === "needs_user_action" && progress.action) return <UserActionPrompt taskId={taskId} action={progress.action} />;
   const running = taskId !== null && (!task || ["queued", "running"].includes(task.status));
 
@@ -44,7 +47,7 @@ export function FindOnEmployerSite({ jobId, runningTaskId, enabled }: { jobId: n
           {(progress.notes?.length ?? 0) > 0 && (
             <ul className="flex flex-col gap-0.5 border-l-2 border-border pl-3 text-xs text-muted">
               {progress.notes!.slice(-3).map((n, i) => (
-                <li key={i}>{n}</li>
+                <li key={i}>{noteText(n)}</li>
               ))}
             </ul>
           )}

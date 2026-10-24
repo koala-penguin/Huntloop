@@ -66,12 +66,14 @@ function knownSkills(names: string[], data: ProfileData, max: number): { skills:
  * Profile skills that spell out a posting keyword the CV doesn't use yet. Applicant-tracking systems
  * match exact phrases, so "Vendor management" counts where "Vendor and budget management" doesn't.
  */
-function keywordSkills(keywords: string[], text: string, chosen: string[], data: ProfileData): string[] {
+function keywordSkills(keywords: string[], text: string, chosen: string[], data: ProfileData, doNotClaim: string[] = []): string[] {
   const known = [...profileSkills(data).values()];
+  const banned = (s: string) => doNotClaim.some((t) => termPresent(s, t) || termPresent(t, s));
   const added: string[] = [];
   for (const keyword of keywords) {
+    if (banned(keyword)) continue;
     if (termPresent(text, keyword) || [...chosen, ...added].some((s) => termPresent(s, keyword))) continue;
-    const match = known.find((s) => termPresent(s, keyword));
+    const match = known.find((s) => termPresent(s, keyword) && !banned(s));
     if (match && !chosen.includes(match)) added.push(match);
   }
   return added;
@@ -79,8 +81,8 @@ function keywordSkills(keywords: string[], text: string, chosen: string[], data:
 
 export interface AssembleCvInput {
   profile: { cvText: string; data: ProfileData };
-  /** keywords: the posting's ATS terms (postingKeywords). */
-  job: { country: string | null; postingLanguage: string | null; keywords?: string[] };
+  /** keywords: the posting's ATS terms (postingKeywords); doNotClaim: terms the CV must not claim (never added as skills). */
+  job: { country: string | null; postingLanguage: string | null; keywords?: string[]; doNotClaim?: string[] };
   plan: TailoringPlan;
   output: TailoredCvOutput;
 }
@@ -111,7 +113,7 @@ export function assembleCv({ profile, job, plan, output }: AssembleCvInput): { d
   const written = [...summary, ...roles.flatMap((r) => r.bullets)].map((l) => l.text).join("\n");
   const chosen = skills.skills.length ? skills.skills : data.skills.map((s) => s.name).slice(0, 24);
   // Matching skills go first so the cap never cuts them.
-  const skillLine = [...keywordSkills(job.keywords ?? [], written, chosen, data), ...chosen].slice(0, 24);
+  const skillLine = [...keywordSkills(job.keywords ?? [], written, chosen, data, job.doNotClaim ?? []), ...chosen].slice(0, 24);
 
   const right = job.country ? data.workRights.find((w) => w.country === job.country) : undefined;
   const workRight =

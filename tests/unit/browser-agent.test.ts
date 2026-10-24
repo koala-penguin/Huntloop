@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { checkToolCall, hostAllowList, parseSnapshot, type GuardState } from "@/server/ai/browser-agent/guard";
-import { runBrowserAgent } from "@/server/ai/browser-agent/agent";
+import { describeAction, runBrowserAgent } from "@/server/ai/browser-agent/agent";
 import { closeBrowser } from "@/server/browser/service";
 import { getFakeGenerator, registerFakeGenerator, type FakeGenerator } from "@/server/ai/fake/transport";
 import "@/server/ai/fake/generators/browser-agent";
@@ -22,6 +22,7 @@ import { startFixtureSites } from "../fixtures/browser/sites.mjs";
 import { setCliSpawner } from "@/server/ai/claude-code/cli";
 import { defaultAiSettings } from "@/shared/ai-settings";
 import { cliResult, fakeCli, mcp, mcpServer } from "../helpers/fake-cli";
+import type { ProgressNoteLike } from "@/shared/progress-note";
 
 const SNAPSHOT = `## Latest page snapshot
 uid=1_0 RootWebArea "Frontend Engineer - Example" url="https://jobs.example.gov.au/job/501"
@@ -114,6 +115,15 @@ describe("browsing agent guard", () => {
     expect(ok("press_key", { pageId: 1, key: "Escape" })).toBe(true);
   });
 
+  it("describes its actions as translatable notes", () => {
+    expect(describeAction("new_page", { url: "https://jobs.example.gov.au/x" })).toEqual({ key: "opening", params: { host: "jobs.example.gov.au" } });
+    expect(describeAction("navigate_page", { type: "url", url: "https://jobs.example.gov.au/y" })).toEqual({ key: "opening", params: { host: "jobs.example.gov.au" } });
+    expect(describeAction("take_snapshot", {})).toEqual({ key: "reading" });
+    expect(describeAction("fill", { value: "frontend" })).toEqual({ key: "searching", params: { query: "frontend" } });
+    expect(describeAction("click", {})).toEqual({ key: "following" });
+    expect(describeAction("wait_for", {})).toEqual({ key: "browsing" });
+  });
+
   it("turns a company domain into the employer's start page", () => {
     expect(employerUrlFrom("tidal.example")).toBe("https://tidal.example");
     expect(employerUrlFrom("http://127.0.0.1:3299/employer/")).toBe("http://127.0.0.1:3299/employer/");
@@ -163,7 +173,7 @@ describe.skipIf(!fs.existsSync(CHROMIUM))("browsing agent (Chrome DevTools MCP, 
 
   it("searches a site without an adapter and reads the jobs it opened", async () => {
     const { db, userId } = testDb();
-    const notes: string[] = [];
+    const notes: ProgressNoteLike[] = [];
     const result = await runBrowserAgent(
       { db, userId },
       { kind: "search", site: { name: "Example Public Jobs", url: `${sites.url}/board/search?q=frontend` }, filters, maxJobs: 5, source: "browser_agent" },
@@ -173,7 +183,7 @@ describe.skipIf(!fs.existsSync(CHROMIUM))("browsing agent (Chrome DevTools MCP, 
     expect(result.leads[0]).toMatchObject({ source: "browser_agent", full: true });
     expect(result.leads[0].text).toContain("Australian citizenship is required");
     expect(result.dropped).toBe(1); // reported but never opened
-    expect(notes).toContain("Reading the page");
+    expect(notes).toContainEqual({ key: "reading" });
     expect(db.select().from(usageLog).all().every((u) => u.task === "browserAgent")).toBe(true);
   }, 60_000);
 

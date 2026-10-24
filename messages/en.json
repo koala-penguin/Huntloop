@@ -1439,5 +1439,17 @@
     },
     "limitReached": "The usage limit is reached. Background work resumes after {time}.",
     "limitsAsOf": "Limits as Claude Code last reported them ({time})."
+  },
+  "browserNotes": {
+    "opening": "Opening {host}",
+    "reading": "Reading the page",
+    "searching": "Searching for “{query}”",
+    "following": "Following a link",
+    "browsing": "Browsing…",
+    "agentFallback": "{site}: no job links found; the browsing agent will try",
+    "siteBrowsing": "{site}: browsing",
+    "blocked": "{site}: {kind, select, captcha {CAPTCHA} login {sign-in required} checkpoint {security check} other {check needed}} — waiting for you",
+    "jobLinks": "{site}: {count} job links",
+    "read": "{site}: read {done} of {total}"
   }
 }

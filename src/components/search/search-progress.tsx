@@ -7,11 +7,13 @@ import { Loader2 } from "lucide-react";
 import { Alert } from "@/components/ui/badge";
 import { useTask } from "@/components/tasks/use-task";
 import { UserActionPrompt, type TaskUserAction } from "@/components/tasks/user-action-prompt";
+import { useProgressNoteText } from "@/components/tasks/progress-note";
+import type { ProgressNoteLike } from "@/shared/progress-note";
 
 interface Progress {
   stage?: string;
   counts?: { leads: number; unique: number; screened: number; toScreen: number; deep: number; toDeep: number };
-  notes?: string[];
+  notes?: ProgressNoteLike[];
   action?: TaskUserAction;
 }
 
@@ -21,6 +23,7 @@ const STAGES = ["planning", "sourcing", "filtering", "screening", "deep", "done"
 export function SearchProgress({ taskId }: { taskId: number }) {
   const t = useTranslations("search.progress");
   const tErrors = useTranslations("errors");
+  const noteText = useProgressNoteText();
   const router = useRouter();
   const task = useTask(taskId);
   const done = task && ["succeeded", "failed", "cancelled"].includes(task.status);
@@ -51,7 +54,7 @@ export function SearchProgress({ taskId }: { taskId: number }) {
       {(progress.notes?.length ?? 0) > 0 && (
         <ul className="flex flex-col gap-1 border-l-2 border-border pl-3 text-xs text-muted">
           {progress.notes!.slice(-3).map((n, i) => (
-            <li key={i}>{n}</li>
+            <li key={i}>{noteText(n)}</li>
           ))}
         </ul>
       )}

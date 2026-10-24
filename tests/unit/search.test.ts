@@ -14,6 +14,7 @@ import { createJob, getJob } from "@/server/repo/jobs";
 import { processJob } from "@/server/jobs/pipeline";
 import { filtersFromPreferences, type SearchFilters } from "@/shared/schemas/search";
 import { defaultPreferences, type Preferences } from "@/shared/schemas/preferences";
+import { sameNote } from "@/shared/progress-note";
 import { testDb } from "../helpers/db";
 import { CV_TEXT, profile, right } from "../helpers/scoring";
 
@@ -61,6 +62,16 @@ const lead = (patch: Partial<JobLead>): JobLead => ({
   postedAt: "2026-10-10",
   salaryText: null,
   ...patch,
+});
+
+describe("progress notes", () => {
+  it("compares plain and structured notes", () => {
+    expect(sameNote({ key: "read", params: { site: "seek", done: 1, total: 3 } }, { key: "read", params: { site: "seek", done: 1, total: 3 } })).toBe(true);
+    expect(sameNote({ key: "read", params: { site: "seek", done: 1, total: 3 } }, { key: "read", params: { site: "seek", done: 2, total: 3 } })).toBe(false);
+    expect(sameNote({ key: "reading" }, "reading")).toBe(false);
+    expect(sameNote("Searching", "Searching")).toBe(true);
+    expect(sameNote(undefined, "x")).toBe(false);
+  });
 });
 
 describe("search tasks", () => {

@@ -182,6 +182,17 @@ describe("tailored CV (demo mode)", () => {
     expect(assemble([])).toEqual(["React", "Vendor and budget management"]);
   });
 
+  it("never adds a keyword skill the candidate mustn't claim", () => {
+    const data = tailoringProfile();
+    data.skills = [...data.skills, { name: "Vendor and budget management", category: "domain" }, { name: "Vendor management", category: "domain" }, { name: "Kubernetes", category: "tool" }];
+    const plan = { summaryAngle: "", targetRequirementIds: [], roles: [], keywords: [], doNotClaim: [], questions: [], linkedinEmphasis: [], advice: [] };
+    const output = { summary: [{ text: "Frontend engineer.", sourceRefs: [], requirementIds: [] }], roles: [], skills: ["React", "Vendor and budget management"] };
+    const assemble = (doNotClaim?: string[]) =>
+      assembleCv({ profile: { cvText: CV_TEXT, data }, job: { country: "AU", postingLanguage: "en", keywords: ["vendor management", "kubernetes"], doNotClaim }, plan, output }).doc.skills;
+    expect(assemble()).toEqual(["Vendor management", "Kubernetes", "React", "Vendor and budget management"]);
+    expect(assemble(["Kubernetes"])).toEqual(["Vendor management", "React", "Vendor and budget management"]);
+  });
+
   it("writes the plan's notes in the interface language and the CV in the posting's", async () => {
     const { db, userId, ctx, job } = await setup();
     setUserLocale(db, userId, "ko");

@@ -19,6 +19,7 @@ import { cliSources, cliToolNote } from "../claude-code/agent";
 import { cliJsonSchema, isRefusal, logCliUsage } from "../claude-code/structured";
 import { MCP_PREFIX, mcpServersFor, openMcpRun } from "../claude-code/mcp-runs";
 import { checkToolCall, hostAllowList, parseSnapshot, selectedPageId, type GuardState } from "./guard";
+import type { ProgressNote, ProgressNoteLike } from "@/shared/progress-note";
 
 export type AgentGoal =
   | { kind: "search"; site: { name: string; url: string }; filters: SearchFilters; maxJobs: number; source: JobLead["source"] }
@@ -27,7 +28,7 @@ export type AgentGoal =
 export interface AgentRunOptions {
   signal?: AbortSignal;
   waitForUser?: TaskContext["waitForUser"];
-  onProgress?: (note: string) => void;
+  onProgress?: (note: ProgressNoteLike) => void;
   maxSteps?: number;
 }
 
@@ -131,7 +132,7 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
     const bridge = await McpBrowserBridge.start(devtoolsUrl);
     const guard: GuardState = { snapshots: new Map(), isAllowedHost };
     const visited = new Set<string>();
-    const note = (text: string) => options.onProgress?.(text);
+    const note = (text: ProgressNoteLike) => options.onProgress?.(text);
     let refused = 0;
     let steps = 0;
     // On the subscription, a run waiting for the user hands its CLI slot to other work meanwhile.
@@ -147,7 +148,7 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
         refused++;
         return { text: `Refused: ${decision.reason}`, isError: true };
       }
-      note(describe(name, decision.input));
+      note(describeAction(name, decision.input));
       const out = await bridge.call(name, decision.input);
       if (!out.isError && out.text.includes("uid=")) {
         const page = Number(decision.input.pageId ?? selectedPageId(out.text));
@@ -268,12 +269,16 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
   });
 }
 
-function describe(name: string, input: Record<string, unknown>): string {
-  if (name === "new_page" || (name === "navigate_page" && input.type === "url")) return `Opening ${hostOf(String(input.url)) ?? "a page"}`;
-  if (name === "take_snapshot") return "Reading the page";
-  if (name === "fill") return `Searching for “${String(input.value).slice(0, 60)}”`;
-  if (name === "click") return "Following a link";
-  return name.replace(/_/g, " ");
+/** The progress note for one approved browser action (rendered from the `browserNotes` catalog). */
+export function describeAction(name: string, input: Record<string, unknown>): ProgressNote {
+  if (name === "new_page" || (name === "navigate_page" && input.type === "url")) {
+    const host = hostOf(String(input.url));
+    return host ? { key: "opening", params: { host } } : { key: "browsing" };
+  }
+  if (name === "take_snapshot") return { key: "reading" };
+  if (name === "fill") return { key: "searching", params: { query: String(input.value).slice(0, 60) } };
+  if (name === "click") return { key: "following" };
+  return { key: "browsing" };
 }
 
 /**
