@@ -316,7 +316,8 @@
     "cli_missing": "Claude Code isn't installed (or not where HUNTLOOP_CLAUDE_PATH points). Install it, or switch to the API key in Settings.",
     "cli_login": "Claude Code isn't signed in. Run “claude auth login” in a terminal, then try again.",
     "subscription_limit": "Your Claude subscription's usage limit has been reached. Try again after it resets, or switch to the API key in Settings.",
-    "model_unavailable": "That model isn't available on your plan. Choose another model for this task in Settings."
+    "model_unavailable": "That model isn't available on your plan. Choose another model for this task in Settings.",
+    "interrupted": "Huntloop was closed before this finished. Try again."
   },
   "profile": {
     "title": "Your profile",

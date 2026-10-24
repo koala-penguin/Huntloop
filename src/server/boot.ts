@@ -5,6 +5,7 @@ import { startScheduler } from "./tasks/scheduler";
 import { readEnv } from "./config/env";
 import { getClaudeCodeStatus } from "./ai/claude-code/status";
 import "./tasks/handlers";
+import { failOrphanedProcessingJobs } from "./tasks/handlers/process-job";
 
 /**
  * Runs once per server process (from instrumentation.ts): check the Claude Code CLI (for the
@@ -17,5 +18,7 @@ export async function boot(): Promise<void> {
   const db = getDb();
   getLocalUser(db);
   startTaskRunner(db);
+  // Right after start() has recovered stale tasks and before its first tick claims anything new.
+  failOrphanedProcessingJobs(db);
   startScheduler(db);
 }

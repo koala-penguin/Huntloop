@@ -37,6 +37,11 @@ export interface CliRunOptions {
   partialMessages?: boolean;
   signal?: AbortSignal;
   onEvent?: (event: CliEvent) => void;
+  /**
+   * Called once the run holds one of the CLI slots, with a function that gives the slot to other
+   * runs while `fn` runs (e.g. while the browser agent waits for the user) and takes it back after.
+   */
+  onSlot?: (yieldSlot: <T>(fn: () => Promise<T>) => Promise<T>) => void;
 }
 
 export interface CliRunResult {
@@ -167,8 +172,28 @@ export function cliFailure(result: CliEvent | null, stderr: string, lastRetryErr
 /** One `claude -p` run. Resolves with the final `result` event; rejects with an AiError. */
 export async function runClaudeCode(options: CliRunOptions): Promise<CliRunResult> {
   await acquire();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "huntloop-cc-"));
+  // `held`: this run counts against the cap right now. `finished`: the run is over, so a yield
+  // that ends later must not take a slot back (or must hand straight back the one it got).
+  let held = true;
+  let finished = false;
+  const yieldSlot = async <T,>(fn: () => Promise<T>): Promise<T> => {
+    if (!held || finished) return fn();
+    held = false;
+    release();
+    try {
+      return await fn();
+    } finally {
+      if (!finished) {
+        await acquire();
+        if (finished) release();
+        else held = true;
+      }
+    }
+  };
+  let tmp: string | null = null;
   try {
+    options.onSlot?.(yieldSlot);
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "huntloop-cc-"));
     const systemPrompt = path.join(tmp, "system.txt");
     fs.writeFileSync(systemPrompt, options.systemPrompt, { mode: 0o600 });
     let mcpConfig: string | null = null;
@@ -258,7 +283,11 @@ export async function runClaudeCode(options: CliRunOptions): Promise<CliRunResul
       child.stdin?.end(`${JSON.stringify({ type: "user", message: { role: "user", content: options.input } })}\n`);
     });
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-    release();
+    if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
+    finished = true;
+    if (held) {
+      held = false;
+      release();
+    }
   }
 }

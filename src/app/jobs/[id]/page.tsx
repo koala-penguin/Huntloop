@@ -37,7 +37,7 @@ import { CvWorkspace, ProceedButton } from "@/components/cv/cv-workspace";
 
 import { AI_ERROR_CODES } from "@/shared/ai-errors";
 import { resolveTaskModel, type Connection } from "@/shared/ai-settings";
-const KNOWN_ERRORS = ["not_a_job_posting", "url_blocked", "missing_posting", "refusal", "budget", "invalid_output", "max_tokens", ...AI_ERROR_CODES];
+const KNOWN_ERRORS = ["not_a_job_posting", "url_blocked", "interrupted", "missing_posting", "refusal", "budget", "invalid_output", "max_tokens", ...AI_ERROR_CODES];
 
 export default async function JobPage({ params, searchParams }: PageProps<"/jobs/[id]">) {
   const { id } = await params;

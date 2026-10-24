@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,7 +9,7 @@ import { parseSearch } from "@/server/ai/tasks/parse-search";
 import { adzunaResultToLead, buildAdzunaQueries, searchAdzuna, takeAdzunaCall, ADZUNA_LIMITS } from "@/server/sources/adzuna";
 import { SourceQuotaError, type JobLead } from "@/server/sources/types";
 import { dedupeLeads, getSearch, prefilter, runSearch, searchResults } from "@/server/search/run";
-import { createSearch, latestSearchTask } from "@/server/search/tasks";
+import { activeSearchTask, createSearch, latestSearchTask, rerunSearch } from "@/server/search/tasks";
 import { createJob, getJob } from "@/server/repo/jobs";
 import { processJob } from "@/server/jobs/pipeline";
 import { filtersFromPreferences, type SearchFilters } from "@/shared/schemas/search";
@@ -60,6 +61,18 @@ const lead = (patch: Partial<JobLead>): JobLead => ({
   postedAt: "2026-10-10",
   salaryText: null,
   ...patch,
+});
+
+describe("search tasks", () => {
+  it("treats a run waiting for the user as still running", () => {
+    const { db, userId } = setup();
+    const { searchId, taskId } = createSearch(db, userId, "frontend jobs in Sydney");
+    db.update(tasks).set({ status: "needs_user_action" }).where(eq(tasks.id, taskId)).run();
+    expect(activeSearchTask(db, userId, searchId)).toBe(taskId);
+    const before = db.select().from(tasks).all().length;
+    expect(rerunSearch(db, userId, searchId)).toBe(taskId);
+    expect(db.select().from(tasks).all().length).toBe(before);
+  });
 });
 
 describe("search planning", () => {

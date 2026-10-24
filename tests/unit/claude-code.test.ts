@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { AiError, callStructured, modeFor } from "@/server/ai/client";
 import { runSubmitLoop } from "@/server/ai/agent-loop";
 import { webTools } from "@/server/ai/request";
-import { buildCliArgs, setCliSpawner } from "@/server/ai/claude-code/cli";
+import { buildCliArgs, runClaudeCode, setCliSpawner, type CliRunOptions } from "@/server/ai/claude-code/cli";
 import { cliEnv, setClaudeCodeStatus } from "@/server/ai/claude-code/status";
 import { resetSubscriptionUsage, subscriptionLimitedUntil, subscriptionNearLimit, subscriptionUsage } from "@/server/ai/claude-code/limits";
 import { restrictedDomains } from "@/server/ingest/domain-policy";
@@ -178,5 +178,89 @@ describe("Claude Code CLI (subscription connection)", () => {
     expect(call.arg("--tools")).toBe("WebSearch,WebFetch");
     expect(call.arg("--disallowedTools")).toContain("WebFetch(domain:seek.com.au)");
     expect(fs.readdirSync(call.cwd)).toEqual([]);
+  });
+
+  it("lets a run hand its slot to others while it waits for the user, without losing count", async () => {
+    const deferred = () => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+    const gates: Array<ReturnType<typeof deferred>> = [];
+    const { spawner, calls } = fakeCli(async () => {
+      const gate = deferred();
+      gates.push(gate);
+      await gate.promise;
+      return [cliResult()];
+    });
+    setCliSpawner(spawner);
+    const base: CliRunOptions = { model: "claude-opus-5-5", effort: "low", systemPrompt: "s", input: [{ type: "text", text: "x" }], tools: [] };
+    const spawned = (n: number) => vi.waitFor(() => expect(calls).toHaveLength(n));
+    const settle = () => new Promise((r) => setTimeout(r, 20));
+
+    // Run 1 yields its slot (as the browser agent does while the user solves a CAPTCHA).
+    const userDone = deferred();
+    let yielded: Promise<unknown> | null = null;
+    const run1 = runClaudeCode({ ...base, onSlot: (yieldSlot) => (yielded = yieldSlot(() => userDone.promise)) });
+    await spawned(1);
+    const run2 = runClaudeCode(base);
+    const run3 = runClaudeCode(base);
+    await spawned(3);
+    const run4 = runClaudeCode(base);
+    await settle();
+    expect(calls).toHaveLength(3); // the cap still applies to runs that didn't yield
+
+    userDone.resolve(); // run 1 now waits to get its slot back, behind run 4
+    gates[1].resolve();
+    await run2;
+    await spawned(4);
+    gates[2].resolve();
+    gates[3].resolve();
+    gates[0].resolve();
+    await Promise.all([run1, run3, run4, yielded]);
+
+    // Back to exactly zero: two fresh runs go in parallel, a third waits.
+    const fresh = [runClaudeCode(base), runClaudeCode(base)];
+    await spawned(6);
+    const third = runClaudeCode(base);
+    await settle();
+    expect(calls).toHaveLength(6);
+    gates[4].resolve();
+    await spawned(7);
+    gates[5].resolve();
+    gates[6].resolve();
+    await Promise.all([...fresh, third]);
+  });
+
+  it("gives back a yielded slot only once when the run is cancelled", async () => {
+    const gates: Array<() => void> = [];
+    const { spawner, calls } = fakeCli(async () => {
+      await new Promise<void>((r) => gates.push(r));
+      return [cliResult()];
+    });
+    setCliSpawner(spawner);
+    const base: CliRunOptions = { model: "claude-opus-5-5", effort: "low", systemPrompt: "s", input: [{ type: "text", text: "x" }], tools: [] };
+    const controller = new AbortController();
+    let releaseUser!: () => void;
+    const userDone = new Promise<void>((r) => (releaseUser = r));
+    let yielded: Promise<unknown> | null = null;
+    const run1 = runClaudeCode({ ...base, signal: controller.signal, onSlot: (yieldSlot) => (yielded = yieldSlot(() => userDone)) });
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    controller.abort();
+    await expect(run1).rejects.toMatchObject({ name: "AbortError" });
+    releaseUser();
+    await yielded;
+
+    const both = [runClaudeCode(base), runClaudeCode(base)];
+    await vi.waitFor(() => expect(calls).toHaveLength(3));
+    const third = runClaudeCode(base);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls).toHaveLength(3);
+    gates[1]();
+    await vi.waitFor(() => expect(calls).toHaveLength(4));
+    gates[2]();
+    gates[3]();
+    gates[0]();
+    await Promise.all([...both, third]);
   });
 });

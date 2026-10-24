@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, notInArray } from "drizzle-orm";
 import type { Db } from "../db/database";
 import { tasks, type TaskRow } from "../db/schema";
 import { formatTaskError } from "../errors";
@@ -40,6 +40,8 @@ export interface TaskHandlerDefinition {
   /** Tasks in the same group never run at the same time (e.g. "browser"). */
   exclusiveGroup?: string;
   maxAttempts?: number;
+  /** Called when recoverStale gives up on a task left running by a previous process. */
+  onAbandoned?: (db: Db, task: TaskRow) => void;
 }
 
 const handlers = new Map<string, TaskHandlerDefinition>();
@@ -132,8 +134,10 @@ export interface RunnerOptions {
 /** In-process worker that executes queued tasks from the database. */
 export class TaskRunner {
   private timer: NodeJS.Timeout | undefined;
-  private running = new Map<number, { controller: AbortController; group?: string }>();
+  /** Tasks this runner is executing; `waiting` ones are paused for the user and don't use a slot. */
+  private running = new Map<number, { controller: AbortController; group?: string; waiting: boolean }>();
   private ticking = false;
+  private lastRecoverAt = 0;
 
   constructor(
     private readonly db: Db,
@@ -153,20 +157,41 @@ export class TaskRunner {
     for (const { controller } of this.running.values()) controller.abort();
   }
 
-  /** Tasks left "running" by a previous process go back to the queue (or fail after max attempts). */
+  /**
+   * Tasks left "running" with a stale heartbeat (by a previous process, or one that stopped
+   * heart-beating) go back to the queue, or fail after max attempts. Runs at start and then every
+   * STALE_AFTER_MS from tick(); tasks this runner is executing itself are never touched.
+   */
   recoverStale(now = Date.now()): void {
+    this.lastRecoverAt = now;
+    const mine = [...this.running.keys()];
     const stale = this.db
       .select()
       .from(tasks)
-      .where(and(inArray(tasks.status, ["running", "needs_user_action"]), lt(tasks.heartbeatAt, new Date(now - STALE_AFTER_MS))))
+      .where(
+        and(
+          inArray(tasks.status, ["running", "needs_user_action"]),
+          lt(tasks.heartbeatAt, new Date(now - STALE_AFTER_MS)),
+          mine.length ? notInArray(tasks.id, mine) : undefined,
+        ),
+      )
       .all();
     for (const task of stale) {
-      const max = handlers.get(task.kind)?.maxAttempts ?? 3;
+      const definition = handlers.get(task.kind);
+      const max = definition?.maxAttempts ?? 3;
+      const giveUp = task.attempts >= max;
       this.db
         .update(tasks)
-        .set(task.attempts >= max ? { status: "failed", error: "Interrupted too many times", finishedAt: new Date() } : { status: "queued", userAction: null })
+        .set(giveUp ? { status: "failed", error: "Interrupted too many times", finishedAt: new Date() } : { status: "queued", userAction: null })
         .where(eq(tasks.id, task.id))
         .run();
+      if (giveUp) {
+        try {
+          definition?.onAbandoned?.(this.db, task);
+        } catch (error) {
+          console.error("[huntloop] onAbandoned", error);
+        }
+      }
     }
   }
 
@@ -176,8 +201,11 @@ export class TaskRunner {
     this.ticking = true;
     const started: Promise<void>[] = [];
     try {
+      const now = Date.now();
+      if (now - this.lastRecoverAt >= STALE_AFTER_MS) this.recoverStale(now);
       const limit = this.options.concurrency ?? 2;
-      while (this.running.size < limit) {
+      const busy = () => [...this.running.values()].filter((r) => !r.waiting).length;
+      while (busy() < limit) {
         const claimed = this.claimNext();
         if (!claimed) break;
         started.push(this.execute(claimed.task, claimed.definition));
@@ -214,7 +242,8 @@ export class TaskRunner {
 
   private async execute(task: TaskRow, definition: TaskHandlerDefinition): Promise<void> {
     const controller = new AbortController();
-    this.running.set(task.id, { controller, group: definition.exclusiveGroup });
+    const entry = { controller, group: definition.exclusiveGroup, waiting: false };
+    this.running.set(task.id, entry);
     let lastProgressWrite = 0;
     let pendingProgress: unknown;
     const writeProgress = () => {
@@ -239,9 +268,14 @@ export class TaskRunner {
           pendingProgress = value;
           if (Date.now() - lastProgressWrite > 250) writeProgress();
         },
-        waitForUser: (reason, isResolved) => {
+        waitForUser: async (reason, isResolved) => {
           if (pendingProgress !== undefined) writeProgress();
-          return waitForUserOnTask(this.db, task.id, reason, isResolved, { signal: controller.signal, currentProgress: pendingProgress });
+          entry.waiting = true;
+          try {
+            return await waitForUserOnTask(this.db, task.id, reason, isResolved, { signal: controller.signal, currentProgress: pendingProgress });
+          } finally {
+            entry.waiting = false;
+          }
         },
       });
       if (pendingProgress !== undefined) writeProgress();

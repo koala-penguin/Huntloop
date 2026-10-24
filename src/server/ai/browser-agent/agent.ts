@@ -134,6 +134,11 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
     const note = (text: string) => options.onProgress?.(text);
     let refused = 0;
     let steps = 0;
+    // On the subscription, a run waiting for the user hands its CLI slot to other work meanwhile.
+    let yieldSlot: (<T>(fn: () => Promise<T>) => Promise<T>) | null = null;
+    const userWait = options.waitForUser;
+    const waitForUser: AgentRunOptions["waitForUser"] = userWait && ((reason, isResolved) => (yieldSlot ? yieldSlot(() => userWait(reason, isResolved)) : userWait(reason, isResolved)));
+    const runOptions: AgentRunOptions = { ...options, waitForUser };
     /** One browser action: the guard first, then the browser, then what navigation changed. */
     const runGuarded = async (name: string, input: Record<string, unknown>): Promise<{ text: string; isError: boolean }> => {
       if (options.signal?.aborted) throw new TaskCancelledError();
@@ -148,7 +153,7 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
         const page = Number(decision.input.pageId ?? selectedPageId(out.text));
         if (Number.isFinite(page)) guard.snapshots.set(page, parseSnapshot(out.text));
       }
-      const extra = NAVIGATING.has(name) ? await afterNavigation(browser, guard, visited, options) : [];
+      const extra = NAVIGATING.has(name) ? await afterNavigation(browser, guard, visited, runOptions) : [];
       return { text: [out.text, ...extra].join("\n"), isError: out.isError };
     };
     try {
@@ -175,6 +180,9 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
             jsonSchema: cliJsonSchema(leadsSchema),
             maxTurns: (options.maxSteps ?? 30) + 5,
             signal: options.signal,
+            onSlot: (y) => {
+              yieldSlot = y;
+            },
             onEvent: (event) => {
               if (event.type === "system" && event.subtype === "task_summary" && typeof event.detail === "string" && event.detail.trim()) note(event.detail.trim());
               if (event.type !== "assistant" && event.type !== "user") return;
@@ -185,7 +193,7 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
           });
           logCliUsage(ctx, "browserAgent", call.model, run);
           if (isRefusal(run)) throw new AiError("refusal", "Claude declined this browsing task");
-          return { ...(await acceptLeads(browser, goal, run.result.structured_output, visited, options)), refused, steps };
+          return { ...(await acceptLeads(browser, goal, run.result.structured_output, visited, runOptions)), refused, steps };
         } catch (error) {
           if (options.signal?.aborted) throw new TaskCancelledError();
           throw error;
