@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { canonicalizeUrl, domainPolicy, restrictedDomains } from "@/server/ingest/domain-policy";
-import { FetchBlockedError, guardedLookup, isPrivateAddress, safeFetch, proxyConfigured } from "@/server/ingest/safe-fetch";
+import { FetchBlockedError, guardedLookup, isPrivateAddress, outboundFetch, safeFetch, proxyConfigured } from "@/server/ingest/safe-fetch";
 import { extractFromHtml, htmlToText } from "@/server/ingest/html";
 import { detectAtsUrl, fetchAtsBoardSummary, fetchAtsPosting } from "@/server/sources/ats";
 import { prepareScreenshot } from "@/server/ingest/images";
@@ -84,6 +85,22 @@ describe("safe fetch", () => {
     expect(single).toMatchObject({ reason: "private_address" });
     const singleOk = await call(all("93.184.216.34"), {});
     expect(singleOk).toEqual([null, "93.184.216.34", 4]);
+  });
+
+  it.skipIf(proxyConfigured())("re-checks the address on the real connection, not only before it", async () => {
+    const server = http.createServer((_req, res) => res.end("local"));
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    try {
+      const { port } = server.address() as { port: number };
+      // "localhost" resolves to loopback at connect time; the default fetch must refuse it there.
+      const error = await outboundFetch()(`http://localhost:${port}/`).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect((error as Error | null)?.cause).toBeInstanceOf(FetchBlockedError);
+    } finally {
+      server.close();
+    }
   });
 
   it("reports a refused connection as a private address", async () => {

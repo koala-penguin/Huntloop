@@ -82,6 +82,8 @@ describe("job boards", () => {
       ["Seattle, WA", "US"],
       ["Spokane, WA", null],
       ["Brisbane QLD", "AU"],
+      ["Bucharest Romania", "RO"],
+      ["Lagos Nigeria", "NG"],
     ];
     for (const [location, country] of cases) expect(guessCountry(location), location).toBe(country);
   });

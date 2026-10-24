@@ -243,6 +243,45 @@ describe("Claude Code CLI (subscription connection)", () => {
     await Promise.all([...fresh, third]);
   });
 
+  it("hands back a slot it gets after being cancelled while waiting to take it back", async () => {
+    const gates: Array<() => void> = [];
+    const { spawner, calls } = fakeCli(async () => {
+      await new Promise<void>((r) => gates.push(r));
+      return [cliResult()];
+    });
+    setCliSpawner(spawner);
+    const base: CliRunOptions = { model: "claude-opus-5-5", effort: "low", systemPrompt: "s", input: [{ type: "text", text: "x" }], tools: [] };
+    const controller = new AbortController();
+    let releaseUser!: () => void;
+    const userDone = new Promise<void>((r) => (releaseUser = r));
+    let yielded: Promise<unknown> | null = null;
+    const run1 = runClaudeCode({ ...base, signal: controller.signal, onSlot: (yieldSlot) => (yielded = yieldSlot(() => userDone)) });
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    const run2 = runClaudeCode(base);
+    const run3 = runClaudeCode(base);
+    await vi.waitFor(() => expect(calls).toHaveLength(3));
+    releaseUser(); // run 1 queues to take its slot back; both slots are busy
+    await new Promise((r) => setTimeout(r, 20));
+    controller.abort(); // and is cancelled while it waits
+    await expect(run1).rejects.toMatchObject({ name: "AbortError" });
+    gates[1](); // run 2 ends: its slot goes to run 1's pending take-back, which must hand it on
+    await run2;
+    await yielded;
+
+    // Run 3 still holds one slot, so exactly one more run may start.
+    const run4 = runClaudeCode(base);
+    await vi.waitFor(() => expect(calls).toHaveLength(4));
+    const run5 = runClaudeCode(base);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls).toHaveLength(4);
+    gates[2]();
+    await vi.waitFor(() => expect(calls).toHaveLength(5));
+    gates[3]();
+    gates[4]();
+    gates[0]();
+    await Promise.all([run3, run4, run5]);
+  });
+
   it("gives back a yielded slot only once when the run is cancelled", async () => {
     const gates: Array<() => void> = [];
     const { spawner, calls } = fakeCli(async () => {
