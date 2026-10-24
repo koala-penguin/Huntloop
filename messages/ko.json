@@ -1000,6 +1000,7 @@
     "runAgain": "다시 검색",
     "summaryTitle": "마지막 실행",
     "sourceLeads": "{source}: 공고 {count}개 발견",
+    "sourceLeadsPartial": "{source}: {count}개 발견 — 요청 한도로 일부만 가져옴",
     "sourceError": "{source}: {error}",
     "sourceErrorReason": {
       "quota": "일일 또는 월간 한도에 도달했습니다. 나중에 다시 시도하세요",

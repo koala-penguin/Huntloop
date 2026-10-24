@@ -44,7 +44,8 @@ export function filtersFromPreferences(preferences: Preferences): SearchFilters 
 }
 
 export interface SearchRunSummary {
-  sources: Partial<Record<SearchSource, { leads: number; error: string | null }>>;
+  /** `partial: "quota"`: the source stopped early at a quota; `leads` is what it found before. */
+  sources: Partial<Record<SearchSource, { leads: number; error: string | null; partial?: "quota" }>>;
   /** Leads after removing duplicates. */
   unique: number;
   /** Already in the user's jobs (found again). */

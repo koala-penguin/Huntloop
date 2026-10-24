@@ -59,7 +59,7 @@ export function canonicalizeUrl(raw: string): string | null {
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
     url.hash = "";
     for (const key of [...url.searchParams.keys()]) {
-      if (/^(utm_|gclid|fbclid|ref|refid|trk|src|source|mc_|_hs)/i.test(key)) url.searchParams.delete(key);
+      if (/^(utm_\w+|mc_\w+|_hs\w+|gclid|fbclid|msclkid|ref|refid|trk|trkinfo|src|source)$/i.test(key)) url.searchParams.delete(key);
     }
     // LinkedIn: /jobs/collections/...?currentJobId=123 → /jobs/view/123
     const current = url.searchParams.get("currentJobId");

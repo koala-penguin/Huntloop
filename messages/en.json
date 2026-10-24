@@ -1000,6 +1000,7 @@
     "runAgain": "Run again",
     "summaryTitle": "Last run",
     "sourceLeads": "{source}: {count, plural, one {# job found} other {# jobs found}}",
+    "sourceLeadsPartial": "{source}: {count, plural, one {# job found} other {# jobs found}} — stopped early at the request limit",
     "sourceError": "{source}: {error}",
     "sourceErrorReason": {
       "quota": "the daily or monthly limit has been reached; try again later",

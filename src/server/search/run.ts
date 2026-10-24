@@ -188,10 +188,18 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
   const sources = (search.sources as SearchSource[]).filter((s) => !options.apiOnly || UNATTENDED_SOURCES.includes(s));
   for (const source of sources) {
     try {
+      if (source === "adzuna") {
+        const adzuna = await searchAdzuna(ctx.db, filters, options.adzunaFetcher);
+        leads.push(...adzuna.leads);
+        // Out of quota before the first call: the same "quota" error as before. Part way: keep what came back.
+        summary.sources.adzuna =
+          adzuna.quotaHit && !adzuna.leads.length ? { leads: 0, error: "quota" } : { leads: adzuna.leads.length, error: null, ...(adzuna.quotaHit ? { partial: "quota" as const } : {}) };
+        progress.counts.leads = leads.length;
+        emit();
+        continue;
+      }
       const found =
-        source === "adzuna"
-          ? await searchAdzuna(ctx.db, filters, options.adzunaFetcher)
-          : source === "seek" || source === "linkedin"
+        source === "seek" || source === "linkedin"
             ? await searchBrowserSite(ctx, source, filters, { signal: ctx.signal, waitForUser: options.waitForUser, note })
             : source === "browser_agent"
               ? await searchOtherSites(ctx, filters, { signal: ctx.signal, waitForUser: options.waitForUser, note })

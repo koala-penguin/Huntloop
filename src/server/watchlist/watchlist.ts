@@ -24,21 +24,80 @@ const prettify = (slug: string) => slug.replace(/[-_]+/g, " ").replace(/\b\w/g, 
 
 const AU_STATES = /\b(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\b/;
 const US_STATES = /,\s*(A[KLRZ]|C[AOT]|D[CE]|FL|GA|HI|I[ADLN]|K[SY]|LA|M[ADEINOST]|N[CDEHJMVY]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[AT]|W[AIVY])\b/;
+const US_STATE_CODES = new Set(
+  "AK AL AR AZ CA CO CT DC DE FL GA HI IA ID IL IN KS KY LA MA MD ME MI MN MO MS MT NC ND NE NH NJ NM NV NY OH OK OR PA RI SC SD TN TX UT VA VT WA WI WV WY".split(" "),
+);
+const US_STATE_NAMES = [
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
+  "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
+  "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina",
+  "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah",
+  "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming", "District of Columbia",
+].map((n) => n.toLowerCase());
+const AU_STATE_CODES = new Set(["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]);
+const AU_STATE_NAMES = new Set(
+  ["New South Wales", "Victoria", "Queensland", "Western Australia", "South Australia", "Tasmania", "Australian Capital Territory", "Northern Territory"].map((n) => n.toLowerCase()),
+);
+/** Names that are both a US state and a country: they say nothing on their own. */
+const AMBIGUOUS = new Set(["georgia"]);
 
-/** A best guess at the country of a board's free-text location ("Sydney, Australia", "Austin, TX"). */
-export function guessCountry(location: string | null): string | null {
-  if (!location) return null;
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const hasWord = (text: string, word: string) => new RegExp(`\\b${escapeRegex(word)}\\b`).test(text);
+
+/** The market whose suggested cities include one of these parts exactly. */
+function cityCountry(parts: string[]): string | null {
+  const lower = parts.map((p) => p.toLowerCase());
+  for (const pack of Object.values(MARKET_PACKS)) if (pack.suggestedCities.some((c) => lower.includes(c.toLowerCase()))) return pack.country;
+  return null;
+}
+
+/** The last comma-separated part, when it names the place outright ("…, Romania", "…, TX", "…, Indiana"). */
+function exactPlace(part: string): string | null {
+  const upper = part.toUpperCase();
+  const lower = part.toLowerCase();
+  if (US_STATE_CODES.has(upper) || US_STATE_NAMES.includes(lower)) return "US";
+  if (/^(usa|united states|u\.s\.?|us)$/.test(lower)) return "US";
+  if (AU_STATE_CODES.has(upper) || AU_STATE_NAMES.has(lower)) return "AU";
+  if (/^(uk|united kingdom)$/.test(lower)) return "GB";
+  return COUNTRY_CODES.find((code) => countryName(code, "en").toLowerCase() === lower) ?? null;
+}
+
+/** Clues anywhere in the text ("Melbourne VIC", "Albuquerque New Mexico", "Auckland"). */
+function placeInText(location: string): string | null {
+  if (!location.trim()) return null;
   const text = location.toLowerCase();
-  for (const code of COUNTRY_CODES) {
-    const name = countryName(code, "en").toLowerCase();
-    if (name.length > 3 && text.includes(name)) return code;
-  }
-  if (/\b(usa|united states|u\.s\.)\b/.test(text)) return "US";
-  if (/\b(uk|united kingdom)\b/.test(text)) return "GB";
+  // State codes are upper case by convention; matching them case-blind would read "in" or "or" as states.
   if (AU_STATES.test(location)) return "AU";
   if (US_STATES.test(location)) return "US";
-  for (const pack of Object.values(MARKET_PACKS)) if (pack.suggestedCities.some((c) => text.includes(c.toLowerCase()))) return pack.country;
+  // Before country names, so "New Mexico" isn't Mexico.
+  if (US_STATE_NAMES.some((name) => !AMBIGUOUS.has(name) && hasWord(text, name))) return "US";
+  if (/\b(usa|united states|u\.s\.)(?=\W|$)/.test(text)) return "US";
+  if (/\b(uk|united kingdom)\b/.test(text)) return "GB";
+  for (const code of COUNTRY_CODES) {
+    const name = countryName(code, "en").toLowerCase();
+    if (name.length > 3 && !AMBIGUOUS.has(name) && hasWord(text, name)) return code;
+  }
+  for (const pack of Object.values(MARKET_PACKS)) if (pack.suggestedCities.some((c) => hasWord(text, c.toLowerCase()))) return pack.country;
   return null;
+}
+
+/** A best guess at the country of a board's free-text location ("Sydney, Australia", "Austin, TX"); null when unsure. */
+export function guessCountry(location: string | null): string | null {
+  if (!location) return null;
+  const parts = location
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const last = parts.at(-1);
+  if (!last) return null;
+  const others = parts.slice(0, -1);
+  // "WA" is Western Australia and Washington: only a known city decides.
+  if (last.toUpperCase() === "WA") {
+    const country = cityCountry(others);
+    return country === "AU" || country === "US" ? country : null;
+  }
+  if (AMBIGUOUS.has(last.toLowerCase())) return placeInText(others.join(", "));
+  return exactPlace(last) ?? placeInText(location);
 }
 
 /** Words that say little about which role it is ("Senior … Engineer"). */

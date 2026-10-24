@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { jobSightings, jobs, sourceCalls, tasks, usageLog } from "@/server/db/schema";
+import { jobSightings, jobs, searches, sourceCalls, tasks, usageLog } from "@/server/db/schema";
 import { saveProfileVersion, savePreferences } from "@/server/repo/profile";
 import { parseSearch } from "@/server/ai/tasks/parse-search";
 import { adzunaResultToLead, buildAdzunaQueries, searchAdzuna, takeAdzunaCall, ADZUNA_LIMITS } from "@/server/sources/adzuna";
@@ -125,12 +125,26 @@ describe("Adzuna", () => {
   it("calls the API with the keys and returns leads", async () => {
     const { db } = setup();
     const urls: string[] = [];
-    const leads = await searchAdzuna(db, { ...filters, titles: ["Frontend Engineer"] }, async (url) => {
+    const { leads, quotaHit } = await searchAdzuna(db, { ...filters, titles: ["Frontend Engineer"] }, async (url) => {
       urls.push(url);
       return fixture("api", "adzuna-search.json");
     });
     expect(urls[0]).toContain("https://api.adzuna.com/v1/api/jobs/au/search/1?app_id=test-id&app_key=test-key&what=Frontend+Engineer&where=Sydney");
     expect(leads).toHaveLength(3);
+    expect(quotaHit).toBe(false);
+  });
+
+  it("keeps the leads it already has when a quota runs out mid-run", async () => {
+    const { db } = setup();
+    for (let i = 0; i < ADZUNA_LIMITS.minute - 1; i++) db.insert(sourceCalls).values({ source: "adzuna", createdAt: new Date() }).run();
+    let calls = 0;
+    const result = await searchAdzuna(db, { ...filters, titles: ["Frontend Engineer", "Frontend Developer"] }, async () => {
+      calls++;
+      return fixture("api", "adzuna-search.json");
+    });
+    expect(calls).toBe(1);
+    expect(result.leads).toHaveLength(3);
+    expect(result.quotaHit).toBe(true);
   });
 });
 
@@ -206,6 +220,19 @@ describe("a search run (demo mode)", () => {
     expect(db.select().from(usageLog).all().length - calls).toBe(1); // only the search agent ran again
     expect(db.select().from(jobSightings).all()).toHaveLength(8);
     expect(searchResults(db, userId, searchId, 999).filter((r) => r.isNew)).toHaveLength(0);
+  });
+
+  it("keeps and screens Adzuna's results when its quota runs out part way", async () => {
+    const { db, userId, ctx } = setup();
+    const { searchId, taskId } = createSearch(db, userId, "frontend engineer in Sydney");
+    db.update(searches)
+      .set({ filters: { ...filtersFromPreferences(prefs()), titles: ["Frontend Engineer", "Frontend Developer"] } })
+      .where(eq(searches.id, searchId))
+      .run();
+    for (let i = 0; i < ADZUNA_LIMITS.minute - 1; i++) db.insert(sourceCalls).values({ source: "adzuna", createdAt: new Date() }).run();
+    const summary = await runSearch(ctx, searchId, { taskId, now: NOW, enrich: false, adzunaFetcher: async () => fixture("api", "adzuna-search.json") });
+    expect(summary.sources.adzuna).toEqual({ leads: 3, error: null, partial: "quota" });
+    expect(summary.screened).toBeGreaterThan(0);
   });
 
   it("deep-analyses the top results using the full posting when it can be read", async () => {

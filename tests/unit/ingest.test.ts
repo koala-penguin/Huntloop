@@ -26,6 +26,19 @@ describe("domain policy", () => {
     expect(canonicalizeUrl("not a url")).toBeNull();
   });
 
+  it("keeps job reference parameters that only look like tracking ones", () => {
+    const a = canonicalizeUrl("https://careers.example.com/apply?reference=REQ-1");
+    const b = canonicalizeUrl("https://careers.example.com/apply?reference=REQ-2");
+    expect(a).toBe("https://careers.example.com/apply?reference=REQ-1");
+    expect(a).not.toBe(b);
+    for (const key of ["referenceId", "refNo", "sourceId", "srcId"]) {
+      expect(canonicalizeUrl(`https://careers.example.com/apply?${key}=7`), key).toBe(`https://careers.example.com/apply?${key}=7`);
+    }
+    for (const key of ["utm_source", "utm_campaign", "gclid", "ref", "trk", "mc_cid", "_hsenc"]) {
+      expect(canonicalizeUrl(`https://careers.example.com/apply?id=1&${key}=x`), key).toBe("https://careers.example.com/apply?id=1");
+    }
+  });
+
   it("keeps the restricted-domain list in step with the site rules", () => {
     const list = restrictedDomains();
     for (const d of list) expect(["browser", "paste"], d).toContain(domainPolicy(new URL(`https://www.${d}/x`)).mode);
