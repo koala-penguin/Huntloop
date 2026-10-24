@@ -77,6 +77,43 @@ describe("browsing agent guard", () => {
     expect(refused("evaluate_script", {})).toMatch(/isn't available/);
   });
 
+  it("only lets Enter submit a search it just typed", () => {
+    const g = guard();
+    const ok = (name: string, input: Record<string, unknown>) => checkToolCall(name, input, g).ok;
+    const reason = (name: string, input: Record<string, unknown>) => {
+      const d = checkToolCall(name, input, g);
+      return d.ok ? null : d.reason;
+    };
+    const fill = () => ok("fill", { pageId: 1, uid: "1_5", value: "frontend" });
+
+    expect(ok("press_key", { pageId: 1, key: "Tab" })).toBe(false);
+    expect(ok("press_key", { pageId: 1, key: "Space" })).toBe(false);
+    expect(reason("press_key", { pageId: 1, key: "Enter" })).toMatch(/Only Enter/);
+
+    expect(fill()).toBe(true);
+    expect(ok("press_key", { pageId: 1, key: "Enter" })).toBe(true);
+    expect(ok("press_key", { pageId: 1, key: "Enter" })).toBe(false);
+
+    expect(fill()).toBe(true);
+    expect(ok("take_snapshot", { pageId: 1 })).toBe(true);
+    expect(ok("press_key", { pageId: 1, key: "Enter" })).toBe(true);
+
+    expect(fill()).toBe(true);
+    expect(ok("select_page", { pageId: 2 })).toBe(true);
+    expect(ok("press_key", { pageId: 1, key: "Enter" })).toBe(false);
+
+    expect(fill()).toBe(true);
+    expect(ok("click", { pageId: 1, uid: "1_2" })).toBe(true);
+    expect(ok("press_key", { pageId: 1, key: "Enter" })).toBe(false);
+
+    expect(fill()).toBe(true);
+    expect(ok("press_key", { pageId: 1, key: "Shift+Enter" })).toBe(false);
+    expect(ok("press_key", { pageId: 1, key: "Control+Enter" })).toBe(false);
+
+    expect(ok("fill", { pageId: 1, uid: "1_5", value: "frontend\n" })).toBe(false);
+    expect(ok("press_key", { pageId: 1, key: "Escape" })).toBe(true);
+  });
+
   it("turns a company domain into the employer's start page", () => {
     expect(employerUrlFrom("tidal.example")).toBe("https://tidal.example");
     expect(employerUrlFrom("http://127.0.0.1:3299/employer/")).toBe("http://127.0.0.1:3299/employer/");

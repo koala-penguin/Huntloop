@@ -70,7 +70,7 @@ const SYSTEM = `You browse job sites and employer career pages for a job seeker,
 
 How to browse:
 - Read pages with take_snapshot (an accessibility-tree text with element uids), then act with click / fill / press_key on uids from the latest snapshot of that page. new_page and navigate_page open URLs.
-- Use only the sites' search and navigation: type search terms into search boxes, press Enter, open result links, change search filters, go to the next page of results.
+- Use only the sites' search and navigation: type search terms into search boxes, press Enter right after typing, open result links, change search filters, go to the next page of results.
 - Never apply, sign in, create accounts, message, connect, follow, save jobs, upload anything, or submit any form other than a job search. Never type personal details. The browser refuses such actions anyway.
 - Stay on the allowed sites. Don't try to solve CAPTCHAs; if a site asks for a check or a sign-in, Huntloop pauses for the user — if it's still blocked, stop and report what you have.
 - Open each job's own page before reporting it: only URLs you actually opened count.

@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { canonicalizeUrl, domainPolicy } from "@/server/ingest/domain-policy";
-import { FetchBlockedError, isPrivateAddress, safeFetch, proxyConfigured } from "@/server/ingest/safe-fetch";
+import { canonicalizeUrl, domainPolicy, restrictedDomains } from "@/server/ingest/domain-policy";
+import { FetchBlockedError, guardedLookup, isPrivateAddress, safeFetch, proxyConfigured } from "@/server/ingest/safe-fetch";
 import { extractFromHtml, htmlToText } from "@/server/ingest/html";
 import { detectAtsUrl, fetchAtsBoardSummary, fetchAtsPosting } from "@/server/sources/ats";
 import { prepareScreenshot } from "@/server/ingest/images";
@@ -25,6 +25,15 @@ describe("domain policy", () => {
     expect(canonicalizeUrl("javascript:alert(1)")).toBeNull();
     expect(canonicalizeUrl("not a url")).toBeNull();
   });
+
+  it("keeps the restricted-domain list in step with the site rules", () => {
+    const list = restrictedDomains();
+    for (const d of list) expect(["browser", "paste"], d).toContain(domainPolicy(new URL(`https://www.${d}/x`)).mode);
+    for (const d of ["jobsdb.com", "monster.com", "glassdoor.com.au", "indeed.com.au", "jobstreet.com.my", "ziprecruiter.co.uk", "seek.com.au", "linkedin.com"]) {
+      expect(list, d).toContain(d);
+    }
+    expect(new Set(list).size).toBe(list.length);
+  });
 });
 
 describe("safe fetch", () => {
@@ -33,6 +42,42 @@ describe("safe fetch", () => {
       expect(isPrivateAddress(ip), ip).toBe(true);
     }
     for (const ip of ["1.1.1.1", "142.250.70.78", "2606:4700::1111"]) expect(isPrivateAddress(ip), ip).toBe(false);
+  });
+
+  it("sees through IPv6 forms that carry an IPv4 address", () => {
+    const priv = ["::ffff:7f00:1", "::ffff:a00:1", "::7f00:1", "64:ff9b::7f00:1", "2002:7f00:1::", "::ffff:0:7f00:1", "64:ff9b:1::a00:1", "::ffff:a9fe:a9fe", "fe80::1%en0", "::", "ff02::1"];
+    for (const ip of priv) expect(isPrivateAddress(ip), ip).toBe(true);
+    for (const ip of ["2001:4860:4860::8888", "::ffff:808:808", "2002:808:808::", "2606:4700::1111"]) expect(isPrivateAddress(ip), ip).toBe(false);
+  });
+
+  it("refuses an IPv4-mapped loopback written as an IPv6 literal", async () => {
+    await expect(safeFetch("http://[::ffff:127.0.0.1]/", { fetchImpl: okFetch("x") })).rejects.toMatchObject({ reason: "private_address" });
+  });
+
+  it("checks the address again when the connection is made", async () => {
+    type Fake = (host: string, options: object, cb: (...args: unknown[]) => void) => void;
+    const call = (fake: Fake, options: object) =>
+      new Promise<unknown[]>((resolve) => guardedLookup(fake as never)("jobs.example", options as never, ((...args: unknown[]) => resolve(args)) as never));
+    const all = (address: string): Fake => (_h, _o, cb) => cb(null, [{ address, family: 4 }]);
+
+    const [blocked] = await call(all("10.0.0.5"), { all: true });
+    expect(blocked).toBeInstanceOf(FetchBlockedError);
+    expect(blocked).toMatchObject({ reason: "private_address" });
+
+    const passed = await call(all("93.184.216.34"), { all: true });
+    expect(passed).toEqual([null, [{ address: "93.184.216.34", family: 4 }]]);
+
+    const [single] = await call(all("10.0.0.5"), {});
+    expect(single).toMatchObject({ reason: "private_address" });
+    const singleOk = await call(all("93.184.216.34"), {});
+    expect(singleOk).toEqual([null, "93.184.216.34", 4]);
+  });
+
+  it("reports a refused connection as a private address", async () => {
+    const failing = (async () => {
+      throw new TypeError("fetch failed", { cause: new FetchBlockedError("private_address") });
+    }) as unknown as typeof fetch;
+    await expect(safeFetch("https://jobs.example/", { fetchImpl: failing, resolve: async () => ["93.184.216.34"] })).rejects.toMatchObject({ reason: "private_address" });
   });
 
   const okFetch = (body: string, init: ResponseInit = {}) => (async () => new Response(body, { status: 200, ...init })) as unknown as typeof fetch;

@@ -5,31 +5,51 @@
  */
 export type DomainMode = "api" | "fetch" | "browser" | "paste";
 
-const RULES: Array<{ pattern: RegExp; mode: DomainMode; site: string }> = [
-  { pattern: /(^|\.)(boards|job-boards)(\.eu)?\.greenhouse\.io$/, mode: "api", site: "greenhouse" },
-  { pattern: /(^|\.)jobs(\.eu)?\.lever\.co$/, mode: "api", site: "lever" },
-  { pattern: /(^|\.)jobs\.ashbyhq\.com$/, mode: "api", site: "ashby" },
-  { pattern: /(^|\.)seek\.com\.au$|(^|\.)seek\.co\.nz$/, mode: "browser", site: "seek" },
-  { pattern: /(^|\.)linkedin\.com$/, mode: "browser", site: "linkedin" },
-  { pattern: /(^|\.)indeed\.[a-z.]+$/, mode: "paste", site: "indeed" },
-  { pattern: /(^|\.)glassdoor\.[a-z.]+$/, mode: "paste", site: "glassdoor" },
-  { pattern: /(^|\.)jora\.com$/, mode: "paste", site: "jora" },
-  { pattern: /(^|\.)jobstreet\.[a-z.]+$/, mode: "paste", site: "jobstreet" },
-  { pattern: /(^|\.)jobsdb\.com$/, mode: "paste", site: "jobsdb" },
-  { pattern: /(^|\.)ziprecruiter\.[a-z.]+$/, mode: "paste", site: "ziprecruiter" },
-  { pattern: /(^|\.)wellfound\.com$/, mode: "paste", site: "wellfound" },
-  { pattern: /(^|\.)monster\.[a-z.]+$/, mode: "paste", site: "monster" },
+/**
+ * One table for both consumers: `pattern` decides how the server may read a URL (wildcard TLDs, so
+ * an unlisted country site is still refused), `domains` lists the hosts Claude's own web tools must
+ * not fetch (tool allow/deny lists need literal domains).
+ */
+const SITES: Array<{ site: string; mode: DomainMode; pattern: RegExp; domains: string[] }> = [
+  { site: "greenhouse", mode: "api", pattern: /(^|\.)(boards|job-boards)(\.eu)?\.greenhouse\.io$/, domains: [] },
+  { site: "lever", mode: "api", pattern: /(^|\.)jobs(\.eu)?\.lever\.co$/, domains: [] },
+  { site: "ashby", mode: "api", pattern: /(^|\.)jobs\.ashbyhq\.com$/, domains: [] },
+  { site: "seek", mode: "browser", pattern: /(^|\.)seek\.com\.au$|(^|\.)seek\.co\.nz$/, domains: ["seek.com.au", "seek.co.nz"] },
+  { site: "linkedin", mode: "browser", pattern: /(^|\.)linkedin\.com$/, domains: ["linkedin.com"] },
+  {
+    site: "indeed",
+    mode: "paste",
+    pattern: /(^|\.)indeed\.[a-z.]+$/,
+    domains: ["indeed.com", "indeed.com.au", "indeed.co.nz", "indeed.com.sg", "indeed.co.uk", "indeed.ca", "indeed.co.in"],
+  },
+  {
+    site: "glassdoor",
+    mode: "paste",
+    pattern: /(^|\.)glassdoor\.[a-z.]+$/,
+    domains: ["glassdoor.com", "glassdoor.com.au", "glassdoor.co.uk", "glassdoor.ca", "glassdoor.co.in", "glassdoor.sg", "glassdoor.co.nz"],
+  },
+  { site: "jora", mode: "paste", pattern: /(^|\.)jora\.com$/, domains: ["jora.com"] },
+  {
+    site: "jobstreet",
+    mode: "paste",
+    pattern: /(^|\.)jobstreet\.[a-z.]+$/,
+    domains: ["jobstreet.com", "jobstreet.com.my", "jobstreet.com.sg", "jobstreet.com.ph", "jobstreet.co.id"],
+  },
+  { site: "jobsdb", mode: "paste", pattern: /(^|\.)jobsdb\.com$/, domains: ["jobsdb.com"] },
+  { site: "ziprecruiter", mode: "paste", pattern: /(^|\.)ziprecruiter\.[a-z.]+$/, domains: ["ziprecruiter.com", "ziprecruiter.co.uk", "ziprecruiter.ca"] },
+  { site: "wellfound", mode: "paste", pattern: /(^|\.)wellfound\.com$/, domains: ["wellfound.com"] },
+  { site: "monster", mode: "paste", pattern: /(^|\.)monster\.[a-z.]+$/, domains: ["monster.com", "monster.co.uk", "monster.ca", "monster.com.sg"] },
 ];
 
 export function domainPolicy(url: URL): { mode: DomainMode; site: string | null } {
   const host = url.hostname.toLowerCase();
-  const rule = RULES.find((r) => r.pattern.test(host));
+  const rule = SITES.find((r) => r.pattern.test(host));
   return rule ? { mode: rule.mode, site: rule.site } : { mode: "fetch", site: null };
 }
 
 /** Domains that must never be fetched by Claude's web_fetch either. */
 export function restrictedDomains(): string[] {
-  return ["seek.com.au", "seek.co.nz", "linkedin.com", "indeed.com", "glassdoor.com", "jora.com", "jobstreet.com", "ziprecruiter.com", "wellfound.com"];
+  return [...new Set(SITES.filter((s) => s.mode !== "api" && s.mode !== "fetch").flatMap((s) => s.domains))];
 }
 
 /** Strips tracking parameters so the same job is recognised again. */
