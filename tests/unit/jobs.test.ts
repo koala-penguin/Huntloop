@@ -194,6 +194,17 @@ describe("analysis and assessment helpers", () => {
     expect(profileHash(cv, data)).toBe(profileHash(cv, { ...data, workRights: [right("AU", "needs_sponsorship")] }));
     expect(profileHash(cv, data)).not.toBe(profileHash(`${cv}\nKubernetes`, data));
   });
+
+  it("keeps employment dates while redacting phone numbers", () => {
+    const data = profile({ basics: { ...profile().basics, phone: "+61 412 345 678" } }, [right("AU", "citizen")]);
+    const plain = profile({ basics: { ...profile().basics, phone: null } }, [right("AU", "citizen")]);
+    expect(redactContacts("Acme (2015-2019), 2019 - 2023, +61 412 345 678", plain)).toBe("Acme (2015-2019), 2019 - 2023, [phone]");
+    expect(redactContacts("Call (+61) 412-345-678 today", data)).toBe("Call [phone] today");
+    expect(redactContacts("Acme 2015.03 - 2019.06", plain)).toBe("Acme 2015.03 - 2019.06");
+    expect(redactContacts("Acme 2015-03 - 2019-06", plain)).toBe("Acme 2015-03 - 2019-06");
+    expect(redactContacts("Office +61 2 9123 4567", plain)).toBe("Office [phone]");
+    expect(redactContacts("Mobile 0412 345 678", plain)).toBe("Mobile [phone]");
+  });
 });
 
 describe("place labels", () => {

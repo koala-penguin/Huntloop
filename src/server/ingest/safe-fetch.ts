@@ -1,6 +1,7 @@
+import { lookup as dnsLookup, type LookupAddress, type LookupAllOptions, type LookupOptions } from "node:dns";
 import dns from "node:dns/promises";
 import net from "node:net";
-import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
+import { Agent, EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 
 /**
  * Server-side fetch for user-supplied URLs. Blocks private, loopback and link-local addresses
@@ -40,13 +41,68 @@ export function isPrivateAddress(address: string): boolean {
     );
   }
   if (net.isIPv6(address)) {
-    const v = address.toLowerCase();
-    if (v === "::" || v === "::1") return true;
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);
-    if (mapped) return isPrivateAddress(mapped[1]);
-    return /^f[cd]/.test(v) || /^fe[89ab]/.test(v) || v.startsWith("ff");
+    const h = expandIpv6(address);
+    if (!h) return true;
+    const zero = (from: number, to: number) => h.slice(from, to).every((x) => x === 0);
+    if (zero(0, 8)) return true; // ::
+    if (zero(0, 7) && h[7] === 1) return true; // ::1
+    const v4 = (hi: number, lo: number) => isPrivateAddress(`${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`);
+    if (zero(0, 5) && h[5] === 0xffff) return v4(h[6], h[7]); // ::ffff:0:0/96, IPv4-mapped
+    if (zero(0, 4) && h[4] === 0xffff && h[5] === 0) return v4(h[6], h[7]); // ::ffff:0:0:0/96, IPv4-translated
+    if (zero(0, 6)) return v4(h[6], h[7]); // ::/96, IPv4-compatible
+    if (h[0] === 0x64 && h[1] === 0xff9b && zero(2, 6)) return v4(h[6], h[7]); // 64:ff9b::/96, NAT64
+    if (h[0] === 0x64 && h[1] === 0xff9b && h[2] === 1) return true; // 64:ff9b:1::/48, local-use NAT64
+    if (h[0] === 0x2002) return v4(h[1], h[2]); // 2002::/16, 6to4
+    return (h[0] & 0xfe00) === 0xfc00 || (h[0] & 0xffc0) === 0xfe80 || (h[0] & 0xff00) === 0xff00;
   }
   return true;
+}
+
+/** The eight 16-bit groups of an IPv6 address, or null when it can't be read. */
+function expandIpv6(address: string): number[] | null {
+  let v = address.toLowerCase().replace(/%.*$/, "");
+  const dotted = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(v);
+  if (dotted) {
+    const o = dotted.slice(1).map(Number);
+    if (o.some((x) => x > 255)) return null;
+    v = v.slice(0, dotted.index) + `${((o[0] << 8) | o[1]).toString(16)}:${((o[2] << 8) | o[3]).toString(16)}`;
+  }
+  const halves = v.split("::");
+  if (halves.length > 2) return null;
+  const groups = (part: string) => (part ? part.split(":") : []);
+  const head = groups(halves[0]);
+  const tail = halves.length === 2 ? groups(halves[1]) : [];
+  const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
+  if (fill < 0 || (halves.length === 2 && fill < 1)) return null;
+  const all = [...head, ...Array<string>(fill).fill("0"), ...tail];
+  if (all.length !== 8 || all.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return null;
+  return all.map((g) => parseInt(g, 16));
+}
+
+type LookupCallback = (error: NodeJS.ErrnoException | null, address: string | LookupAddress[], family?: number) => void;
+type LookupFn = (hostname: string, options: LookupOptions, callback: LookupCallback) => void;
+
+/**
+ * A connect-time `lookup` that refuses private addresses. assertPublic resolves the name once
+ * before the request; the connection resolves it again, so a name that changes its answer in
+ * between (DNS rebinding) is caught here.
+ */
+export function guardedLookup(lookup: typeof dnsLookup = dnsLookup): LookupFn {
+  return (hostname, options, callback) => {
+    const opts = (typeof options === "object" && options ? options : {}) as LookupOptions;
+    (lookup as (h: string, o: LookupAllOptions, cb: (e: NodeJS.ErrnoException | null, a: LookupAddress[]) => void) => void)(
+      hostname,
+      { ...opts, all: true },
+      (error, addresses) => {
+        if (error) return callback(error, []);
+        if (!addresses.length || addresses.some((a) => isPrivateAddress(a.address))) {
+          return callback(new FetchBlockedError("private_address") as unknown as NodeJS.ErrnoException, []);
+        }
+        if (opts.all) return callback(null, addresses);
+        callback(null, addresses[0].address, addresses[0].family);
+      },
+    );
+  };
 }
 
 export type Resolver = (host: string) => Promise<string[]>;
@@ -59,10 +115,20 @@ export function proxyConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 let proxiedFetch: typeof fetch | null = null;
+let guardedFetch: typeof fetch | null = null;
 
-/** Node's built-in fetch ignores proxy variables; with a proxy configured, requests go through it. */
+/**
+ * Node's built-in fetch ignores proxy variables; with a proxy configured, requests go through it
+ * (the proxy resolves names). Without one, every connection re-checks the address it resolves to.
+ */
 export function outboundFetch(): typeof fetch {
-  if (!proxyConfigured()) return fetch;
+  if (!proxyConfigured()) {
+    if (!guardedFetch) {
+      const dispatcher = new Agent({ connect: { lookup: guardedLookup() as never } });
+      guardedFetch = ((input: string | URL, init?: RequestInit) => undiciFetch(input, { ...(init as object), dispatcher } as never)) as unknown as typeof fetch;
+    }
+    return guardedFetch;
+  }
   if (!proxiedFetch) {
     const dispatcher = new EnvHttpProxyAgent();
     proxiedFetch = ((input: string | URL, init?: RequestInit) => undiciFetch(input, { ...(init as object), dispatcher } as never)) as unknown as typeof fetch;
@@ -135,6 +201,8 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
         },
       });
     } catch (error) {
+      // undici reports a refused connect-time lookup as TypeError("fetch failed", { cause }).
+      if (error instanceof Error && error.cause instanceof FetchBlockedError) throw error.cause;
       if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new FetchBlockedError("timeout");
       throw error;
     }

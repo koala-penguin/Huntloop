@@ -104,18 +104,28 @@ export function adzunaResultToLead(result: Json, country: string): JobLead {
 export type AdzunaFetcher = (url: string) => Promise<unknown>;
 const defaultFetcher: AdzunaFetcher = async (url) => JSON.parse((await safeFetch(url, { accept: "application/json" })).body);
 
-/** Runs the queries (respecting quotas) and returns leads; stops early when a quota is hit. */
-export async function searchAdzuna(db: Db, filters: SearchFilters, fetcher: AdzunaFetcher = defaultFetcher): Promise<JobLead[]> {
+/**
+ * Runs the queries (respecting quotas) and returns the leads found. When a quota runs out part way
+ * it stops there and keeps what it has, with `quotaHit` set.
+ */
+export async function searchAdzuna(db: Db, filters: SearchFilters, fetcher: AdzunaFetcher = defaultFetcher): Promise<{ leads: JobLead[]; quotaHit: boolean }> {
   const credentials = adzunaCredentials();
-  if (!credentials) return [];
+  if (!credentials) return { leads: [], quotaHit: false };
   const leads: JobLead[] = [];
+  let quotaHit = false;
   for (const query of buildAdzunaQueries(filters)) {
-    takeAdzunaCall(db);
+    try {
+      takeAdzunaCall(db);
+    } catch (error) {
+      if (!(error instanceof SourceQuotaError)) throw error;
+      quotaHit = true;
+      break;
+    }
     const data = (await fetcher(adzunaUrl(query, credentials))) as Json;
     for (const result of (data.results as Json[] | undefined) ?? []) {
       const lead = adzunaResultToLead(result, query.country);
       if (lead.url && lead.title) leads.push(lead);
     }
   }
-  return leads;
+  return { leads, quotaHit };
 }

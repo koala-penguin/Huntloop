@@ -316,7 +316,8 @@
     "cli_missing": "Claude Code isn't installed (or not where HUNTLOOP_CLAUDE_PATH points). Install it, or switch to the API key in Settings.",
     "cli_login": "Claude Code isn't signed in. Run “claude auth login” in a terminal, then try again.",
     "subscription_limit": "Your Claude subscription's usage limit has been reached. Try again after it resets, or switch to the API key in Settings.",
-    "model_unavailable": "That model isn't available on your plan. Choose another model for this task in Settings."
+    "model_unavailable": "That model isn't available on your plan. Choose another model for this task in Settings.",
+    "interrupted": "Huntloop was closed before this finished. Try again."
   },
   "profile": {
     "title": "Your profile",
@@ -879,7 +880,8 @@
       "cli_missing": "Claude Code isn't installed. Install it, or switch to the API key in Settings.",
       "cli_login": "Claude Code isn't signed in. Run “claude auth login” in a terminal, then try again.",
       "subscription_limit": "Your Claude subscription's usage limit has been reached. Try again after it resets, or switch to the API key.",
-      "model_unavailable": "The chat's model isn't available on your plan. Start a new conversation after choosing another model in Settings."
+      "model_unavailable": "The chat's model isn't available on your plan. Start a new conversation after choosing another model in Settings.",
+      "session_expired": "This conversation can't be continued after the update. Start a new conversation to keep chatting."
     },
     "activity": {
       "web_search": "Searched the web: {detail}",
@@ -999,6 +1001,7 @@
     "runAgain": "Run again",
     "summaryTitle": "Last run",
     "sourceLeads": "{source}: {count, plural, one {# job found} other {# jobs found}}",
+    "sourceLeadsPartial": "{source}: {count, plural, one {# job found} other {# jobs found}} — stopped early at the request limit",
     "sourceError": "{source}: {error}",
     "sourceErrorReason": {
       "quota": "the daily or monthly limit has been reached; try again later",
@@ -1436,5 +1439,17 @@
     },
     "limitReached": "The usage limit is reached. Background work resumes after {time}.",
     "limitsAsOf": "Limits as Claude Code last reported them ({time})."
+  },
+  "browserNotes": {
+    "opening": "Opening {host}",
+    "reading": "Reading the page",
+    "searching": "Searching for “{query}”",
+    "following": "Following a link",
+    "browsing": "Browsing…",
+    "agentFallback": "{site}: no job links found; the browsing agent will try",
+    "siteBrowsing": "{site}: browsing",
+    "blocked": "{site}: {kind, select, captcha {CAPTCHA} login {sign-in required} checkpoint {security check} other {check needed}} — waiting for you",
+    "jobLinks": "{site}: {count} job links",
+    "read": "{site}: read {done} of {total}"
   }
 }

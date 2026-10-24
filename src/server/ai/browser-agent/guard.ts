@@ -32,13 +32,20 @@ const BLOCKED_LABEL =
 const CLICKABLE_ROLES = new Set(["link", "button", "tab", "menuitem", "menuitemradio", "option", "combobox", "checkbox", "radio", "listitem", "treeitem", "switch", "StaticText", "heading", "gridcell", "cell", "row"]);
 const SEARCH_FIELD = /search|keyword|what|job|title|role|position|where|location|suburb|city|state|postcode|zip|query|find|filter|검색|지역|직무|키워드/i;
 const PRIVATE_FIELD = /password|e-?mail|phone|mobile|first name|last name|full name|address|card|cvv|birth|resume|cv\b|cover letter|비밀번호|이메일|전화|이름|주소/i;
-const ALLOWED_KEYS = new Set(["Enter", "Tab", "Escape", "ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "PageDown", "PageUp", "Home", "End", "Space"]);
+const ALLOWED_KEYS = new Set(["Enter", "Escape", "ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "PageDown", "PageUp", "Home", "End"]);
+/** Reads of the current page; they don't change what Enter would act on. */
+const KEEPS_LAST_ACTION = new Set<AgentTool>(["take_snapshot", "wait_for", "list_pages"]);
 
 export interface GuardState {
   /** Latest snapshot per page id (uids are only valid for the page they came from). */
   snapshots: Map<number, Map<string, SnapshotElement>>;
   /** Hosts the agent may open (suffix match: "seek.com.au" allows "www.seek.com.au"). */
   isAllowedHost: (host: string) => boolean;
+  /**
+   * The last approved call that changes the page or which page is selected. Enter is only allowed
+   * right after a fill, so it submits the search just typed and nothing else.
+   */
+  lastAction?: AgentTool;
 }
 
 export type GuardDecision = { ok: true; input: Record<string, unknown> } | { ok: false; reason: string };
@@ -71,6 +78,12 @@ function element(state: GuardState, input: Record<string, unknown>): SnapshotEle
 }
 
 export function checkToolCall(name: string, rawInput: unknown, state: GuardState): GuardDecision {
+  const decision = decide(name, rawInput, state);
+  if (decision.ok && !KEEPS_LAST_ACTION.has(name as AgentTool)) state.lastAction = name as AgentTool;
+  return decision;
+}
+
+function decide(name: string, rawInput: unknown, state: GuardState): GuardDecision {
   if (!(AGENT_TOOLS as readonly string[]).includes(name)) return { ok: false, reason: `The ${name} tool isn't available.` };
   const input = { ...((rawInput ?? {}) as Record<string, unknown>) };
   const deny = (reason: string): GuardDecision => ({ ok: false, reason });
@@ -122,12 +135,16 @@ export function checkToolCall(name: string, rawInput: unknown, state: GuardState
       if (PRIVATE_FIELD.test(el.name)) return deny("Never type into account, contact or application fields.");
       if (el.role !== "searchbox" && !SEARCH_FIELD.test(el.name)) return deny(`"${el.name}" doesn't look like a job search field.`);
       const value = String(input.value ?? "");
-      if (value.length > 120 || /@|\d{6,}/.test(value)) return deny("Only type short search terms (no contact details).");
+      if (value.length > 120 || /@|\d{6,}|[\u0000-\u001f\u007f]/.test(value)) return deny("Only type short search terms (no contact details).");
       return { ok: true, input };
     }
-    case "press_key":
-      if (!ALLOWED_KEYS.has(String(input.key))) return deny("Only Enter, Tab, Escape, arrow and paging keys are allowed.");
+    case "press_key": {
+      const key = String(input.key);
+      const refusal = "Only Enter right after typing into a search field, Escape, arrow and paging keys are allowed.";
+      if (!ALLOWED_KEYS.has(key)) return deny(refusal);
+      if (key === "Enter" && state.lastAction !== "fill") return deny(refusal);
       return { ok: true, input };
+    }
     case "wait_for":
       input.timeout = Math.min(Number(input.timeout) || 10_000, 10_000);
       return { ok: true, input };

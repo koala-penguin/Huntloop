@@ -32,7 +32,7 @@ export async function searchBrowserSite(
   if (leads.length || stats.blocked || stats.resultPages === 0 || !all.agent.enabled || !all.agent.fallback) return leads;
   const start = adapter.queries(filters)[0]?.pageUrl(0);
   if (!start) return leads;
-  run.note?.(`${site}: no job links found; the browsing agent will try`);
+  run.note?.({ key: "agentFallback", params: { site } });
   const { runBrowserAgent } = await import("../../ai/browser-agent/agent");
   const result = await runBrowserAgent(
     ctx,
@@ -62,7 +62,7 @@ export async function searchOtherSites(ctx: AiContext, filters: SearchFilters, r
   const { runBrowserAgent } = await import("../../ai/browser-agent/agent");
   const leads: JobLead[] = [];
   for (const site of agent.sites.slice(0, 3)) {
-    run.note?.(`${site.name}: browsing`);
+    run.note?.({ key: "siteBrowsing", params: { site: site.name } });
     const result = await runBrowserAgent(
       ctx,
       { kind: "search", site, filters, maxJobs: agent.maxJobs, source: "browser_agent" },

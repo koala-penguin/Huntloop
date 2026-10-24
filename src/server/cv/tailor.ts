@@ -85,9 +85,11 @@ export async function tailorCvForJob(ctx: AiContext, jobId: number, options: Tai
   const { output, model } = await writeTailoredCv(ctx, input, plan, previous && options.revise ? { draft: previous.content, instructions: options.revise.instructions } : undefined);
 
   options.onStage?.("checking");
+  // With the plan known, the full do-not-claim list (the prompt's `base` had no plan yet).
+  const doNotClaim = buildProvenanceContext(c.profile, { analysis: c.fit.analysis, score: c.fit.score, plan }).doNotClaim;
   const { doc, dropped, languageFallback } = assembleCv({
     profile: c.profile,
-    job: { country: c.job.country, postingLanguage: c.fit.analysis.language, keywords: postingKeywords(c.fit.analysis) },
+    job: { country: c.job.country, postingLanguage: c.fit.analysis.language, keywords: postingKeywords(c.fit.analysis), doNotClaim },
     plan,
     output,
   });

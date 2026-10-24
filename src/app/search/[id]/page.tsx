@@ -92,7 +92,9 @@ export default async function SearchDetailPage({ params }: PageProps<"/search/[i
                       source: t(`source.${source}`),
                       error: t(`sourceErrorReason.${["quota", "budget", "refusal", "browser_unavailable", "subscription_limit", "cli_login", "cli_missing"].includes(s!.error) ? s!.error : "other"}`),
                     })
-                  : t("sourceLeads", { source: t(`source.${source}`), count: s!.leads })}
+                  : s!.partial === "quota"
+                    ? t("sourceLeadsPartial", { source: t(`source.${source}`), count: s!.leads })
+                    : t("sourceLeads", { source: t(`source.${source}`), count: s!.leads })}
               </li>
             ))}
             <li>{t("summaryCounts", { unique: summary.unique, known: summary.known, screened: summary.screened, deep: summary.deep })}</li>

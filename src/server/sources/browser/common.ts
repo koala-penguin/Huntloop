@@ -8,13 +8,14 @@ import { pause } from "../../browser/pacing";
 import { withBrowserPage } from "../../browser/service";
 import { extractFromHtml, htmlToText, type PostingHints } from "../../ingest/html";
 import type { JobLead } from "../types";
+import type { ProgressNoteLike } from "@/shared/progress-note";
 
 export interface BrowserRunContext {
   signal?: AbortSignal;
   /** Job pages to open at most (per site, per run). */
   maxPages: number;
   waitForUser?: TaskContext["waitForUser"];
-  note?: (text: string) => void;
+  note?: (text: ProgressNoteLike) => void;
   /** Filled in by a run: results pages loaded, job links found, whether a wall stopped it. */
   stats?: { resultPages: number; jobLinks: number; blocked: boolean };
 }
@@ -64,7 +65,7 @@ export async function clearBlocks(page: Page, site: BrowserSite, ctx: BrowserRun
   const block = await detectBlock(page);
   if (!block) return true;
   if (!ctx.waitForUser) return false;
-  ctx.note?.(`${site}: ${block}`);
+  ctx.note?.({ key: "blocked", params: { site, kind: block } });
   const answer = await ctx.waitForUser({ kind: block, site, url: page.url() }, async () => !(await detectBlock(page)));
   if (answer === "skipped") return false;
   if (await detectBlock(page)) {
@@ -175,7 +176,7 @@ export async function runSiteSearch(adapter: SiteAdapter, filters: SearchFilters
           if (found.size >= ctx.maxPages) break;
         }
         if (ctx.stats) ctx.stats.jobLinks = found.size;
-        ctx.note?.(`${adapter.site}: ${found.size} job links`);
+        ctx.note?.({ key: "jobLinks", params: { site: adapter.site, count: found.size } });
         if (added === 0) break; // no more results
       }
     }
@@ -188,7 +189,7 @@ export async function runSiteSearch(adapter: SiteAdapter, filters: SearchFilters
       const captured = await adapter.capture(page);
       if (captured.text.length < 100) continue;
       leads.push(toLead(adapter, id, url, url.from, captured));
-      ctx.note?.(`${adapter.site}: read ${leads.length} of ${found.size}`);
+      ctx.note?.({ key: "read", params: { site: adapter.site, done: leads.length, total: found.size } });
     }
     return leads;
   });

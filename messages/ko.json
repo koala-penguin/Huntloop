@@ -316,7 +316,8 @@
     "cli_missing": "Claude Code가 설치되어 있지 않습니다(또는 HUNTLOOP_CLAUDE_PATH 경로에 없습니다). 설치하거나 설정에서 API 키로 전환하세요.",
     "cli_login": "Claude Code에 로그인되어 있지 않습니다. 터미널에서 “claude auth login”을 실행한 뒤 다시 시도하세요.",
     "subscription_limit": "Claude 구독 사용 한도에 도달했습니다. 한도가 초기화된 뒤 다시 시도하거나 설정에서 API 키로 전환하세요.",
-    "model_unavailable": "현재 플랜에서는 이 모델을 쓸 수 없습니다. 설정에서 이 작업의 모델을 바꾸세요."
+    "model_unavailable": "현재 플랜에서는 이 모델을 쓸 수 없습니다. 설정에서 이 작업의 모델을 바꾸세요.",
+    "interrupted": "작업이 끝나기 전에 Huntloop가 종료되었습니다. 다시 시도하세요."
   },
   "profile": {
     "title": "내 프로필",
@@ -879,7 +880,8 @@
       "cli_missing": "Claude Code가 설치되어 있지 않습니다. 설치하거나 설정에서 API 키로 전환하세요.",
       "cli_login": "Claude Code에 로그인되어 있지 않습니다. 터미널에서 “claude auth login”을 실행한 뒤 다시 시도하세요.",
       "subscription_limit": "Claude 구독 사용 한도에 도달했습니다. 한도가 초기화된 뒤 다시 시도하거나 API 키로 전환하세요.",
-      "model_unavailable": "이 대화의 모델을 현재 플랜에서 쓸 수 없습니다. 설정에서 다른 모델을 고른 뒤 새 대화를 시작하세요."
+      "model_unavailable": "이 대화의 모델을 현재 플랜에서 쓸 수 없습니다. 설정에서 다른 모델을 고른 뒤 새 대화를 시작하세요.",
+      "session_expired": "업데이트 이후 이 대화는 이어갈 수 없습니다. 새 대화를 시작해 주세요."
     },
     "activity": {
       "web_search": "웹 검색: {detail}",
@@ -999,6 +1001,7 @@
     "runAgain": "다시 검색",
     "summaryTitle": "마지막 실행",
     "sourceLeads": "{source}: 공고 {count}개 발견",
+    "sourceLeadsPartial": "{source}: {count}개 발견 — 요청 한도로 일부만 가져옴",
     "sourceError": "{source}: {error}",
     "sourceErrorReason": {
       "quota": "일일 또는 월간 한도에 도달했습니다. 나중에 다시 시도하세요",
@@ -1436,5 +1439,17 @@
     },
     "limitReached": "사용 한도에 도달했습니다. 백그라운드 작업은 {time} 이후에 다시 시작됩니다.",
     "limitsAsOf": "Claude Code가 마지막으로 알려준 한도입니다({time})."
+  },
+  "browserNotes": {
+    "opening": "{host} 여는 중",
+    "reading": "페이지를 읽는 중",
+    "searching": "“{query}” 검색 중",
+    "following": "링크를 따라가는 중",
+    "browsing": "탐색 중…",
+    "agentFallback": "{site}: 공고 링크를 찾지 못해 브라우징 에이전트가 시도합니다",
+    "siteBrowsing": "{site}: 탐색 중",
+    "blocked": "{site}: {kind, select, captcha {CAPTCHA} login {로그인 필요} checkpoint {보안 확인} other {확인 필요}} — 사용자 확인 대기 중",
+    "jobLinks": "{site}: 공고 링크 {count}개",
+    "read": "{site}: {total}개 중 {done}개 읽음"
   }
 }

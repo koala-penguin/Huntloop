@@ -129,6 +129,7 @@ export async function runCliChatTurn(turn: CliChatTurn): Promise<string> {
 
   const toolNames = mcpTools.map((t) => t.name);
   const note = toolNames.length ? `\n- Huntloop's own tools carry the prefix ${MCP_PREFIX} (for example ${toolNames[0]} is ${MCP_PREFIX}${toolNames[0]}).` : "";
+  const session = conversation.providerSession ? ({ mode: "resume", id: conversation.providerSession } as const) : ({ mode: "new", id: randomUUID() } as const);
   try {
     const run = await runClaudeCode({
       model: conversation.model,
@@ -141,9 +142,16 @@ export async function runCliChatTurn(turn: CliChatTurn): Promise<string> {
       mcpServers: mcpServersFor(mcp.token),
       maxTurns: 12,
       partialMessages: true,
-      session: conversation.providerSession ? { mode: "resume", id: conversation.providerSession } : { mode: "new", id: randomUUID() },
+      session,
       signal: ctx.signal,
       onEvent,
+    }).catch((error: unknown) => {
+      // The CLI can't find the saved session (measured text, Claude Code 2.1.310). Say so instead of
+      // quietly starting over: the panel still shows the earlier turns Claude would have forgotten.
+      if (session.mode === "resume" && error instanceof AiError && /no conversation found with session id/i.test(`${error.message}\n${String(error.detail ?? "")}`)) {
+        throw new AiError("session_expired", "This conversation can't be continued in Claude Code");
+      }
+      throw error;
     });
     logCliUsage(ctx, turn.task, conversation.model, run);
     if (isRefusal(run)) throw new AiError("refusal", "Claude declined to answer");

@@ -66,13 +66,28 @@ export function profileHash(cvText: string, data: ProfileData): string {
 
 /** Strips the candidate's name, email, phone and links before the CV leaves the machine for assessment. */
 export function redactContacts(cvText: string, data: ProfileData): string {
-  let text = cvText
+  let text = cvText;
+  // The profile's own number first, however it is spaced or bracketed in the CV.
+  const digits = data.basics.phone?.replace(/\D/g, "");
+  if (digits && digits.length >= 6) text = text.replace(new RegExp(`(?<!\\d)\\(?\\+?\\(?${[...digits].join("[\\s().-]*")}(?!\\d)`, "g"), "[phone]");
+  text = text
     .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, "[email]")
-    .replace(/(\+?\d[\d\s().-]{7,}\d)/g, (m) => (m.replace(/\D/g, "").length >= 8 ? "[phone]" : m))
+    .replace(/(\+?\d[\d\s().-]{7,}\d)/g, (m) => (looksLikePhone(m) ? "[phone]" : m))
     .replace(/\bhttps?:\/\/\S+|\b(?:www\.)?linkedin\.com\/\S+|\bgithub\.com\/\S+/gi, "[link]");
   const name = data.basics.name?.trim();
   if (name && name.length > 2) text = text.split(name).join("[name]");
   return text;
+}
+
+const isYear = (chunk: string) => /^(19|20)\d{2}$/.test(chunk);
+const isMonth = (chunk: string) => /^(0?[1-9]|1[0-2])$/.test(chunk);
+
+/** 8+ digits, and not a run of dates ("2015-2019", "2019 - 2023", "2015.03 - 2019.06"). */
+function looksLikePhone(match: string): boolean {
+  if (match.replace(/\D/g, "").length < 8) return false;
+  const chunks = match.match(/\d+/g) ?? [];
+  const dates = chunks.every((c) => isYear(c) || isMonth(c)) && chunks.filter(isYear).length >= 2;
+  return !dates;
 }
 
 /** Requirements code decides on its own (work rights, location) are not sent for assessment. */

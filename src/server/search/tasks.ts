@@ -16,7 +16,7 @@ function searchTasks(db: Db, userId: number, searchId: number, statuses: string[
 }
 
 export function activeSearchTask(db: Db, userId: number, searchId: number): number | null {
-  return searchTasks(db, userId, searchId, ["queued", "running"]).get()?.id ?? null;
+  return searchTasks(db, userId, searchId, ["queued", "running", "needs_user_action"]).get()?.id ?? null;
 }
 
 /** The latest finished run, for "new since last run". */

@@ -19,13 +19,14 @@ import { getSourceSettings } from "../repo/settings";
 import { TaskCancelledError, type TaskContext } from "../tasks/runner";
 import { searchBrowserSite, searchOtherSites } from "../sources/browser";
 import { mapLimit } from "./limit";
+import { sameNote, type ProgressNoteLike } from "@/shared/progress-note";
 
 export type SearchStage = "planning" | "sourcing" | "filtering" | "screening" | "deep" | "done";
 
 export interface SearchProgress {
   stage: SearchStage;
   counts: { leads: number; unique: number; screened: number; toScreen: number; deep: number; toDeep: number };
-  notes: string[];
+  notes: ProgressNoteLike[];
 }
 
 export interface SearchRunOptions {
@@ -163,8 +164,8 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
   const caps = settingsFor(ctx).search;
   const progress: SearchProgress = { stage: "planning", counts: { leads: 0, unique: 0, screened: 0, toScreen: 0, deep: 0, toDeep: 0 }, notes: [] };
   const emit = () => options.onProgress?.(structuredClone(progress));
-  const note = (text: string) => {
-    if (progress.notes.at(-1) === text) return;
+  const note = (text: ProgressNoteLike) => {
+    if (sameNote(progress.notes.at(-1), text)) return;
     progress.notes = [...progress.notes, text].slice(-6);
     emit();
   };
@@ -188,10 +189,18 @@ export async function runSearch(ctx: AiContext, searchId: number, options: Searc
   const sources = (search.sources as SearchSource[]).filter((s) => !options.apiOnly || UNATTENDED_SOURCES.includes(s));
   for (const source of sources) {
     try {
+      if (source === "adzuna") {
+        const adzuna = await searchAdzuna(ctx.db, filters, options.adzunaFetcher);
+        leads.push(...adzuna.leads);
+        // Out of quota before the first call: the same "quota" error as before. Part way: keep what came back.
+        summary.sources.adzuna =
+          adzuna.quotaHit && !adzuna.leads.length ? { leads: 0, error: "quota" } : { leads: adzuna.leads.length, error: null, ...(adzuna.quotaHit ? { partial: "quota" as const } : {}) };
+        progress.counts.leads = leads.length;
+        emit();
+        continue;
+      }
       const found =
-        source === "adzuna"
-          ? await searchAdzuna(ctx.db, filters, options.adzunaFetcher)
-          : source === "seek" || source === "linkedin"
+        source === "seek" || source === "linkedin"
             ? await searchBrowserSite(ctx, source, filters, { signal: ctx.signal, waitForUser: options.waitForUser, note })
             : source === "browser_agent"
               ? await searchOtherSites(ctx, filters, { signal: ctx.signal, waitForUser: options.waitForUser, note })

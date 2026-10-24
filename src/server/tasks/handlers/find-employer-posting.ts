@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sameNote, type ProgressNoteLike } from "@/shared/progress-note";
 import { runBrowserAgent } from "../../ai/browser-agent/agent";
 import { getJob, updateJob } from "../../repo/jobs";
 import { getCompany } from "../../research/company";
@@ -29,7 +30,7 @@ export async function runFindEmployerPosting(ctx: TaskContext): Promise<{ found:
   if (!getSourceSettings(ctx.db, ctx.userId).agent.enabled) throw new UserFacingError("agent_disabled");
   if (!job.companyName || !job.title) throw new UserFacingError("no_company");
   const company = job.companyId ? getCompany(ctx.db, ctx.userId, job.companyId) : undefined;
-  const notes: string[] = [];
+  const notes: ProgressNoteLike[] = [];
   ctx.progress({ stage: "browsing", notes });
 
   const result = await runBrowserAgent(
@@ -40,7 +41,7 @@ export async function runFindEmployerPosting(ctx: TaskContext): Promise<{ found:
       waitForUser: ctx.waitForUser,
       maxSteps: 20,
       onProgress: (note) => {
-        if (notes.at(-1) === note) return;
+        if (sameNote(notes.at(-1), note)) return;
         notes.push(note);
         ctx.progress({ stage: "browsing", notes: notes.slice(-6) });
       },

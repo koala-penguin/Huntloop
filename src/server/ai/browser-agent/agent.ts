@@ -19,6 +19,7 @@ import { cliSources, cliToolNote } from "../claude-code/agent";
 import { cliJsonSchema, isRefusal, logCliUsage } from "../claude-code/structured";
 import { MCP_PREFIX, mcpServersFor, openMcpRun } from "../claude-code/mcp-runs";
 import { checkToolCall, hostAllowList, parseSnapshot, selectedPageId, type GuardState } from "./guard";
+import type { ProgressNote, ProgressNoteLike } from "@/shared/progress-note";
 
 export type AgentGoal =
   | { kind: "search"; site: { name: string; url: string }; filters: SearchFilters; maxJobs: number; source: JobLead["source"] }
@@ -27,7 +28,7 @@ export type AgentGoal =
 export interface AgentRunOptions {
   signal?: AbortSignal;
   waitForUser?: TaskContext["waitForUser"];
-  onProgress?: (note: string) => void;
+  onProgress?: (note: ProgressNoteLike) => void;
   maxSteps?: number;
 }
 
@@ -70,7 +71,7 @@ const SYSTEM = `You browse job sites and employer career pages for a job seeker,
 
 How to browse:
 - Read pages with take_snapshot (an accessibility-tree text with element uids), then act with click / fill / press_key on uids from the latest snapshot of that page. new_page and navigate_page open URLs.
-- Use only the sites' search and navigation: type search terms into search boxes, press Enter, open result links, change search filters, go to the next page of results.
+- Use only the sites' search and navigation: type search terms into search boxes, press Enter right after typing, open result links, change search filters, go to the next page of results.
 - Never apply, sign in, create accounts, message, connect, follow, save jobs, upload anything, or submit any form other than a job search. Never type personal details. The browser refuses such actions anyway.
 - Stay on the allowed sites. Don't try to solve CAPTCHAs; if a site asks for a check or a sign-in, Huntloop pauses for the user — if it's still blocked, stop and report what you have.
 - Open each job's own page before reporting it: only URLs you actually opened count.
@@ -131,9 +132,14 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
     const bridge = await McpBrowserBridge.start(devtoolsUrl);
     const guard: GuardState = { snapshots: new Map(), isAllowedHost };
     const visited = new Set<string>();
-    const note = (text: string) => options.onProgress?.(text);
+    const note = (text: ProgressNoteLike) => options.onProgress?.(text);
     let refused = 0;
     let steps = 0;
+    // On the subscription, a run waiting for the user hands its CLI slot to other work meanwhile.
+    let yieldSlot: (<T>(fn: () => Promise<T>) => Promise<T>) | null = null;
+    const userWait = options.waitForUser;
+    const waitForUser: AgentRunOptions["waitForUser"] = userWait && ((reason, isResolved) => (yieldSlot ? yieldSlot(() => userWait(reason, isResolved)) : userWait(reason, isResolved)));
+    const runOptions: AgentRunOptions = { ...options, waitForUser };
     /** One browser action: the guard first, then the browser, then what navigation changed. */
     const runGuarded = async (name: string, input: Record<string, unknown>): Promise<{ text: string; isError: boolean }> => {
       if (options.signal?.aborted) throw new TaskCancelledError();
@@ -142,13 +148,13 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
         refused++;
         return { text: `Refused: ${decision.reason}`, isError: true };
       }
-      note(describe(name, decision.input));
+      note(describeAction(name, decision.input));
       const out = await bridge.call(name, decision.input);
       if (!out.isError && out.text.includes("uid=")) {
         const page = Number(decision.input.pageId ?? selectedPageId(out.text));
         if (Number.isFinite(page)) guard.snapshots.set(page, parseSnapshot(out.text));
       }
-      const extra = NAVIGATING.has(name) ? await afterNavigation(browser, guard, visited, options) : [];
+      const extra = NAVIGATING.has(name) ? await afterNavigation(browser, guard, visited, runOptions) : [];
       return { text: [out.text, ...extra].join("\n"), isError: out.isError };
     };
     try {
@@ -175,6 +181,9 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
             jsonSchema: cliJsonSchema(leadsSchema),
             maxTurns: (options.maxSteps ?? 30) + 5,
             signal: options.signal,
+            onSlot: (y) => {
+              yieldSlot = y;
+            },
             onEvent: (event) => {
               if (event.type === "system" && event.subtype === "task_summary" && typeof event.detail === "string" && event.detail.trim()) note(event.detail.trim());
               if (event.type !== "assistant" && event.type !== "user") return;
@@ -185,7 +194,7 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
           });
           logCliUsage(ctx, "browserAgent", call.model, run);
           if (isRefusal(run)) throw new AiError("refusal", "Claude declined this browsing task");
-          return { ...(await acceptLeads(browser, goal, run.result.structured_output, visited, options)), refused, steps };
+          return { ...(await acceptLeads(browser, goal, run.result.structured_output, visited, runOptions)), refused, steps };
         } catch (error) {
           if (options.signal?.aborted) throw new TaskCancelledError();
           throw error;
@@ -260,12 +269,16 @@ export async function runBrowserAgent(ctx: AiContext, goal: AgentGoal, options: 
   });
 }
 
-function describe(name: string, input: Record<string, unknown>): string {
-  if (name === "new_page" || (name === "navigate_page" && input.type === "url")) return `Opening ${hostOf(String(input.url)) ?? "a page"}`;
-  if (name === "take_snapshot") return "Reading the page";
-  if (name === "fill") return `Searching for “${String(input.value).slice(0, 60)}”`;
-  if (name === "click") return "Following a link";
-  return name.replace(/_/g, " ");
+/** The progress note for one approved browser action (rendered from the `browserNotes` catalog). */
+export function describeAction(name: string, input: Record<string, unknown>): ProgressNote {
+  if (name === "new_page" || (name === "navigate_page" && input.type === "url")) {
+    const host = hostOf(String(input.url));
+    return host ? { key: "opening", params: { host } } : { key: "browsing" };
+  }
+  if (name === "take_snapshot") return { key: "reading" };
+  if (name === "fill") return { key: "searching", params: { query: String(input.value).slice(0, 60) } };
+  if (name === "click") return { key: "following" };
+  return { key: "browsing" };
 }
 
 /**

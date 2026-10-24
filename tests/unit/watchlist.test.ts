@@ -68,6 +68,24 @@ describe("job boards", () => {
     expect(guessCountry("Austin, TX")).toBe("US");
     expect(guessCountry("Auckland")).toBe("NZ");
     expect(guessCountry("Remote")).toBeNull();
+    const cases: Array<[string, string | null]> = [
+      ["Indianapolis, IN", "US"],
+      ["Indiana", "US"],
+      ["Jersey City, NJ", "US"],
+      ["Atlanta, Georgia", null],
+      ["Georgia", null],
+      ["Albuquerque, New Mexico", "US"],
+      ["Albuquerque New Mexico", "US"],
+      ["Bucharest, Romania", "RO"],
+      ["Lagos, Nigeria", "NG"],
+      ["Perth, WA", "AU"],
+      ["Seattle, WA", "US"],
+      ["Spokane, WA", null],
+      ["Brisbane QLD", "AU"],
+      ["Bucharest Romania", "RO"],
+      ["Lagos Nigeria", "NG"],
+    ];
+    for (const [location, country] of cases) expect(guessCountry(location), location).toBe(country);
   });
 });
 

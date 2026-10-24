@@ -34,7 +34,7 @@ interface Live {
   finished: boolean;
 }
 
-const KNOWN_ERRORS = ["refusal", "budget", "max_tokens", "chat_busy", "job_not_ready", "api", ...AI_ERROR_CODES];
+const KNOWN_ERRORS = ["refusal", "budget", "max_tokens", "chat_busy", "job_not_ready", "api", "session_expired", ...AI_ERROR_CODES];
 const SUGGESTIONS = ["explain", "fit", "improve", "research"] as const;
 const COACH_SUGGESTIONS = ["week", "compare", "followUp", "search"] as const;
 const KNOWN_ACTIVITIES = ["web_search", "web_fetch", "save_job_note", "set_job_status", "start_company_research", "revise_cv_draft", "list_jobs", "get_job", "compare_jobs", "search_jobs", "import_job_url"];
