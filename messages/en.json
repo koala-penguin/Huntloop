@@ -880,7 +880,8 @@
       "cli_missing": "Claude Code isn't installed. Install it, or switch to the API key in Settings.",
       "cli_login": "Claude Code isn't signed in. Run “claude auth login” in a terminal, then try again.",
       "subscription_limit": "Your Claude subscription's usage limit has been reached. Try again after it resets, or switch to the API key.",
-      "model_unavailable": "The chat's model isn't available on your plan. Start a new conversation after choosing another model in Settings."
+      "model_unavailable": "The chat's model isn't available on your plan. Start a new conversation after choosing another model in Settings.",
+      "session_expired": "This conversation can't be continued after the update. Start a new conversation to keep chatting."
     },
     "activity": {
       "web_search": "Searched the web: {detail}",

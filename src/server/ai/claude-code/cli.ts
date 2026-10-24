@@ -4,10 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { createInterface } from "node:readline";
-import { dataDir } from "../../config/env";
 import { AiError } from "../errors";
 import { claudeBinary, cliEnv } from "./status";
-import { recordLimitReached, recordRateLimit, subscriptionUsage } from "./limits";
+import { recordLimitReached, recordRateLimit, subscriptionLimitedUntil } from "./limits";
 
 /**
  * Runs the user's Claude Code CLI in print mode (`claude -p`) with stream-json in and out. Every
@@ -98,9 +97,22 @@ function release(): void {
   state.queue.shift()?.();
 }
 
+/**
+ * The CLI's working directory: one fixed folder outside Huntloop's own tree (the default data
+ * folder sits inside the repo, where the CLI would read CLAUDE.md / AGENTS.md as project
+ * instructions — checked with Claude Code 2.1.310). Fixed, not per run: chat sessions are found by
+ * it. The CLI reads `<cwd>/.claude/settings.json` (--setting-sources project), and the system temp
+ * folder can be shared between users (Linux /tmp), so the folder must be ours and private.
+ */
 export function workDir(): string {
-  const dir = path.join(dataDir(), "claude-code");
-  fs.mkdirSync(dir, { recursive: true });
+  const dir = path.join(os.tmpdir(), "huntloop-claude-code");
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const refuse = () => new AiError("api", `Claude Code's working folder isn't private: ${dir}`);
+  const st = fs.lstatSync(dir);
+  if (!st.isDirectory() || st.isSymbolicLink()) throw refuse();
+  if (typeof process.getuid === "function" && (st.uid !== process.getuid() || (st.mode & 0o022) !== 0)) throw refuse();
+  // Huntloop never creates these; if they exist, someone else put them there.
+  if (fs.existsSync(path.join(dir, ".claude")) || fs.existsSync(path.join(dir, "CLAUDE.md"))) throw refuse();
   return dir;
 }
 
@@ -151,10 +163,11 @@ function resultText(result: CliEvent | null, stderr: string): string {
 /** Turns a failed run into an AiError the UI can explain. */
 export function cliFailure(result: CliEvent | null, stderr: string, lastRetryError: string | null): AiError {
   const text = resultText(result, stderr);
-  const limited = subscriptionUsage()?.status === "rejected";
+  // Only a limit that hasn't reset yet; an old "rejected" state must not mislabel other failures.
+  const limited = subscriptionLimitedUntil() !== null;
   if (limited || lastRetryError === "rate_limit" || /usage limit|limit reached|rate.?limit|out of (extra )?usage|weekly limit/i.test(text)) {
     const epoch = /\|(\d{9,})\b/.exec(text)?.[1];
-    const resetsAt = epoch ? new Date(Number(epoch) * 1000) : (subscriptionUsage()?.resetsAt ?? null);
+    const resetsAt = epoch ? new Date(Number(epoch) * 1000) : subscriptionLimitedUntil();
     recordLimitReached(resetsAt);
     return new AiError("subscription_limit", "Claude subscription usage limit reached", { resetsAt: resetsAt?.toISOString() ?? null });
   }

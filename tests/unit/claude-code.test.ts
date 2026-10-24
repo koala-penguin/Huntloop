@@ -6,9 +6,9 @@ import { z } from "zod";
 import { AiError, callStructured, modeFor } from "@/server/ai/client";
 import { runSubmitLoop } from "@/server/ai/agent-loop";
 import { webTools } from "@/server/ai/request";
-import { buildCliArgs, runClaudeCode, setCliSpawner, type CliRunOptions } from "@/server/ai/claude-code/cli";
+import { buildCliArgs, runClaudeCode, setCliSpawner, workDir, type CliRunOptions } from "@/server/ai/claude-code/cli";
 import { cliEnv, setClaudeCodeStatus } from "@/server/ai/claude-code/status";
-import { resetSubscriptionUsage, subscriptionLimitedUntil, subscriptionNearLimit, subscriptionUsage } from "@/server/ai/claude-code/limits";
+import { recordLimitReached, resetSubscriptionUsage, subscriptionLimitedUntil, subscriptionNearLimit, subscriptionUsage } from "@/server/ai/claude-code/limits";
 import { restrictedDomains } from "@/server/ingest/domain-policy";
 import { spendSummary, usageReport } from "@/server/repo/usage";
 import { usageLog } from "@/server/db/schema";
@@ -67,14 +67,25 @@ describe("Claude Code CLI (subscription connection)", () => {
     ]);
     setCliSpawner(spawner);
     const ctx = subscriptionCtx();
-    const result = await callStructured(ctx, "parseSearch", {
-      schema,
-      system: [{ type: "text", text: "Extract the job.", cache_control: { type: "ephemeral" } }] as never,
-      messages: [{ role: "user", content: [{ type: "text", text: "Data analyst in Perth", cache_control: { type: "ephemeral" } }] as never }],
-    });
+    // Huntloop's default data folder sits inside the repo; the CLI must still run outside it,
+    // or it would pick up the repo's CLAUDE.md / AGENTS.md as project instructions.
+    const dataDir = process.env.HUNTLOOP_DATA_DIR;
+    process.env.HUNTLOOP_DATA_DIR = path.join(process.cwd(), "data");
+    let result;
+    try {
+      result = await callStructured(ctx, "parseSearch", {
+        schema,
+        system: [{ type: "text", text: "Extract the job.", cache_control: { type: "ephemeral" } }] as never,
+        messages: [{ role: "user", content: [{ type: "text", text: "Data analyst in Perth", cache_control: { type: "ephemeral" } }] as never }],
+      });
+    } finally {
+      process.env.HUNTLOOP_DATA_DIR = dataDir;
+    }
     expect(result.data).toEqual({ title: "Data Analyst", city: "Perth" });
 
     const call = calls[0];
+    expect(path.relative(process.cwd(), call.cwd).startsWith("..")).toBe(true);
+    expect(fs.readdirSync(call.cwd)).toEqual([]);
     expect(call.arg("--model")).toBe("claude-opus-5-5");
     expect(call.arg("--effort")).toBe("low");
     expect(JSON.parse(call.arg("--json-schema")!)).toMatchObject({ type: "object", required: ["title", "city"] });
@@ -262,5 +273,42 @@ describe("Claude Code CLI (subscription connection)", () => {
     gates[3]();
     gates[0]();
     await Promise.all([...both, third]);
+  });
+
+  it("stops blaming the usage limit once it has reset", async () => {
+    recordLimitReached(new Date(Date.now() - 60_000));
+    expect(subscriptionUsage()?.status).toBe("allowed");
+    expect(subscriptionLimitedUntil()).toBeNull();
+    setCliSpawner(fakeCli(() => [cliResult({ is_error: true, result: "Not logged in · Please run /login" })]).spawner);
+    await expect(callStructured(subscriptionCtx(), "parseSearch", { schema, messages: [{ role: "user", content: "x" }] })).rejects.toMatchObject({ code: "cli_login" });
+
+    recordLimitReached(new Date(Date.now() + 3_600_000));
+    await expect(callStructured(subscriptionCtx(), "parseSearch", { schema, messages: [{ role: "user", content: "x" }] })).rejects.toMatchObject({ code: "subscription_limit" });
+  });
+
+  it.skipIf(typeof process.getuid !== "function")("keeps Claude Code's working folder private and refuses one someone else set up", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "huntloop-workdir-"));
+    const spy = vi.spyOn(os, "tmpdir").mockReturnValue(root);
+    try {
+      const dir = workDir();
+      expect(path.dirname(dir)).toBe(root);
+      expect(fs.statSync(dir).mode & 0o077).toBe(0);
+      expect(workDir()).toBe(dir); // the same folder every time (chat sessions are found by it)
+
+      fs.chmodSync(dir, 0o777);
+      expect(() => workDir()).toThrow(/isn't private/);
+      fs.chmodSync(dir, 0o700);
+      fs.mkdirSync(path.join(dir, ".claude"));
+      expect(() => workDir()).toThrow(/isn't private/);
+      fs.rmSync(path.join(dir, ".claude"), { recursive: true });
+
+      fs.rmSync(dir, { recursive: true });
+      const elsewhere = fs.mkdtempSync(path.join(root, "other-"));
+      fs.symlinkSync(elsewhere, dir);
+      expect(() => workDir()).toThrow(/isn't private/);
+    } finally {
+      spy.mockRestore();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });

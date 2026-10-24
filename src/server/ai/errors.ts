@@ -11,7 +11,9 @@ export type AiErrorCode =
   /** The Claude subscription's usage limit is reached; `detail.resetsAt` says when it resets. */
   | "subscription_limit"
   /** The chosen model isn't available on this plan or key. */
-  | "model_unavailable";
+  | "model_unavailable"
+  /** A chat thread's Claude Code session can't be continued (e.g. it was saved under an older working folder). */
+  | "session_expired";
 
 export class AiError extends Error {
   constructor(

@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { setCliSpawner } from "@/server/ai/claude-code/cli";
 import { setClaudeCodeStatus } from "@/server/ai/claude-code/status";
+import { resetSubscriptionUsage } from "@/server/ai/claude-code/limits";
 import { createJobConversation, listChatActions, listChatMessages, runChatTurn, type ChatEvent } from "@/server/ai/chat/harness";
 import { transcript } from "@/server/ai/chat/render";
 import { DEMO_SCREENSHOT_POSTING } from "@/server/ai/fake/generators/jobs";
@@ -121,6 +122,25 @@ describe("job chat on the Claude subscription", () => {
     expect(events.at(-1)).toMatchObject({ type: "error", code: "subscription_limit" });
     expect(listChatMessages(ctx, conversation.id)).toHaveLength(before);
     expect(db.select().from(conversations).where(eq(conversations.id, conversation.id)).get()!.providerSession).toBe("sess-OK");
+  });
+
+  it("asks for a new conversation when the saved session can't be resumed", async () => {
+    resetSubscriptionUsage(); // the earlier usage-limit test leaves a limit behind
+    const { db, ctx, conversation } = await setup();
+    db.update(conversations).set({ providerSession: "sess-old" }).where(eq(conversations.id, conversation.id)).run();
+    const missing = "No conversation found with session ID: sess-old";
+    const { spawner, calls } = fakeCli(() => [cliResult({ subtype: "error_during_execution", is_error: true, result: "", errors: [missing] })]);
+    setCliSpawner(spawner);
+    const events = await turn(ctx, conversation.id, "Still there?");
+    expect(events.at(-1)).toMatchObject({ type: "error", code: "session_expired" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].arg("--resume")).toBe("sess-old");
+    expect(db.select().from(conversations).where(eq(conversations.id, conversation.id)).get()!.providerSession).toBe("sess-old");
+
+    // Other failures on a resumed thread stay what they were.
+    setCliSpawner(fakeCli(() => [cliResult({ subtype: "error_during_execution", is_error: true, result: "", errors: ["something else broke"] })]).spawner);
+    const other = await turn(ctx, conversation.id, "Still there?");
+    expect(other.at(-1)).toMatchObject({ type: "error", code: "api" });
   });
 
   it("keeps an API thread on the API after the user switches to the subscription", async () => {

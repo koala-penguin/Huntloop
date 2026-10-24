@@ -55,8 +55,12 @@ export function recordLimitReached(resetsAt: Date | null, now = new Date()): voi
   };
 }
 
-export function subscriptionUsage(): SubscriptionUsage | null {
-  return state.usage ?? null;
+/** The latest usage; a limit whose reset time has passed reads as "allowed" again. */
+export function subscriptionUsage(now = new Date()): SubscriptionUsage | null {
+  const usage = state.usage;
+  if (!usage) return null;
+  if (usage.status === "rejected" && (!usage.resetsAt || usage.resetsAt <= now)) return { ...usage, status: "allowed" };
+  return usage;
 }
 
 /** When the limit was reached and hasn't reset yet: the reset time. */

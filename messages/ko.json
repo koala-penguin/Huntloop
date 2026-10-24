@@ -880,7 +880,8 @@
       "cli_missing": "Claude Code가 설치되어 있지 않습니다. 설치하거나 설정에서 API 키로 전환하세요.",
       "cli_login": "Claude Code에 로그인되어 있지 않습니다. 터미널에서 “claude auth login”을 실행한 뒤 다시 시도하세요.",
       "subscription_limit": "Claude 구독 사용 한도에 도달했습니다. 한도가 초기화된 뒤 다시 시도하거나 API 키로 전환하세요.",
-      "model_unavailable": "이 대화의 모델을 현재 플랜에서 쓸 수 없습니다. 설정에서 다른 모델을 고른 뒤 새 대화를 시작하세요."
+      "model_unavailable": "이 대화의 모델을 현재 플랜에서 쓸 수 없습니다. 설정에서 다른 모델을 고른 뒤 새 대화를 시작하세요.",
+      "session_expired": "업데이트 이후 이 대화는 이어갈 수 없습니다. 새 대화를 시작해 주세요."
     },
     "activity": {
       "web_search": "웹 검색: {detail}",
