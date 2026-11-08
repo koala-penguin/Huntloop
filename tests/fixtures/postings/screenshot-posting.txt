@@ -1,0 +1,20 @@
+Senior Frontend Engineer
+Bright Harbour Health · Sydney NSW (Hybrid)
+Full time · $165,000 – $185,000 + super
+Posted 2d ago
+
+About the role
+Bright Harbour Health is rebuilding its patient booking platform. You will lead frontend delivery for the booking experience used by 400 clinics across Australia.
+
+What you'll bring
+• 5+ years of professional frontend development experience
+• Strong React and TypeScript skills
+• Experience with accessibility (WCAG 2.2) in production web apps
+• Experience mentoring other engineers
+• Experience with GraphQL is a plus
+• Healthcare or regulated industry experience is desirable
+
+You must have full working rights in Australia. We are unable to offer visa sponsorship for this role.
+
+How to apply
+Apply with your CV and a short note about a product you are proud of.

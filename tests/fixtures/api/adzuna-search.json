@@ -1,0 +1,41 @@
+{
+  "count": 3,
+  "mean": 150000,
+  "results": [
+    {
+      "id": "4901234567",
+      "title": "Senior <strong>Frontend</strong> Engineer",
+      "description": "Join our product team in Sydney building <strong>React</strong> and TypeScript apps for healthcare clinics. Hybrid, 3 days in the office...",
+      "created": "2026-10-10T03:12:00Z",
+      "redirect_url": "https://www.adzuna.com.au/land/ad/4901234567?se=abc&utm_medium=api",
+      "company": { "display_name": "Bright Harbour Health" },
+      "location": { "display_name": "Sydney, New South Wales", "area": ["Australia", "New South Wales", "Sydney"] },
+      "salary_min": 165000,
+      "salary_max": 185000,
+      "salary_is_predicted": "0",
+      "contract_time": "full_time",
+      "category": { "label": "IT Jobs", "tag": "it-jobs" }
+    },
+    {
+      "id": "4901234568",
+      "title": "Frontend Developer",
+      "description": "Melbourne fintech hiring a frontend developer with Vue experience. Must hold Australian citizenship and Baseline clearance...",
+      "created": "2026-10-08T01:00:00Z",
+      "redirect_url": "https://www.adzuna.com.au/land/ad/4901234568?se=abc",
+      "company": { "display_name": "Southern Ledger" },
+      "location": { "display_name": "Melbourne, Victoria" },
+      "salary_min": 120000,
+      "salary_is_predicted": "1",
+      "contract_time": "full_time"
+    },
+    {
+      "id": "4901234569",
+      "title": "Senior Frontend Engineer",
+      "description": "Recruiter listing for a confidential client. Unpaid trial period applies.",
+      "created": "2026-06-01T01:00:00Z",
+      "redirect_url": "https://www.adzuna.com.au/land/ad/4901234569",
+      "company": { "display_name": "Talent Partners" },
+      "location": { "display_name": "Sydney, New South Wales" }
+    }
+  ]
+}

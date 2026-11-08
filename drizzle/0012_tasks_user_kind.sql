@@ -1,0 +1,1 @@
+CREATE INDEX `tasks_user_kind` ON `tasks` (`user_id`,`kind`);

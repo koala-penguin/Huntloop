@@ -1,0 +1,14 @@
+{
+  "id": "6f1c2a7e-4b2d-4f1e-9a8b-1c2d3e4f5a6b",
+  "text": "Backend Engineer (Go)",
+  "hostedUrl": "https://jobs.lever.co/xero/6f1c2a7e-4b2d-4f1e-9a8b-1c2d3e4f5a6b",
+  "applyUrl": "https://jobs.lever.co/xero/6f1c2a7e-4b2d-4f1e-9a8b-1c2d3e4f5a6b/apply",
+  "createdAt": 1790000000000,
+  "country": "NZ",
+  "workplaceType": "hybrid",
+  "categories": { "commitment": "Full-time", "location": "Wellington", "team": "Platform" },
+  "descriptionPlain": "We are looking for a backend engineer to join our platform team in Wellington.",
+  "lists": [{ "text": "What you'll need", "content": "<li>3+ years with Go</li><li>Experience with PostgreSQL</li>" }],
+  "additionalPlain": "You must be eligible to work in New Zealand.",
+  "salaryRange": { "currency": "NZD", "interval": "per-year-salary", "min": 140000, "max": 170000 }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "6000000009990001",
+  "name": "Head of Data Platform ",
+  "uuid": "0a0b0c0d-1e2f-4a5b-8c6d-7e8f90a1b2c3",
+  "jobId": "11111111-2222-4333-8444-555555555555",
+  "jobAdId": "66666666-7777-4888-9999-000000000000",
+  "defaultJobAd": true,
+  "refNumber": "R000001",
+  "company": { "name": "Demo Harbour Software", "identifier": "DemoHarbour" },
+  "location": { "city": "Sydney", "country": "au", "remote": false, "hybrid": true, "fullLocation": "Sydney, Australia" },
+  "releasedDate": "2026-08-05T12:25:49.071Z",
+  "postingUrl": "https://jobs.smartrecruiters.com/DemoHarbour/6000000009990001-head-of-data-platform",
+  "applyUrl": "https://jobs.smartrecruiters.com/DemoHarbour/6000000009990001-head-of-data-platform?oga=true",
+  "jobAd": {
+    "sections": {
+      "companyDescription": { "title": "Company Description", "text": "<p>Demo Harbour Software builds scheduling tools for ferry operators.</p>" },
+      "jobDescription": { "title": "Job Description", "text": "<p><strong>What you'd be doing</strong></p><p>Lead the data platform team and own our analytics roadmap across the business. Apply with your CV and a short note.</p>" },
+      "qualifications": { "title": "Qualifications", "text": "" },
+      "additionalInformation": { "title": "Additional Information", "text": "" }
+    }
+  },
+  "active": false,
+  "visibility": "PUBLIC",
+  "typeOfEmployment": { "id": "permanent", "label": "Full-time" },
+  "language": { "code": "en", "label": "English" }
+}
