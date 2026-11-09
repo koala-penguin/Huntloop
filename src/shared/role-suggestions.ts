@@ -29,7 +29,7 @@ export function roleFamily(title: string | null | undefined): RoleFamily {
 }
 
 /** Single-word tool names used in the examples (a revision may never add one the candidate didn't type). */
-export const TOOL_TERMS = ["snowflake", "bigquery", "redshift", "databricks", "dbt", "tableau", "looker", "python", "sql", "airflow", "excel", "jira", "figma", "salesforce", "hubspot", "aws", "azure", "gcp", "kubernetes", "docker", "react", "typescript", "xero", "sap", "workday", "notion"];
+export const TOOL_TERMS = ["snowflake", "bigquery", "redshift", "databricks", "dbt", "tableau", "looker", "python", "java", "sql", "airflow", "excel", "jira", "figma", "salesforce", "hubspot", "aws", "azure", "gcp", "kubernetes", "docker", "react", "typescript", "xero", "sap", "workday", "notion"];
 
 const EN: Record<RoleFamily, Topics> = {
   data_leadership: {

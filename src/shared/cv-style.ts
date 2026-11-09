@@ -6,8 +6,10 @@
 
 export const BANNED_PHRASES_EN = [
   "spearheaded",
+  "spearheading",
   "leveraged",
   "leverage",
+  "leveraging",
   "synergy",
   "synergies",
   "passionate",
@@ -21,6 +23,7 @@ export const BANNED_PHRASES_EN = [
   "cutting-edge",
   "utilize",
   "utilized",
+  "utilizing",
   "game-changer",
   "game changing",
   "drive impact",
@@ -49,6 +52,7 @@ export const BANNED_PHRASES_EN = [
   "revolutionize",
   "streamline",
   "streamlined",
+  "streamlining",
   "i am a",
 ] as const;
 

@@ -46,6 +46,44 @@ describe("the revision check (polishGate)", () => {
     expect(polishGate("I fixed bugs", "Fixed bugs. Fixed bugs again. Fixed more bugs. Fixed bugs.")).toMatchObject({ ok: false });
   });
 
+  it("refuses a changed number even when it is glued to a word (5명, 3개, 2배)", () => {
+    expect(polishGate("팀원 5명과 대시보드를 만들었습니다", "팀원 6명과 대시보드를 만들었습니다.")).toMatchObject({ ok: false, reason: "numbers" });
+    expect(polishGate("3개 팀을 맡았습니다", "4개 팀을 맡았습니다.")).toMatchObject({ ok: false, reason: "numbers" });
+    expect(polishGate("매출을 2배로 늘렸습니다", "매출을 3배로 늘렸습니다.")).toMatchObject({ ok: false, reason: "numbers" });
+    expect(polishGate("팀원 5명과 대시보드를 만들었어요", "팀원 5명과 대시보드를 만들었습니다.")).toEqual({ ok: true });
+    expect(polishGate("Cut costs 3x in a year", "Cut costs 4x in a year.")).toMatchObject({ ok: false, reason: "numbers" });
+  });
+
+  it("refuses new acronyms and names anywhere, and keeps names that opened the answer", () => {
+    for (const text of [
+      "Led a team of 5 at EY on the merchant dashboard.",
+      "Led the AI team of 5 on the merchant dashboard.",
+      "Led a team of 5 on the merchant dashboard in R.",
+      "Led a team of 5 people as VP on the merchant dashboard.",
+      "Led a team of 5 on the merchant dashboard with ML.",
+      "Led a team of 5 on the merchant dashboard. Google noticed.",
+      "AI team of 5 on the merchant dashboard.",
+    ]) {
+      expect(polishGate(raw, text), text).toMatchObject({ ok: false, reason: "new_term" });
+    }
+    expect(polishGate("Google hired me to lead 5 people", "Hired to lead 5 people.")).toMatchObject({ ok: false, reason: "dropped" });
+    expect(polishGate("Google hired me to lead 5 people", "Hired by Google to lead 5 people.")).toEqual({ ok: true });
+    // A capital that is only grammar is not a name: an opening word or verb may be reworded.
+    expect(polishGate("Mostly I built reports in SQL for 3 teams", "Built reports in SQL for 3 teams.")).toEqual({ ok: true });
+    expect(polishGate("Managed the reporting team of 5", "Led the reporting team of 5.")).toEqual({ ok: true });
+    expect(polishGate("I've led 2 migrations to the cloud", "Led 2 migrations to the cloud.")).toEqual({ ok: true });
+  });
+
+  it("refuses size words in any form and stock words in any form", () => {
+    for (const word of ["largest", "biggest", "huge", "massive", "larger"]) {
+      expect(polishGate("I led a team on the merchant dashboard", `Led the ${word} team on the merchant dashboard.`), word).toMatchObject({ ok: false, reason: "new_term" });
+    }
+    expect(polishGate("I grew sign-ups on the merchant dashboard", "Grew sign-ups on the merchant dashboard, doubling them.")).toMatchObject({ ok: false, reason: "new_term" });
+    expect(polishGate("I built it in the cloud", "Built it in the cloud, leveraging AWS.")).toMatchObject({ ok: false });
+    expect(polishGate("I built it on cloud servers", "Built it, leveraging cloud servers.")).toMatchObject({ ok: false, reason: "style" });
+    expect(polishGate("I built the backend services", "Built the backend services in java.")).toMatchObject({ ok: false, reason: "new_term" });
+  });
+
   it("the demo interviewer's revision passes for every sample answer", () => {
     for (const answer of Object.values(ANSWERS)) expect(polishGate(answer, fakePolish(answer))).toEqual({ ok: true });
     expect(fakePolish("I led a team of 5 on the merchant dashboard")).toBe("Led a team of 5 on the merchant dashboard.");
