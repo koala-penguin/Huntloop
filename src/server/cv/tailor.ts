@@ -154,6 +154,13 @@ export function recheckDocument(db: Db, userId: number, doc: StoredCvDocument, p
     const flags = validateLinkedin(content, buildProvenanceContext(profile, { analysis: null, score: null, plan: null }));
     return updateCvDocument(db, doc.id, { content, flags, ...stamp });
   }
+  if (doc.kind === "base") {
+    const content = structuredClone(doc.content);
+    const text = cvContentText(content);
+    const { flags, pageEstimate } = validateCv(content, buildProvenanceContext(profile, { analysis: null, score: null, plan: null }), text);
+    const checks: CvChecks = { keywordsBefore: null, keywordsAfter: null, pageEstimate, dropped: doc.checks?.dropped ?? 0, languageFallback: doc.checks?.languageFallback ?? false };
+    return updateCvDocument(db, doc.id, { content, flags, checks, ...stamp });
+  }
   const c = jobContext(db, userId, doc.jobId!);
   const content = structuredClone(doc.content);
   const { flags, pageEstimate, text } = checkCv(content, c, doc.plan);

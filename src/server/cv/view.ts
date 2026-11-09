@@ -1,7 +1,7 @@
 import type { Db } from "../db/database";
 import type { JobRow } from "../db/schema";
 import type { JobFit } from "../jobs/fit";
-import { getCvDocument, latestCvDocument, listCvVersions, type StoredCv, type StoredLinkedin } from "../repo/cv-documents";
+import { getCvDocument, latestCvDocument, listCvVersions, type StoredBaseCv, type StoredCv, type StoredLinkedin } from "../repo/cv-documents";
 import { getCurrentProfile } from "../repo/profile";
 import { blockingCount, blockingFlags, type CvFlag, type CvLine } from "@/shared/schemas/cv";
 import type { CvDocView } from "@/components/cv/cv-workspace";
@@ -13,7 +13,7 @@ import { isCvStale } from "./tailor";
 
 /** What the CV tab and the LinkedIn tab show, prepared on the server. */
 
-function flagged(lines: Array<{ line: CvLine; where: string; removable: boolean }>, flags: CvFlag[]): FlaggedLine[] {
+export function flagged(lines: Array<{ line: CvLine; where: string; removable: boolean }>, flags: CvFlag[]): FlaggedLine[] {
   const byLine = new Map<string, CvFlag[]>();
   for (const f of flags) if (f.lineId) byLine.set(f.lineId, [...(byLine.get(f.lineId) ?? []), f]);
   return lines
@@ -115,4 +115,32 @@ export function linkedinPanelData(db: Db, userId: number, labels: { headline: st
     stale: isCvStale(doc, profile),
     blocking: blockingCount(doc.flags),
   };
+}
+
+/** The base CV from the interview: preview, flag cards and export state (no plan, no job). */
+export function baseCvData(db: Db, userId: number, options: { summaryLabel: string }): { doc: CvDocView; previewHtml: string } | null {
+  const doc: StoredBaseCv | null = latestCvDocument(db, userId, "base", null);
+  if (!doc) return null;
+  const profile = getCurrentProfile(db, userId);
+  const lines = [
+    ...doc.content.summary.map((line) => ({ line, where: options.summaryLabel, removable: true })),
+    ...doc.content.roles.flatMap((r) => r.bullets.map((line) => ({ line, where: `${r.title} — ${r.company}`, removable: true }))),
+  ];
+  const highlight = new Set(doc.flags.filter((f) => f.lineId).map((f) => f.lineId!));
+  const view: CvDocView = {
+    id: doc.id,
+    version: doc.version,
+    simulated: doc.simulated,
+    createdAt: doc.createdAt.toISOString(),
+    stale: isCvStale(doc, profile),
+    pages: doc.content.pages,
+    plan: null,
+    checks: doc.checks,
+    blocking: blockingCount(doc.flags),
+    lengthWarning: doc.flags.some((f) => f.kind === "length"),
+    flagged: flagged(lines, doc.flags),
+    answered: [],
+    coverage: [],
+  };
+  return { doc: view, previewHtml: renderCvHtml(doc.content, cvTranslator(doc.content.language), { highlight }) };
 }

@@ -5,7 +5,7 @@ import { hashJson } from "../hash";
 import type { CvChecks, CvDocument, CvEdit, CvFlag, LinkedinDocument, TailoringPlan } from "@/shared/schemas/cv";
 import type { ProfileData } from "@/shared/schemas/profile";
 
-export type CvDocumentKind = "cv" | "linkedin";
+export type CvDocumentKind = "cv" | "linkedin" | "base";
 
 interface StoredBase {
   id: number;
@@ -37,7 +37,15 @@ export interface StoredLinkedin extends StoredBase {
   content: LinkedinDocument;
 }
 
-export type StoredCvDocument = StoredCv | StoredLinkedin;
+/** The base CV from the CV builder interview: no job, no plan, checked against the profile alone. */
+export interface StoredBaseCv extends StoredBase {
+  kind: "base";
+  plan: null;
+  content: CvDocument;
+  checks: CvChecks | null;
+}
+
+export type StoredCvDocument = StoredCv | StoredLinkedin | StoredBaseCv;
 
 /** Everything a tailored CV or LinkedIn draft is written from: CV text, roles and highlights, facts, contacts. */
 export function cvProfileHash(cvText: string, data: ProfileData): string {
@@ -61,9 +69,9 @@ function toStored(row: typeof cvDocuments.$inferSelect): StoredCvDocument {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
-  return row.kind === "linkedin"
-    ? { ...base, kind: "linkedin", content: row.content as LinkedinDocument }
-    : { ...base, kind: "cv", plan: (row.plan ?? null) as TailoringPlan | null, content: row.content as CvDocument, checks: (row.checks ?? null) as CvChecks | null };
+  if (row.kind === "linkedin") return { ...base, kind: "linkedin", content: row.content as LinkedinDocument };
+  if (row.kind === "base") return { ...base, kind: "base", plan: null, content: row.content as CvDocument, checks: (row.checks ?? null) as CvChecks | null };
+  return { ...base, kind: "cv", plan: (row.plan ?? null) as TailoringPlan | null, content: row.content as CvDocument, checks: (row.checks ?? null) as CvChecks | null };
 }
 
 const owner = (userId: number, kind: CvDocumentKind, jobId: number | null) =>
@@ -80,6 +88,7 @@ export function getCvDocument(db: Db, userId: number, id: number): StoredCvDocum
 
 export function latestCvDocument(db: Db, userId: number, kind: "cv", jobId: number): StoredCv | null;
 export function latestCvDocument(db: Db, userId: number, kind: "linkedin", jobId: null): StoredLinkedin | null;
+export function latestCvDocument(db: Db, userId: number, kind: "base", jobId: null): StoredBaseCv | null;
 export function latestCvDocument(db: Db, userId: number, kind: CvDocumentKind, jobId: number | null): StoredCvDocument | null {
   const row = db.select().from(cvDocuments).where(owner(userId, kind, jobId)).orderBy(desc(cvDocuments.version)).limit(1).get();
   return row ? toStored(row) : null;

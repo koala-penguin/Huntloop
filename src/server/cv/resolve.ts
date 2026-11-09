@@ -16,12 +16,12 @@ export type LineAction = { kind: "remove" } | { kind: "edit"; text: string } | {
 const MAX_LINE = 600;
 
 function allLines(doc: StoredCvDocument): CvLine[] {
-  if (doc.kind === "cv") return [...doc.content.summary, ...doc.content.roles.flatMap((r) => r.bullets)];
+  if (doc.kind !== "linkedin") return [...doc.content.summary, ...doc.content.roles.flatMap((r) => r.bullets)];
   return [doc.content.headline, ...doc.content.about, ...doc.content.positions.flatMap((p) => p.bullets)];
 }
 
 function removeLine(doc: StoredCvDocument, lineId: string): void {
-  if (doc.kind === "cv") {
+  if (doc.kind !== "linkedin") {
     const c: CvDocument = doc.content;
     c.summary = c.summary.filter((l) => l.id !== lineId);
     for (const r of c.roles) r.bullets = r.bullets.filter((l) => l.id !== lineId);

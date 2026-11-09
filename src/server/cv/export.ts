@@ -24,12 +24,12 @@ const filePart = (s: string | null | undefined) =>
     .slice(0, 40);
 
 /**
- * A tailored CV as a Word or PDF file. Refused while any line still has a blocking flag — nothing
+ * A tailored CV (or the base CV from the interview) as a Word or PDF file. Refused while any line still has a blocking flag — nothing
  * unverified leaves Huntloop without the user having dealt with it.
  */
 export async function exportCv(db: Db, userId: number, docId: number, format: CvExportFormat): Promise<{ bytes: Buffer; mime: string; fileName: string }> {
   const doc = getCvDocument(db, userId, docId);
-  if (!doc || doc.kind !== "cv") throw new UserFacingError("not_found");
+  if (!doc || doc.kind === "linkedin") throw new UserFacingError("not_found");
   if (blockingFlags(doc.flags).length) throw new UserFacingError("unresolved_flags");
   const t = cvTranslator(doc.content.language);
   const bytes = format === "docx" ? await buildCvDocx(doc.content, t) : await htmlToPdf(renderCvHtml(doc.content, t), doc.content.paper);
