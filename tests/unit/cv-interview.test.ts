@@ -825,6 +825,23 @@ describe("CV interview — cleaner versions of answers", () => {
     expect(db.select().from(interviewAnswers).all()).toEqual([]);
   });
 
+  it("a revision may not drop an employer from the forms, even one that looks like a verb", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    const current = reload(db, userId, interview);
+    saveStageForm(db, current, "roles", [{ ...current.form.roles[0], company: "Boeing" }, current.form.roles[1]]);
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    override = (req) => {
+      if (!toolRound(req)) return demoInterviewer(req);
+      const last = req.body.messages.at(-1)!.content as Array<{ content?: string }>;
+      const id = /Recorded #(\d+)/.exec(last.map((b) => String(b.content)).join(" "))?.[1];
+      return id ? { content: [{ type: "tool_use", id: `toolu_keep_${Math.random()}`, name: "propose_polish", input: { answer_id: Number(id), text: "Hired to lead 6 frontend engineers." } }] } : { content: [{ type: "text", text: "Next?" }] };
+    };
+    await turn(ctx, conversation.id, "Boeing hired me to lead 6 frontend engineers.");
+    const result = requests.flatMap((r) => r.messages.flatMap((m) => (Array.isArray(m.content) ? (m.content as Array<{ type: string; tool_use_id?: string; content?: string; is_error?: boolean }>) : []))).filter((b) => b.type === "tool_result" && b.tool_use_id?.startsWith("toolu_keep_")).at(-1)!;
+    expect(result).toMatchObject({ is_error: true });
+    expect(result.content).toMatch(/drops "Boeing"/);
+  });
+
   it("a quick reply is never recorded as an answer", async () => {
     const { db, ctx, interview } = setupInterview();
     const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");

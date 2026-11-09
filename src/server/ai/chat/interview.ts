@@ -475,7 +475,8 @@ function interviewScope(ctx: AiContext, conversation: ConversationRow): ChatScop
             .all()
             .some((a) => (a.payload as { answerId?: number }).answerId === answer.id);
           if (waiting) return result("A cleaner version of this answer is already waiting for the candidate.", true);
-          const gate = polishGate(answer.quote, text);
+          const { current, roles } = interview.form;
+          const gate = polishGate(answer.quote, text, { keep: [current.company, current.title, ...roles.flatMap((r) => [r.company, r.title])].filter(Boolean) });
           if (!gate.ok) return result(polishRefusal(gate), true);
           const action = ctx.db
             .insert(chatActions)

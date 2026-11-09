@@ -19,6 +19,14 @@ const FACT_LIKE_WORDS = new Set(
     "largest", "biggest", "huge", "massive", "vast", "double", "doubled", "doubling", "triple", "tripled", "half", "halved",
   ].map(stem),
 );
+/** The same kind of claim in Korean (matched anywhere: particles follow them). */
+const KO_FACT_LIKE = ["대규모", "대형", "핵심", "전사", "수많은", "최초", "최고"];
+
+/** Irregular past tenses a CV line often opens with (regular ones end in -ed). */
+const OPENING_VERBS = new Set(
+  "led ran built grew cut set won made wrote took kept brought taught sold drove began became oversaw hired shipped owned found put met gave got rebuilt redesigned rewrote".split(" "),
+);
+
 /** Size words in any form: large, larger, largest, big, bigger, biggest… */
 const SIZE_WORD = /^(large|big|huge|massive|vast)(r|st|ger|gest|er|est)?$/;
 
@@ -74,6 +82,11 @@ const hasCapital = (t: Token) => /\p{Lu}/u.test(t.text) && !firstPerson(t);
 const acronym = (t: Token) => /^\p{Lu}[\p{Lu}\p{N}+#]*$/u.test(t.text) && !firstPerson(t);
 /** A verb form that often opens a CV line ("Managed", "Planning"): rewording it is fine. */
 const verbForm = (t: Token) => /^\p{Lu}\p{Ll}+(ed|ing)$/u.test(t.text);
+/** A capitalised first word that reads as a CV line's opening verb ("Led", "Managed", "Builds"). */
+const openingVerb = (t: Token) => /^\p{Lu}\p{Ll}+(ed|ing|s)$/u.test(t.text) || OPENING_VERBS.has(t.text.toLowerCase());
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Whole-term, case-insensitive ("Booking.com", "Head of Data"). */
+const containsTerm = (text: string, term: string) => new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(term)}(?=$|[^\\p{L}\\p{N}])`, "iu").test(text);
 const digitRuns = (text: string) => (text.match(/\d+(?:[.,]\d+)*/g) ?? []).sort();
 const numberKey = (n: { kind: string; value: number }) => `${n.kind}:${n.value}`;
 
@@ -83,7 +96,15 @@ function multiset(values: string[]): Map<string, number> {
   return m;
 }
 
-export function polishGate(raw: string, polished: string): PolishGateResult {
+export interface PolishGateOptions {
+  /**
+   * Names the candidate gave in the forms (employers, job titles). If the answer mentions one, the
+   * revision must keep it, wherever it stands.
+   */
+  keep?: string[];
+}
+
+export function polishGate(raw: string, polished: string, options: PolishGateOptions = {}): PolishGateResult {
   const text = polished.replace(/\s+/g, " ").trim();
   const source = raw.replace(/\s+/g, " ").trim();
   if (!text) return { ok: false, reason: "length", detail: "empty" };
@@ -119,6 +140,8 @@ export function polishGate(raw: string, polished: string): PolishGateResult {
     return !polishedKeys.has(t.key);
   });
   if (dropped) return { ok: false, reason: "dropped", detail: `drops "${dropped.text}"` };
+  const lostTerm = (options.keep ?? []).map((k) => k.trim()).find((k) => k.length >= 2 && containsTerm(source, k) && !containsTerm(text, k));
+  if (lostTerm) return { ok: false, reason: "dropped", detail: `drops "${lostTerm}"` };
 
   // 3. New words may not be names, numbers, tools, size claims, or English inside a Korean answer.
   // Every word counts here, however short. A new word with a capital letter is a new name, with one
@@ -128,11 +151,14 @@ export function polishGate(raw: string, polished: string): PolishGateResult {
   const isNew = (t: Token) => !rawKeys.has(t.key) && !rawLower.has(t.text.toLowerCase());
   for (const t of polishedTokens.filter(isNew)) {
     const lower = t.text.toLowerCase();
-    const newName = hasCapital(t) && (acronym(t) || !t.first);
+    // The first word may be a new capitalised word only when it reads as the line's opening verb.
+    const newName = hasCapital(t) && (acronym(t) || !t.first || !openingVerb(t));
     if (newName || /\d/.test(t.text) || (koreanAnswer && /[A-Za-z]/.test(t.text)) || FACT_LIKE_WORDS.has(t.key) || SIZE_WORD.test(lower) || TOOL_TERMS.includes(lower)) {
       return { ok: false, reason: "new_term", detail: `adds "${t.text}"` };
     }
   }
+  const koClaim = KO_FACT_LIKE.find((w) => text.includes(w) && !source.includes(w));
+  if (koClaim) return { ok: false, reason: "new_term", detail: `adds "${koClaim}"` };
   const fresh = content(polishedTokens).filter((t) => !rawKeys.has(t.key));
 
   // 6. Style: no em dash, no opening "I", and no stock phrase the candidate didn't use themselves.
