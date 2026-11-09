@@ -27,6 +27,11 @@ const OPENING_VERBS = new Set(
   "led ran built grew cut set won made wrote took kept brought taught sold drove began became oversaw hired shipped owned found put met gave got rebuilt redesigned rewrote".split(" "),
 );
 
+/** Present-tense openers for a current role ("Owns hiring"), allowed even when the candidate put it another way. */
+const PRESENT_OPENERS = new Set(
+  "owns oversees handles builds supports leads runs manages drives delivers designs develops maintains partners coaches mentors sets shapes leading running owning overseeing handling building supporting managing".split(" "),
+);
+
 /** Size words in any form: large, larger, largest, big, bigger, biggest… */
 const SIZE_WORD = /^(large|big|huge|massive|vast)(r|st|ger|gest|er|est)?$/;
 
@@ -90,7 +95,7 @@ const verbForm = (t: Token) => /^\p{Lu}\p{Ll}+(ed|ing)$/u.test(t.text);
 function openingVerb(t: Token, rawWords: Set<string>): boolean {
   const w = t.text.toLowerCase();
   if (!/^\p{Lu}\p{Ll}+$/u.test(t.text)) return false;
-  if (w.endsWith("ed") || OPENING_VERBS.has(w)) return true;
+  if (w.endsWith("ed") || OPENING_VERBS.has(w) || PRESENT_OPENERS.has(w)) return true;
   const bases = w.endsWith("ing")
     ? [w.slice(0, -3), w.slice(0, -4), `${w.slice(0, -3)}e`]
     : w.endsWith("es")

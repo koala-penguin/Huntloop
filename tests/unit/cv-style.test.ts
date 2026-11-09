@@ -93,6 +93,16 @@ describe("the revision check (polishGate)", () => {
     expect(polishGate("I was in charge of 5 analysts", "Managed 5 analysts.")).toEqual({ ok: true });
   });
 
+  it("common present-tense openers pass without their base word in the answer", () => {
+    expect(polishGate("I'm responsible for the data platform", "Owns the data platform.")).toEqual({ ok: true });
+    expect(polishGate("I'm in charge of hiring for 2 teams", "Oversees hiring for 2 teams.")).toEqual({ ok: true });
+    expect(polishGate("I built the weekly reports for 3 teams", "Builds the weekly reports for 3 teams.")).toEqual({ ok: true });
+    expect(polishGate("I'm in charge of hiring for 2 teams", "Leading hiring for 2 teams.")).toEqual({ ok: true });
+    for (const name of ["Woolworths", "Siemens", "Boeing", "Google"]) {
+      expect(polishGate("we cut costs by 30%", `${name} cut costs by 30%.`), name).toMatchObject({ ok: false, reason: "new_term" });
+    }
+  });
+
   it("keeps employers and titles from the forms wherever they stand in the answer", () => {
     const keep = ["Boeing", "Booking.com", "Head of Data"];
     expect(polishGate("Boeing hired me to lead 5 engineers", "Hired to lead 5 engineers.", { keep })).toMatchObject({ ok: false, reason: "dropped" });
