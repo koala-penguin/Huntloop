@@ -290,6 +290,7 @@ const row = (id: number, partial: Partial<InterviewAnswerRow>): InterviewAnswerR
   experienceRef: "exp-1",
   question: "",
   quote: "",
+  polished: null,
   private: false,
   origin: "chat",
   messageId: null,

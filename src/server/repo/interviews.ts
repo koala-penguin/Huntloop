@@ -119,6 +119,26 @@ export function setStageStatus(db: Db, interview: Interview, key: string, status
   return { ...interview, stages, ...(nextStage ? { stage: nextStage } : {}) };
 }
 
+/** Undo a skip, or reopen a finished part: back to "to do" (a stage also becomes the current one). */
+export function reopenStage(db: Db, interview: Interview, key: string): Interview {
+  return setStageStatus(db, interview, key, "pending", key.startsWith("role:") ? undefined : (key as InterviewStage));
+}
+
+/**
+ * Continue after a chat. A part the user skipped and then answered anyway counts as done; a skipped
+ * part with nothing in it stays skipped; anything else is done.
+ */
+export function completeChatStage(db: Db, interview: Interview, key: string, hasAnswers: boolean): Interview {
+  if (interview.stages[key] === "skipped" && !hasAnswers) return interview;
+  return setStageStatus(db, interview, key, "done");
+}
+
+/** Whether a stage key ("current", "role:exp-N") has any answer still in use. */
+export function stageHasAnswers(db: Db, interview: Interview, key: string): boolean {
+  const ref = /^role:(exp-\d+)$/.exec(key)?.[1] ?? null;
+  return listAnswers(db, interview.id, { includePrivate: true }).some((a) => (ref ? a.stage === "role_deep" && a.experienceRef === ref : a.stage === key));
+}
+
 export function setCurrentStage(db: Db, interview: Interview, stage: InterviewStage): Interview {
   updateInterview(db, interview.id, { stage });
   return { ...interview, stage };
@@ -185,6 +205,14 @@ function ownAnswer(db: Db, interview: Interview, answerId: number): InterviewAns
   return row;
 }
 
+/** The user's accepted (or edited) revision of an answer; null goes back to their original words. */
+export function setPolished(db: Db, interview: Interview, answerId: number, text: string | null): InterviewAnswerRow {
+  const answer = ownAnswer(db, interview, answerId);
+  const polished = text === null ? null : text.replace(/\s+/g, " ").trim();
+  if (polished !== null && (polished.length < 2 || polished.length > 4000)) throw new UserFacingError("invalid");
+  return db.update(interviewAnswers).set({ polished }).where(eq(interviewAnswers.id, answer.id)).returning().get();
+}
+
 /** An edit is a new answer in the user's words that supersedes the old one (the old one stays for the record). */
 export function editAnswer(db: Db, interview: Interview, answerId: number, patch: { quote?: string; private?: boolean }): InterviewAnswerRow {
   const old = ownAnswer(db, interview, answerId);
@@ -193,7 +221,7 @@ export function editAnswer(db: Db, interview: Interview, answerId: number, patch
   return db.transaction((tx) => {
     const next = tx
       .insert(interviewAnswers)
-      .values({ interviewId: interview.id, stage: old.stage, topic: old.topic, experienceRef: old.experienceRef, question: old.question, quote, private: patch.private ?? old.private, origin: "user_edit", messageId: null })
+      .values({ interviewId: interview.id, stage: old.stage, topic: old.topic, experienceRef: old.experienceRef, question: old.question, quote, polished: patch.quote === undefined ? old.polished : null, private: patch.private ?? old.private, origin: "user_edit", messageId: null })
       .returning()
       .get();
     tx.update(interviewAnswers).set({ supersededBy: next.id }).where(eq(interviewAnswers.id, old.id)).run();

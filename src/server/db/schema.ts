@@ -618,6 +618,8 @@ export const interviewAnswers = sqliteTable(
     question: text("question").notNull().default(""),
     /** The candidate's words, exactly as typed. */
     quote: text("quote").notNull(),
+    /** The user-accepted revision of `quote` (their claim once accepted); null = use quote verbatim. */
+    polished: text("polished"),
     /** Never used for the profile or CV. */
     private: integer("private", { mode: "boolean" }).notNull().default(false),
     /** chat | user_edit | form */

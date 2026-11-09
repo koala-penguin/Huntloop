@@ -1,0 +1,1 @@
+ALTER TABLE `interview_answers` ADD `polished` text;

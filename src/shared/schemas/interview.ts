@@ -29,6 +29,30 @@ export const STAGE_STATUSES = ["pending", "done", "skipped"] as const;
 export type StageStatus = (typeof STAGE_STATUSES)[number];
 export const ANSWER_ORIGINS = ["chat", "user_edit", "form"] as const;
 
+/**
+ * What a chat part needs before the interviewer may call it covered (by conversation scope: the
+ * current-situation chat, a role in depth, a brief role). The candidate can always stop earlier.
+ */
+export const REQUIRED_TOPICS: Record<"current" | "deep" | "brief", InterviewTopic[]> = {
+  current: ["context"],
+  deep: ["scope", "responsibility", "achievement"],
+  brief: ["achievement"],
+};
+
+/**
+ * The quick replies under an interview chat, typed or clicked. "Skip this question" moves on to the
+ * next topic; "That's all for this part" finishes the part; "I don't have a number" keeps an answer
+ * without one. Plain "skip" means the question, never the part.
+ */
+export const CONTROL = {
+  skipQuestion: /^(skip( this question)?|pass|next question|이 질문(은)? 건너뛰(기|어요)|넘어가요)[.!]?$/i,
+  finished: /^(that'?s all( for this part)?|that is all|done|i'?m done|이 부분은 다 했어요|다 했어요|끝이에요|여기까지요)[.!]?$/i,
+  noNumber: /^(i don'?t have a number|no number|숫자는 없어요|숫자가 없어요)[.!]?$/i,
+} as const;
+
+/** The interviewer's first question, shown before the candidate types anything, with example prompts. */
+export type ChatOpening = { text: string; options: string[]; topic: InterviewTopic };
+
 /** Chat turns the interviewer aims for per stage ("question x of ~y"). */
 export const STAGE_TURN_TARGETS = { current: 5, deep: 12, brief: 4 } as const;
 
