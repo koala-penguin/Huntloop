@@ -4,11 +4,11 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useTransition } from "react";
-import { ArrowRight, Check, SkipForward } from "lucide-react";
+import { ArrowRight, Check, RotateCcw, SkipForward, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
-import { goToStageAction, skipStageAction } from "@/app/profile/interview/actions";
+import { goToStageAction, reopenStageAction, skipStageAction } from "@/app/profile/interview/actions";
 import type { StageStatus } from "@/shared/schemas/interview";
 
 /** The role tabs above the per-role chat: one conversation per role, each done, skipped or to do. */
@@ -42,7 +42,7 @@ export function PinRole({ id }: { id: string }) {
   return null;
 }
 
-/** Under a chat: done notice, Skip, and Continue (to the next role still to do, or the next step). */
+/** Under a chat: done or skipped notice (with Reopen / Undo skip), Skip, and Continue (to the next role still to do, or the next step). */
 export function ChatStageControls({
   interviewId,
   stage,
@@ -74,6 +74,11 @@ export function ChatStageControls({
       }
       router.refresh();
     });
+  const reopen = () =>
+    start(async () => {
+      await reopenStageAction(interviewId, statusKey);
+      router.refresh();
+    });
   return (
     <div className="flex flex-col gap-2">
       {status === "done" && (
@@ -82,12 +87,28 @@ export function ChatStageControls({
           {t("roleChat.done")}
         </Alert>
       )}
+      {status === "skipped" && (
+        <Alert tone="neutral" className="flex flex-wrap items-center gap-2" data-skipped>
+          <SkipForward className="size-4 shrink-0" aria-hidden />
+          <span className="flex-1">{t("roleChat.skipped")}</span>
+          <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={reopen}>
+            <Undo2 className="size-3.5" aria-hidden />
+            {t("undoSkip")}
+          </Button>
+        </Alert>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" variant={status === "done" ? "primary" : "secondary"} disabled={pending} onClick={next}>
           <ArrowRight className="size-3.5" aria-hidden />
           {nextRole ? t("roleChat.nextRole") : t("continue")}
         </Button>
-        {status !== "done" && (
+        {status === "done" && (
+          <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={reopen}>
+            <RotateCcw className="size-3.5" aria-hidden />
+            {t("roleChat.reopen")}
+          </Button>
+        )}
+        {status === "pending" && (
           <Button
             type="button"
             size="sm"

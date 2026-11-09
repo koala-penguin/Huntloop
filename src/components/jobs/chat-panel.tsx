@@ -6,13 +6,15 @@ import { useState, useTransition, type KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
-import { Check, Globe, Loader2, NotebookPen, RotateCcw, Search, Send, Sparkles, X } from "lucide-react";
+import { Check, Globe, Loader2, NotebookPen, Pencil, RotateCcw, Search, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label, Textarea } from "@/components/ui/form";
 import { Alert, Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import { newConversationAction, resolveChatActionAction } from "@/app/jobs/[id]/actions";
 import { newCoachConversationAction } from "@/app/coach/actions";
+import { acceptPolishAction } from "@/app/profile/interview/actions";
+import type { ChatOpening, StageStatus } from "@/shared/schemas/interview";
 
 import { AI_ERROR_CODES } from "@/shared/ai-errors";
 import type { Connection } from "@/shared/ai-settings";
@@ -24,6 +26,8 @@ export interface ChatItem {
   activities: Array<{ name: string; detail: string | null }>;
   sources: Array<{ url: string; title: string | null }>;
   actions: Array<{ id: number; kind: string; status: string; payload: Record<string, unknown> }>;
+  /** Example replies offered under an interview question. */
+  suggestions?: string[];
 }
 
 interface Live {
@@ -39,7 +43,8 @@ interface Live {
 const KNOWN_ERRORS = ["refusal", "budget", "max_tokens", "chat_busy", "job_not_ready", "api", "session_expired", ...AI_ERROR_CODES];
 const SUGGESTIONS = ["explain", "fit", "improve", "research"] as const;
 const COACH_SUGGESTIONS = ["week", "compare", "followUp", "search"] as const;
-const INTERVIEW_SUGGESTIONS = ["thatsAll", "noNumber", "skip"] as const;
+/** Quick replies under an interview chat: skip one question, finish the part, no number to give. */
+const INTERVIEW_CONTROLS = ["skipQuestion", "thatsAll", "noNumber"] as const;
 const KNOWN_ACTIVITIES = [
   "web_search",
   "web_fetch",
@@ -56,13 +61,15 @@ const KNOWN_ACTIVITIES = [
   "record_skill",
   "list_answers",
   "complete_stage",
+  "suggest_options",
+  "propose_polish",
 ];
 
 /** A job's own chat, the coach across all jobs, or one stage (and role) of the CV builder interview. */
 export type ChatScopeProp =
   | { kind: "job"; jobId: number }
   | { kind: "coach" }
-  | { kind: "cv_interview"; interviewId: number; stage: "current" | "role_deep"; experienceRef: string | null; opening: string };
+  | { kind: "cv_interview"; interviewId: number; stage: "current" | "role_deep"; experienceRef: string | null; opening: ChatOpening; status: StageStatus };
 
 /** What differs per kind of chat: where messages go, the input's id and the texts around it. */
 function scopeView(scope: ChatScopeProp, t: (key: string) => string, hasProfile: boolean) {
@@ -99,8 +106,9 @@ function scopeView(scope: ChatScopeProp, t: (key: string) => string, hasProfile:
         intro: null,
         placeholder: t("interview.placeholder"),
         hint: t("interview.hint"),
-        suggestions: INTERVIEW_SUGGESTIONS.map((s) => t(`interview.suggestion.${s}`)),
-        alwaysSuggest: true,
+        suggestions: INTERVIEW_CONTROLS.map((s) => t(`interview.control.${s}`)),
+        // Hidden once the part is done: there is no question left to skip.
+        alwaysSuggest: scope.status !== "done",
         canReset: false,
       };
   }
@@ -138,11 +146,79 @@ function Activity({ name, detail }: { name: string; detail: string | null }) {
   );
 }
 
-function ActionCard({ action }: { action: ChatItem["actions"][number] }) {
+/** A cleaner version of an interview answer: the candidate takes it, edits it, or keeps their own words. */
+function PolishCard({ action, interviewId }: { action: ChatItem["actions"][number]; interviewId: number | null }) {
   const t = useTranslations("chat.card");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(String(action.payload.text ?? ""));
+  const run = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
+    start(async () => {
+      const result = await fn();
+      if (!result.ok) setError(result.error ?? "invalid");
+      else setEditing(false);
+      router.refresh();
+    });
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-accent/40 bg-accent-soft p-3" data-action={action.kind} data-status={action.status}>
+      <p className="text-sm font-medium">{t("polishTitle")}</p>
+      {editing ? (
+        <Textarea aria-label={t("polishEditLabel")} rows={3} maxLength={4000} value={text} onChange={(e) => setText(e.target.value)} />
+      ) : (
+        <p className="text-sm" data-polish-text>
+          {String(action.payload.text ?? "")}
+        </p>
+      )}
+      <p className="text-xs text-muted">
+        {t("polishYours")} {String(action.payload.raw ?? "")}
+      </p>
+      {action.status === "pending" ? (
+        <div className="flex flex-wrap gap-2">
+          {editing ? (
+            <>
+              <Button type="button" size="sm" disabled={pending || text.trim().length < 2 || interviewId === null} onClick={() => run(() => acceptPolishAction(interviewId!, action.id, text))}>
+                <Check className="size-3.5" aria-hidden />
+                {t("polishSaveEdit")}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => setEditing(false)}>
+                {t("polishCancel")}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" size="sm" disabled={pending} onClick={() => run(() => resolveChatActionAction(action.id, "accept"))}>
+                <Check className="size-3.5" aria-hidden />
+                {t("polishAccept")}
+              </Button>
+              <Button type="button" variant="secondary" size="sm" disabled={pending || interviewId === null} onClick={() => setEditing(true)}>
+                <Pencil className="size-3.5" aria-hidden />
+                {t("polishEdit")}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => resolveChatActionAction(action.id, "dismiss"))}>
+                <X className="size-3.5" aria-hidden />
+                {t("polishKeep")}
+              </Button>
+            </>
+          )}
+        </div>
+      ) : (
+        <Badge tone={action.status === "accepted" ? "accent" : "outline"} className="self-start">
+          {action.status === "accepted" ? t("polishAccepted") : t("polishKept")}
+        </Badge>
+      )}
+      {error && <Alert tone="danger">{error}</Alert>}
+    </div>
+  );
+}
+
+function ActionCard({ action, interviewId }: { action: ChatItem["actions"][number]; interviewId: number | null }) {
+  const t = useTranslations("chat.card");
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  if (action.kind === "interview_polish") return <PolishCard action={action} interviewId={interviewId} />;
   const decide = (decision: "accept" | "dismiss") =>
     start(async () => {
       const result = await resolveChatActionAction(action.id, decision);
@@ -184,7 +260,7 @@ function ActionCard({ action }: { action: ChatItem["actions"][number] }) {
   );
 }
 
-function AssistantBubble({ item }: { item: Pick<ChatItem, "text" | "activities" | "sources" | "actions"> }) {
+function AssistantBubble({ item, interviewId = null }: { item: Pick<ChatItem, "text" | "activities" | "sources" | "actions">; interviewId?: number | null }) {
   const t = useTranslations("chat");
   return (
     <div className="flex flex-col gap-2" data-role="assistant">
@@ -211,7 +287,7 @@ function AssistantBubble({ item }: { item: Pick<ChatItem, "text" | "activities" 
         </details>
       )}
       {item.actions.map((a) => (
-        <ActionCard key={a.id} action={a} />
+        <ActionCard key={a.id} action={a} interviewId={interviewId} />
       ))}
     </div>
   );
@@ -256,6 +332,16 @@ export function ChatPanel({
   const inputId = view.inputId;
   const showLive = live && (!live.finished || items.length <= live.baseCount);
   const sending = !!live && !live.finished;
+  const interviewId = scope.kind === "cv_interview" ? scope.interviewId : null;
+  // Examples under the interviewer's latest question (the opening's before the first message). They
+  // only fill the reply box: what the candidate sends is their answer.
+  const lastItem = items.at(-1);
+  const examples =
+    scope.kind !== "cv_interview" || scope.status === "done" || showLive ? [] : items.length === 0 ? scope.opening.options : lastItem?.role === "assistant" ? (lastItem.suggestions ?? []) : [];
+  const addExample = (text: string) => {
+    setInput((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text}` : text));
+    inputRef.current?.focus();
+  };
 
   const send = async (text: string) => {
     const message = text.trim();
@@ -314,8 +400,8 @@ export function ChatPanel({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-4" aria-live="polite">
         {items.length === 0 && !showLive && view.intro && <p className="text-sm text-muted">{view.intro}</p>}
-        {scope.kind === "cv_interview" && <AssistantBubble item={{ text: scope.opening, activities: [], sources: [], actions: [] }} />}
-        {items.map((item) => (item.role === "user" ? <UserBubble key={item.id} text={item.text} /> : <AssistantBubble key={item.id} item={item} />))}
+        {scope.kind === "cv_interview" && <AssistantBubble item={{ text: scope.opening.text, activities: [], sources: [], actions: [] }} />}
+        {items.map((item) => (item.role === "user" ? <UserBubble key={item.id} text={item.text} /> : <AssistantBubble key={item.id} item={item} interviewId={interviewId} />))}
         {showLive && (
           <>
             <UserBubble text={live.user} />
@@ -332,10 +418,30 @@ export function ChatPanel({
         )}
       </div>
 
-      {(view.alwaysSuggest ? !sending : items.length === 0 && !live) && (
+      {examples.length > 0 && !sending && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs text-muted">{t("interview.suggestionsHint")}</p>
+          <div role="group" aria-label={t("interview.suggestionsLabel")} className="flex flex-wrap gap-2">
+            {examples.map((text) => (
+              <Button key={text} type="button" variant="secondary" size="sm" data-suggestion={text} onClick={() => addExample(text)}>
+                {text}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(scope.kind === "cv_interview" ? view.alwaysSuggest && !sending : items.length === 0 && !live) && (
         <div className="flex flex-wrap gap-2">
-          {view.suggestions.map((text) => (
-            <Button key={text} type="button" variant="secondary" size="sm" onClick={() => void send(text)}>
+          {view.suggestions.map((text, i) => (
+            <Button
+              key={text}
+              type="button"
+              variant={scope.kind === "cv_interview" ? "ghost" : "secondary"}
+              size="sm"
+              data-control={scope.kind === "cv_interview" ? INTERVIEW_CONTROLS[i] : undefined}
+              onClick={() => void send(text)}
+            >
               {text}
             </Button>
           ))}

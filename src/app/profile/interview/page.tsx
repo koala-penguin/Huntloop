@@ -6,7 +6,7 @@ import { conversations } from "@/server/db/schema";
 import { appContext } from "@/server/context";
 import { budgetStatus } from "@/server/ai/client";
 import { listChatActions, listChatMessages } from "@/server/ai/chat/harness";
-import { interviewOpening } from "@/server/ai/chat/interview";
+import { INTERVIEW_TOOLSET_VERSION, interviewOpening } from "@/server/ai/chat/interview";
 import { transcript } from "@/server/ai/chat/render";
 import { getLatestInterview, listAnswers, stageConversation, type Interview } from "@/server/repo/interviews";
 import { getCurrentProfile, getPreferences } from "@/server/repo/profile";
@@ -30,7 +30,9 @@ import { INTERVIEW_STAGES, answerRole, interviewFormSchema, roleStageKey, rolesI
 function chatItems(db: ReturnType<typeof appContext>["db"], interview: Interview, stage: ChatStage, ref: string | null) {
   const link = stageConversation(db, interview.id, stage, stage === "role_deep" ? ref : null);
   const conversation = link ? db.select().from(conversations).where(eq(conversations.id, link.conversationId)).get() : undefined;
-  if (!conversation) return { items: [], conversation: null };
+  // A chat with the older interviewer is replaced on the next message; while the interview is still
+  // going, show the new opening instead (a finished interview keeps its transcript to read).
+  if (!conversation || (interview.status === "in_progress" && conversation.toolsetVersion !== INTERVIEW_TOOLSET_VERSION)) return { items: [], conversation: null };
   return { items: transcript(listChatMessages({ db }, conversation.id), listChatActions({ db }, conversation.id)), conversation };
 }
 
@@ -86,16 +88,15 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
     { key: "general", label: t("drawer.general"), answers: answers.filter((a) => !answerRole(form, a)) },
     // Answers about a role that was removed from the role table: kept for the record, never used.
     { key: "removed", label: t("drawer.removedRole"), answers: answers.filter((a) => { const ref = answerRole(form, a); return !!ref && !form.roles.some((r) => r.id === ref); }) },
-  ].map((g) => ({ ...g, answers: g.answers.map((a) => ({ id: a.id, topic: a.topic, quote: a.quote, private: a.private, edited: a.origin === "user_edit" })) }));
+  ].map((g) => ({ ...g, answers: g.answers.map((a) => ({ id: a.id, topic: a.topic, quote: a.quote, polished: a.polished, private: a.private, edited: a.origin === "user_edit" })) }));
 
   const chat = (chatStage: ChatStage, ref: string | null, status: StageStatus, nextRole: string | null, next: InterviewStage) => {
     const { items, conversation } = chatItems(db, interview, chatStage, ref);
-    const roleForm = ref ? (form.roles.find((r) => r.id === ref) ?? null) : null;
     return (
       <Card className="flex flex-col gap-4">
         <ChatPanel
           key={`${chatStage}-${ref ?? "current"}`}
-          scope={{ kind: "cv_interview", interviewId: interview.id, stage: chatStage, experienceRef: ref, opening: interviewOpening(interview, chatStage, ref).text }}
+          scope={{ kind: "cv_interview", interviewId: interview.id, stage: chatStage, experienceRef: ref, opening: interviewOpening(interview, chatStage, ref), status }}
           items={items}
           hasConversation={!!conversation}
           provider={conversation ? (conversation.provider as Connection) : null}
@@ -141,10 +142,10 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
       );
       break;
     case "education":
-      main = <EducationForm interviewId={interview.id} initial={form} />;
+      main = <EducationForm interviewId={interview.id} initial={form} status={interview.stages.education as StageStatus | undefined} />;
       break;
     case "languages":
-      main = <LanguagesForm interviewId={interview.id} initial={form.languages} />;
+      main = <LanguagesForm interviewId={interview.id} initial={form.languages} cvLanguage={form.contact.cvLanguage || interview.language} status={interview.stages.languages as StageStatus | undefined} />;
       break;
     case "contact":
       main = <ContactForm interviewId={interview.id} initial={form.contact} />;

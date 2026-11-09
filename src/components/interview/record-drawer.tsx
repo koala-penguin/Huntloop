@@ -13,6 +13,8 @@ export interface RecordedAnswer {
   id: number;
   topic: string;
   quote: string;
+  /** The cleaner version they accepted (used on the CV), if any. */
+  polished?: string | null;
   private: boolean;
   edited: boolean;
 }
@@ -27,7 +29,8 @@ function AnswerItem({ interviewId, answer }: { interviewId: number; answer: Reco
   const t = useTranslations("interview");
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(answer.quote);
+  const shown = answer.polished ?? answer.quote;
+  const [text, setText] = useState(shown);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const act = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
@@ -65,7 +68,15 @@ function AnswerItem({ interviewId, answer }: { interviewId: number; answer: Reco
           </div>
         </div>
       ) : (
-        <p className="text-sm whitespace-pre-wrap">{answer.quote}</p>
+        <>
+          <p className="text-sm whitespace-pre-wrap">{shown}</p>
+          {answer.polished && (
+            <details className="text-xs text-muted">
+              <summary className="cursor-pointer">{t("drawer.original")}</summary>
+              <p className="mt-1 whitespace-pre-wrap">{answer.quote}</p>
+            </details>
+          )}
+        </>
       )}
       {!editing && (
         <div className="flex flex-wrap gap-2">
@@ -106,7 +117,7 @@ export function RecordDrawer({ interviewId, groups, open }: { interviewId: numbe
                 <h3 className="text-xs font-medium text-muted">{g.label}</h3>
                 <ul className="flex flex-col gap-2">
                   {g.answers.map((a) => (
-                    <AnswerItem key={`${a.id}:${a.quote}:${a.private}`} interviewId={interviewId} answer={a} />
+                    <AnswerItem key={`${a.id}:${a.polished ?? a.quote}:${a.private}`} interviewId={interviewId} answer={a} />
                   ))}
                 </ul>
               </section>

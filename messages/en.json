@@ -951,7 +951,9 @@
       "record_answer": "Recorded: {detail}",
       "record_skill": "Noted a skill: {detail}",
       "list_answers": "Read back your answers",
-      "complete_stage": "Finished this part"
+      "complete_stage": "Finished this part",
+      "suggest_options": "Suggested examples: {detail}",
+      "propose_polish": "Offered a cleaner version"
     },
     "card": {
       "factTitle": "Add this to your profile?",
@@ -961,7 +963,17 @@
       "notNow": "Not now",
       "factAdded": "Added to your profile",
       "proceeded": "Moving ahead: status set to Applying",
-      "dismissed": "Dismissed"
+      "dismissed": "Dismissed",
+      "polishTitle": "A cleaner version of your answer",
+      "polishYours": "Your words:",
+      "polishAccept": "Use this",
+      "polishEdit": "Edit",
+      "polishKeep": "Keep my words",
+      "polishAccepted": "Using this version",
+      "polishKept": "Kept your words",
+      "polishEditLabel": "Edit the cleaner version",
+      "polishSaveEdit": "Use my edit",
+      "polishCancel": "Cancel"
     },
     "coach": {
       "title": "Coach",
@@ -986,11 +998,13 @@
     },
     "interview": {
       "placeholder": "Type your answer… (Enter to send, Shift+Enter for a new line)",
-      "hint": "Your answers are recorded exactly as you type them. Type numbers as digits.",
-      "suggestion": {
-        "thatsAll": "That's all",
-        "noNumber": "I don't have a number",
-        "skip": "Skip"
+      "hint": "Your answers are recorded as you type them; a cleaner version is used only if you accept it. Type numbers as digits.",
+      "suggestionsLabel": "Examples to start from",
+      "suggestionsHint": "Examples for this kind of role. Click one to put it in your answer, then make it yours.",
+      "control": {
+        "skipQuestion": "Skip this question",
+        "thatsAll": "That's all for this part",
+        "noNumber": "I don't have a number"
       }
     }
   },
@@ -1673,7 +1687,10 @@
       "description": "Languages you can work in, and how well.",
       "language": "Language ({n})",
       "level": "Level ({n})",
-      "add": "Add a language"
+      "add": "Add a language",
+      "placeholder": "Start typing a language",
+      "noMatch": "No matching language. You can keep what you typed.",
+      "matches": "{count, plural, one {# language matches} other {# languages match}}"
     },
     "contact": {
       "title": "How you appear on the CV",
@@ -1715,7 +1732,7 @@
     },
     "drawer": {
       "title": "What I've recorded ({count})",
-      "description": "Your own words, exactly as typed. Private answers never reach your profile or CV. After you generate, changes here update your profile straight away; generate again to rewrite the CV.",
+      "description": "Your own words as typed, or the cleaner version you accepted. Private answers never reach your profile or CV. After you generate, changes here update your profile straight away; generate again to rewrite the CV.",
       "empty": "Nothing recorded yet.",
       "general": "About you",
       "private": "Private",
@@ -1727,7 +1744,8 @@
       "makePrivate": "Keep private",
       "makePublic": "Use on my CV",
       "delete": "Delete",
-      "removedRole": "From a role you removed (not used)"
+      "removedRole": "From a role you removed (not used)",
+      "original": "Your original words"
     },
     "skills": {
       "title": "Skills",
@@ -1778,10 +1796,14 @@
     },
     "roleChat": {
       "rolesLabel": "Roles",
-      "done": "This part is done. You can still add to it, or continue.",
+      "done": "This part is done. Continue, or reopen it to add more.",
       "nextRole": "Next role",
       "skipRole": "Skip this role",
-      "noRoles": "Add your roles in the previous step first."
-    }
+      "noRoles": "Add your roles in the previous step first.",
+      "skipped": "You skipped this part. You can still answer below.",
+      "reopen": "Reopen"
+    },
+    "undoSkip": "Undo skip",
+    "skippedForm": "You skipped this step. You can still fill it in."
   }
 }

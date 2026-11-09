@@ -951,7 +951,9 @@
       "record_answer": "기록함: {detail}",
       "record_skill": "기술을 메모함: {detail}",
       "list_answers": "답변을 다시 읽음",
-      "complete_stage": "이 부분을 마침"
+      "complete_stage": "이 부분을 마침",
+      "suggest_options": "예시 제안: {detail}",
+      "propose_polish": "다듬은 문장 제안"
     },
     "card": {
       "factTitle": "프로필에 추가할까요?",
@@ -961,7 +963,17 @@
       "notNow": "나중에",
       "factAdded": "프로필에 추가했습니다",
       "proceeded": "진행합니다: 상태를 '지원 준비 중'으로 바꿨습니다",
-      "dismissed": "닫음"
+      "dismissed": "닫음",
+      "polishTitle": "답을 다듬은 문장",
+      "polishYours": "내가 쓴 말:",
+      "polishAccept": "이걸로 쓰기",
+      "polishEdit": "고치기",
+      "polishKeep": "내 말 그대로 두기",
+      "polishAccepted": "이 문장을 씁니다",
+      "polishKept": "내 말 그대로 둠",
+      "polishEditLabel": "다듬은 문장 고치기",
+      "polishSaveEdit": "고친 문장 쓰기",
+      "polishCancel": "취소"
     },
     "coach": {
       "title": "코치",
@@ -986,11 +998,13 @@
     },
     "interview": {
       "placeholder": "답을 입력하세요… (Enter로 전송, Shift+Enter로 줄바꿈)",
-      "hint": "답은 입력한 그대로 기록됩니다. 숫자는 숫자로 적어 주세요.",
-      "suggestion": {
-        "thatsAll": "다 했어요",
-        "noNumber": "숫자는 없어요",
-        "skip": "건너뛰기"
+      "hint": "답은 입력한 그대로 기록되고, 다듬은 문장은 수락할 때만 쓰입니다. 숫자는 숫자로 적어 주세요.",
+      "suggestionsLabel": "참고할 예시",
+      "suggestionsHint": "이런 역할에서 흔히 하는 일입니다. 눌러서 답에 넣은 뒤 내 말로 고쳐 주세요.",
+      "control": {
+        "skipQuestion": "이 질문 건너뛰기",
+        "thatsAll": "이 부분은 다 했어요",
+        "noNumber": "숫자는 없어요"
       }
     }
   },
@@ -1673,7 +1687,10 @@
       "description": "업무에 쓸 수 있는 언어와 수준.",
       "language": "언어 ({n})",
       "level": "수준 ({n})",
-      "add": "언어 추가"
+      "add": "언어 추가",
+      "placeholder": "언어 이름을 입력하세요",
+      "noMatch": "맞는 언어가 없습니다. 입력한 그대로 둘 수 있습니다.",
+      "matches": "{count, plural, other {언어 #개}}"
     },
     "contact": {
       "title": "CV에 표시될 정보",
@@ -1715,7 +1732,7 @@
     },
     "drawer": {
       "title": "기록한 내용 ({count})",
-      "description": "내가 입력한 말 그대로입니다. 비공개 답변은 프로필이나 CV에 들어가지 않습니다. 만든 뒤에 여기서 바꾸면 프로필에 바로 반영되며, CV를 새로 쓰려면 다시 만드세요.",
+      "description": "입력한 그대로의 말, 또는 수락한 다듬은 문장입니다. 비공개 답은 프로필이나 CV에 들어가지 않습니다. 생성한 뒤에는 여기서 바꾸면 프로필에 바로 반영되고, CV는 다시 생성해야 바뀝니다.",
       "empty": "아직 기록된 내용이 없습니다.",
       "general": "나에 대해",
       "private": "비공개",
@@ -1727,7 +1744,8 @@
       "makePrivate": "비공개로",
       "makePublic": "CV에 사용",
       "delete": "삭제",
-      "removedRole": "삭제한 역할의 답변 (사용하지 않음)"
+      "removedRole": "삭제한 역할의 답변 (사용하지 않음)",
+      "original": "처음 쓴 말"
     },
     "skills": {
       "title": "기술",
@@ -1778,10 +1796,14 @@
     },
     "roleChat": {
       "rolesLabel": "역할",
-      "done": "이 부분은 끝났습니다. 더 덧붙이거나 다음으로 넘어가세요.",
+      "done": "이 부분은 끝났습니다. 계속하거나, 다시 열어 더 덧붙이세요.",
       "nextRole": "다음 역할",
       "skipRole": "이 역할 건너뛰기",
-      "noRoles": "먼저 이전 단계에서 역할을 추가하세요."
-    }
+      "noRoles": "먼저 이전 단계에서 역할을 추가하세요.",
+      "skipped": "이 부분을 건너뛰었습니다. 아래에서 계속 답할 수 있습니다.",
+      "reopen": "다시 열기"
+    },
+    "undoSkip": "건너뛰기 취소",
+    "skippedForm": "이 단계를 건너뛰었습니다. 지금 채워도 됩니다."
   }
 }

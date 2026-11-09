@@ -8,7 +8,12 @@ export interface TranscriptItem {
   activities: Array<{ name: string; detail: string | null }>;
   sources: Array<{ url: string; title: string | null }>;
   actions: Array<{ id: number; kind: string; status: string; payload: Record<string, unknown> }>;
+  /** Example replies the interviewer offered under its question (suggest_options), shown as chips. */
+  suggestions: string[];
 }
+
+/** Tools shown as something else (a card, chips), not as an activity line. */
+const SHOWN_ELSEWHERE = ["propose_profile_fact", "propose_proceed", "propose_polish", "suggest_options"];
 
 type Block = Record<string, unknown> & { type: string };
 
@@ -19,12 +24,12 @@ export function transcript(rows: ChatMessageRow[], actions: ChatActionRow[]): Tr
   for (const row of rows) {
     if (row.kind === "user") {
       current = null;
-      items.push({ id: row.id, role: "user", text: row.text ?? "", activities: [], sources: [], actions: [] });
+      items.push({ id: row.id, role: "user", text: row.text ?? "", activities: [], sources: [], actions: [], suggestions: [] });
       continue;
     }
     if (row.kind !== "assistant") continue;
     if (!current) {
-      current = { id: row.id, role: "assistant", text: "", activities: [], sources: [], actions: [] };
+      current = { id: row.id, role: "assistant", text: "", activities: [], sources: [], actions: [], suggestions: [] };
       items.push(current);
     }
     for (const block of row.content as Block[]) {
@@ -37,7 +42,8 @@ export function transcript(rows: ChatMessageRow[], actions: ChatActionRow[]): Tr
       } else if (block.type === "server_tool_use" || block.type === "tool_use") {
         const input = (block.input ?? {}) as Record<string, unknown>;
         const detail = [input.query, input.url, input.note, input.status, input.instructions].find((v) => typeof v === "string") as string | undefined;
-        if (!["propose_profile_fact", "propose_proceed"].includes(String(block.name))) current.activities.push({ name: String(block.name), detail: detail ?? null });
+        if (block.name === "suggest_options" && Array.isArray(input.options)) current.suggestions = input.options.map(String).filter((o) => o.trim() && !/\d/.test(o)).slice(0, 6);
+        if (!SHOWN_ELSEWHERE.includes(String(block.name))) current.activities.push({ name: String(block.name), detail: detail ?? null });
       }
     }
     for (const action of actions.filter((a) => a.messageId === row.id)) {

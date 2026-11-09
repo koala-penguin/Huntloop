@@ -3,19 +3,20 @@
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
-import { ArrowRight, Plus, SkipForward, Trash2 } from "lucide-react";
+import { ArrowRight, Plus, SkipForward, Trash2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FieldHint, Input, Label, Select } from "@/components/ui/form";
 import { TagInput } from "@/components/ui/tag-input";
 import { CountrySelect } from "@/components/ui/country-select";
+import { LanguageCombobox } from "@/components/ui/language-combobox";
 import { marketPack } from "@/shared/markets";
 import { EMPLOYMENT_TYPES, WORKPLACE_TYPES } from "@/shared/schemas/preferences";
 import { LANGUAGE_LEVELS, SENIORITY_LEVELS, type WorkRight } from "@/shared/schemas/profile";
 import { CV_LANGUAGES } from "@/shared/schemas/cv";
-import { CURRENT_STATUSES, INTERVIEW_DEPTHS, INTERVIEW_PERSONAS, ROLE_DEPTHS, type InterviewForm, type RoleForm } from "@/shared/schemas/interview";
-import { saveStageFormAction, skipStageAction, startInterviewAction } from "@/app/profile/interview/actions";
+import { CURRENT_STATUSES, INTERVIEW_DEPTHS, INTERVIEW_PERSONAS, ROLE_DEPTHS, type InterviewForm, type RoleForm, type StageStatus } from "@/shared/schemas/interview";
+import { reopenStageAction, saveStageFormAction, skipStageAction, startInterviewAction } from "@/app/profile/interview/actions";
 
 /** The CV builder's form stages. Each saves through one server action; "Save and continue" also moves on. */
 
@@ -62,6 +63,7 @@ function useStageSave(interviewId: number) {
     error,
     save: (stage: string, value: unknown, advance: boolean) => run(() => saveStageFormAction(interviewId, stage, value, advance)),
     skip: (key: string) => run(() => skipStageAction(interviewId, key)),
+    undoSkip: (key: string) => run(() => reopenStageAction(interviewId, key)),
   };
 }
 
@@ -77,11 +79,38 @@ function StageCard({ title, description, children }: { title: string; descriptio
   );
 }
 
-function Actions({ pending, error, onSave, onContinue, onSkip }: { pending: boolean; error: string | null; onSave?: () => void; onContinue: () => void; onSkip?: () => void }) {
+function Actions({
+  pending,
+  error,
+  onSave,
+  onContinue,
+  onSkip,
+  skipped = false,
+  onUndoSkip,
+}: {
+  pending: boolean;
+  error: string | null;
+  onSave?: () => void;
+  onContinue: () => void;
+  onSkip?: () => void;
+  /** This step was skipped: say so, with a way back. */
+  skipped?: boolean;
+  onUndoSkip?: () => void;
+}) {
   const t = useTranslations("interview");
   const tErrors = useTranslations("errors");
   return (
     <div className="flex flex-col gap-2">
+      {skipped && onUndoSkip && (
+        <Alert tone="neutral" className="flex flex-wrap items-center gap-2" data-skipped>
+          <SkipForward className="size-4 shrink-0" aria-hidden />
+          <span className="flex-1">{t("skippedForm")}</span>
+          <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={onUndoSkip}>
+            <Undo2 className="size-3.5" aria-hidden />
+            {t("undoSkip")}
+          </Button>
+        </Alert>
+      )}
       {error && <Alert tone="danger">{error === "invalid" ? t("invalidForm") : tErrors("generic", { message: error })}</Alert>}
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" disabled={pending} onClick={onContinue}>
@@ -93,7 +122,7 @@ function Actions({ pending, error, onSave, onContinue, onSkip }: { pending: bool
             {t("save")}
           </Button>
         )}
-        {onSkip && (
+        {onSkip && !skipped && (
           <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={onSkip}>
             <SkipForward className="size-3.5" aria-hidden />
             {t("skip")}
@@ -366,12 +395,12 @@ export function RolesForm({ interviewId, initial, quick }: { interviewId: number
 }
 
 /** Stage 6: education and certifications (facts only; no chat in this version). */
-export function EducationForm({ interviewId, initial }: { interviewId: number; initial: Pick<InterviewForm, "education" | "certifications"> }) {
+export function EducationForm({ interviewId, initial, status = "pending" }: { interviewId: number; initial: Pick<InterviewForm, "education" | "certifications">; status?: StageStatus }) {
   const t = useTranslations("interview");
   const tProfile = useTranslations("profile");
   const [education, setEducation] = useState(initial.education);
   const [certifications, setCertifications] = useState(initial.certifications);
-  const { pending, error, save, skip } = useStageSave(interviewId);
+  const { pending, error, save, skip, undoSkip } = useStageSave(interviewId);
   const nullable = (v: string) => (v.trim() ? v : null);
   return (
     <StageCard title={t("education.title")} description={t("education.description")}>
@@ -418,23 +447,38 @@ export function EducationForm({ interviewId, initial }: { interviewId: number; i
         error={error}
         onContinue={() => save("education", { education: education.filter((e) => e.institution.trim()), certifications: certifications.filter((c) => c.name.trim()) }, true)}
         onSkip={() => skip("education")}
+        skipped={status === "skipped"}
+        onUndoSkip={() => undoSkip("education")}
       />
     </StageCard>
   );
 }
 
 /** Stage 9: languages and levels. */
-export function LanguagesForm({ interviewId, initial }: { interviewId: number; initial: InterviewForm["languages"] }) {
+export function LanguagesForm({
+  interviewId,
+  initial,
+  cvLanguage,
+  status = "pending",
+}: {
+  interviewId: number;
+  initial: InterviewForm["languages"];
+  /** Language names are written in the CV's language. */
+  cvLanguage: string;
+  status?: StageStatus;
+}) {
   const t = useTranslations("interview");
   const tProfile = useTranslations("profile");
   const [languages, setLanguages] = useState(initial);
-  const { pending, error, save, skip } = useStageSave(interviewId);
+  const { pending, error, save, skip, undoSkip } = useStageSave(interviewId);
   return (
     <StageCard title={t("languages.title")} description={t("languages.description")}>
       <ol className="flex flex-col gap-3">
         {languages.map((l, i) => (
           <li key={i} className="grid gap-3 sm:grid-cols-3">
-            <Field label={t("languages.language", { n: i + 1 })}>{(id) => <Input id={id} value={l.language} onChange={(e) => setLanguages(languages.map((x, j) => (j === i ? { ...x, language: e.target.value } : x)))} />}</Field>
+            <Field label={t("languages.language", { n: i + 1 })}>
+              {(id) => <LanguageCombobox id={id} value={l.language} listLocale={cvLanguage} onChange={(language) => setLanguages(languages.map((x, j) => (j === i ? { ...x, language } : x)))} />}
+            </Field>
             <Field label={t("languages.level", { n: i + 1 })}>
               {(id) => (
                 <Select id={id} value={l.level} onChange={(e) => setLanguages(languages.map((x, j) => (j === i ? { ...x, level: e.target.value as typeof l.level } : x)))}>
@@ -461,7 +505,14 @@ export function LanguagesForm({ interviewId, initial }: { interviewId: number; i
           {t("languages.add")}
         </Button>
       </div>
-      <Actions pending={pending} error={error} onContinue={() => save("languages", languages.filter((l) => l.language.trim()), true)} onSkip={() => skip("languages")} />
+      <Actions
+        pending={pending}
+        error={error}
+        onContinue={() => save("languages", languages.filter((l) => l.language.trim()), true)}
+        onSkip={() => skip("languages")}
+        skipped={status === "skipped"}
+        onUndoSkip={() => undoSkip("languages")}
+      />
     </StageCard>
   );
 }

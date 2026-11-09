@@ -20,6 +20,7 @@ import { FieldHint, Input, Select, Textarea } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { CountrySelect } from "@/components/ui/country-select";
+import { LanguageCombobox } from "@/components/ui/language-combobox";
 import { saveProfileAction } from "@/app/profile/actions";
 import { useFieldValue } from "@/components/ui/use-field-value";
 
@@ -386,7 +387,12 @@ export function ProfileEditor({ version, cvText: initialCvText, data: initialDat
             {data.languages.map((lang, index) => (
               <li key={index} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
                 <Field label={t("language")}>
-                  <Input value={lang.language} onChange={(e) => update((d) => ({ ...d, languages: d.languages.map((l, i) => (i === index ? { ...l, language: e.target.value } : l)) }))} />
+                  <LanguageCombobox
+                    id={`profile-language-${index}`}
+                    aria-label={t("language")}
+                    value={lang.language}
+                    onChange={(language) => update((d) => ({ ...d, languages: d.languages.map((l, i) => (i === index ? { ...l, language } : l)) }))}
+                  />
                 </Field>
                 <Field label={t("level")}>
                   <Select value={lang.level} onChange={(e) => update((d) => ({ ...d, languages: d.languages.map((l, i) => (i === index ? { ...l, level: e.target.value as typeof l.level } : l)) }))}>
