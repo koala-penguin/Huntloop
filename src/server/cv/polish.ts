@@ -82,8 +82,24 @@ const hasCapital = (t: Token) => /\p{Lu}/u.test(t.text) && !firstPerson(t);
 const acronym = (t: Token) => /^\p{Lu}[\p{Lu}\p{N}+#]*$/u.test(t.text) && !firstPerson(t);
 /** A verb form that often opens a CV line ("Managed", "Planning"): rewording it is fine. */
 const verbForm = (t: Token) => /^\p{Lu}\p{Ll}+(ed|ing)$/u.test(t.text);
-/** A capitalised first word that reads as a CV line's opening verb ("Led", "Managed", "Builds"). */
-const openingVerb = (t: Token) => /^\p{Lu}\p{Ll}+(ed|ing|s)$/u.test(t.text) || OPENING_VERBS.has(t.text.toLowerCase());
+/**
+ * A capitalised first word that reads as a CV line's opening verb: a past tense ("Managed", "Led"),
+ * or an -s / -ing form whose base word the candidate used ("Runs" from "run", "Planning" from
+ * "plan"). Names can end in -s or -ing too ("Woolworths", "Boeing"), so those need the base word.
+ */
+function openingVerb(t: Token, rawWords: Set<string>): boolean {
+  const w = t.text.toLowerCase();
+  if (!/^\p{Lu}\p{Ll}+$/u.test(t.text)) return false;
+  if (w.endsWith("ed") || OPENING_VERBS.has(w)) return true;
+  const bases = w.endsWith("ing")
+    ? [w.slice(0, -3), w.slice(0, -4), `${w.slice(0, -3)}e`]
+    : w.endsWith("es")
+      ? [w.slice(0, -1), w.slice(0, -2)]
+      : w.endsWith("s")
+        ? [w.slice(0, -1)]
+        : [];
+  return bases.some((b) => b.length >= 2 && rawWords.has(b));
+}
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** Whole-term, case-insensitive ("Booking.com", "Head of Data"). */
 const containsTerm = (text: string, term: string) => new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(term)}(?=$|[^\\p{L}\\p{N}])`, "iu").test(text);
@@ -152,7 +168,7 @@ export function polishGate(raw: string, polished: string, options: PolishGateOpt
   for (const t of polishedTokens.filter(isNew)) {
     const lower = t.text.toLowerCase();
     // The first word may be a new capitalised word only when it reads as the line's opening verb.
-    const newName = hasCapital(t) && (acronym(t) || !t.first || !openingVerb(t));
+    const newName = hasCapital(t) && (acronym(t) || !t.first || !openingVerb(t, rawLower));
     if (newName || /\d/.test(t.text) || (koreanAnswer && /[A-Za-z]/.test(t.text)) || FACT_LIKE_WORDS.has(t.key) || SIZE_WORD.test(lower) || TOOL_TERMS.includes(lower)) {
       return { ok: false, reason: "new_term", detail: `adds "${t.text}"` };
     }

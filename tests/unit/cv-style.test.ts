@@ -83,6 +83,16 @@ describe("the revision check (polishGate)", () => {
     expect(polishGate("Managed the reporting team of 5", "Led the reporting team of 5.")).toEqual({ ok: true });
   });
 
+  it("an -s or -ing first word needs its base word in the answer; past tenses don't", () => {
+    expect(polishGate("I run the night shift for 2 teams", "Runs the night shift for 2 teams.")).toEqual({ ok: true });
+    expect(polishGate("I plan sprints with 3 product teams", "Planning sprints with 3 product teams.")).toEqual({ ok: true });
+    expect(polishGate("I make the weekly reports for 3 teams", "Making the weekly reports for 3 teams.")).toEqual({ ok: true });
+    for (const name of ["Woolworths", "Siemens", "Boeing"]) {
+      expect(polishGate("we cut costs by 30%", `${name} cut costs by 30%.`), name).toMatchObject({ ok: false, reason: "new_term" });
+    }
+    expect(polishGate("I was in charge of 5 analysts", "Managed 5 analysts.")).toEqual({ ok: true });
+  });
+
   it("keeps employers and titles from the forms wherever they stand in the answer", () => {
     const keep = ["Boeing", "Booking.com", "Head of Data"];
     expect(polishGate("Boeing hired me to lead 5 engineers", "Hired to lead 5 engineers.", { keep })).toMatchObject({ ok: false, reason: "dropped" });

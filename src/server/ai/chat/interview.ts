@@ -476,7 +476,10 @@ function interviewScope(ctx: AiContext, conversation: ConversationRow): ChatScop
             .some((a) => (a.payload as { answerId?: number }).answerId === answer.id);
           if (waiting) return result("A cleaner version of this answer is already waiting for the candidate.", true);
           const { current, roles } = interview.form;
-          const gate = polishGate(answer.quote, text, { keep: [current.company, current.title, ...roles.flatMap((r) => [r.company, r.title])].filter(Boolean) });
+          // Employers, and job titles of two or more words ("Head of Data"); a one-word title like
+          // "Manager" is too common a word to hold the revision to.
+          const titles = [current.title, ...roles.map((r) => r.title)].filter((t) => t.trim().split(/\s+/).length >= 2);
+          const gate = polishGate(answer.quote, text, { keep: [current.company, ...roles.map((r) => r.company), ...titles].filter(Boolean) });
           if (!gate.ok) return result(polishRefusal(gate), true);
           const action = ctx.db
             .insert(chatActions)
