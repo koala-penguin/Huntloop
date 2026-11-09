@@ -80,18 +80,37 @@ export function saveStageForm(db: Db, interview: Interview, stage: FormStage, va
   const parsed = interviewFormSchema.safeParse({ ...interview.form, ...patch });
   if (!parsed.success) throw new UserFacingError("invalid");
   const form = parsed.data;
+  // Role ids are handed out here, never reused: answers, chats and stage status hang off them.
+  let next = nextRoleNumber(db, interview);
   if (stage === "roles") {
-    const ids = form.roles.map((r) => r.id);
-    if (new Set(ids).size !== ids.length) throw new UserFacingError("invalid");
+    const kept = new Set(interview.form.roles.map((r) => r.id));
+    const seen = new Set<string>();
+    form.roles = form.roles.map((r) => {
+      const fresh = !r.id.startsWith("exp-") || !kept.has(r.id) || seen.has(r.id);
+      const role = fresh ? { ...r, id: `exp-${next++}` } : r;
+      seen.add(role.id);
+      return role;
+    });
   }
   if (stage === "current" && !form.roles.length && form.current.title.trim() && ["employed", "self_employed"].includes(form.current.status)) {
     form.roles = [
-      roleFormSchema.parse({ id: "exp-1", title: form.current.title, company: form.current.company, start: form.current.start, country: form.current.country, end: "" }),
+      roleFormSchema.parse({ id: `exp-${next++}`, title: form.current.title, company: form.current.company, start: form.current.start, country: form.current.country, end: "" }),
     ];
   }
   const columns = stage === "setup" ? { depth: form.setup.depth, personas: form.setup.personas, targetCountry: form.setup.country, language: form.setup.language } : {};
   updateInterview(db, interview.id, { form, ...columns });
   return { ...interview, ...columns, form };
+}
+
+/** One more than every role number the interview has ever used (form, answers, chats, stage status). */
+function nextRoleNumber(db: Db, interview: Interview): number {
+  const refs = [
+    ...interview.form.roles.map((r) => r.id),
+    ...Object.keys(interview.stages).map((k) => k.replace(/^role:/, "")),
+    ...db.select({ ref: interviewAnswers.experienceRef }).from(interviewAnswers).where(eq(interviewAnswers.interviewId, interview.id)).all().map((r) => r.ref),
+    ...db.select({ ref: interviewConversations.experienceRef }).from(interviewConversations).where(eq(interviewConversations.interviewId, interview.id)).all().map((r) => r.ref),
+  ];
+  return Math.max(0, ...refs.map((ref) => Number(/^exp-(\d+)$/.exec(ref ?? "")?.[1] ?? 0))) + 1;
 }
 
 export function setStageStatus(db: Db, interview: Interview, key: string, status: StageStatus, nextStage?: InterviewStage): Interview {

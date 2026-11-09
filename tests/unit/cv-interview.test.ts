@@ -17,7 +17,7 @@ import { createJob } from "@/server/repo/jobs";
 import { processJob } from "@/server/jobs/pipeline";
 import { loadJobFit } from "@/server/jobs/fit";
 import { isCvStale, recheckDocument, tailorCvForJob, writeLinkedinForUser } from "@/server/cv/tailor";
-import { buildProfileFromInterview, generateBaseCv, interviewReady, mergePreferences } from "@/server/cv/interview-build";
+import { applyInterviewEdits, buildProfileFromInterview, generateBaseCv, interviewReady, mergePreferences } from "@/server/cv/interview-build";
 import { resolveCvLine } from "@/server/cv/resolve";
 import { exportCv } from "@/server/cv/export";
 import { cvProfileHash, latestCvDocument } from "@/server/repo/cv-documents";
@@ -25,6 +25,7 @@ import { enqueueTask } from "@/server/tasks/runner";
 import { EXTRACT_PROFILE_TASK } from "@/server/tasks/handlers/extract-profile";
 import { startBuildBaseCv } from "@/server/tasks/handlers/build-base-cv";
 import { interviewFormSchema } from "@/shared/schemas/interview";
+import { defaultPreferences } from "@/shared/schemas/preferences";
 import { buildProvenanceContext, checkLine } from "@/server/cv/provenance";
 import { blockingFlags, type CvLine } from "@/shared/schemas/cv";
 import { testDb } from "../helpers/db";
@@ -333,7 +334,6 @@ describe("CV interview — building the profile", () => {
     expect(built.cvText).toBe(
       [
         "CAREER RECORD — Huntloop interview, 2026-11-09",
-        "TARGET: Data Engineering Lead · Wellington (NZ) · lead",
         "CURRENT: Senior Data Engineer, Kea Analytics, 2021-03 – present",
         "ROLE exp-1: Senior Data Engineer — Kea Analytics (2021-03 – present, Wellington NZ)",
         "  scope: I lead a team of 6 data engineers.",
@@ -482,5 +482,80 @@ describe("CV interview — editing, resuming and discarding", () => {
     expect(db.select().from(interviewAnswers).all()).toEqual([]);
     expect(db.select().from(chatMessages).where(eq(chatMessages.conversationId, conversation.id)).all()).toEqual([]);
     expect(db.select().from(conversations).where(eq(conversations.id, conversation.id)).get()).toBeUndefined();
+  });
+});
+
+describe("CV interview — review fixes", () => {
+  it("M1: a role added after another was removed gets a new id, never the removed role's answers or chat", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    const acme = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-2");
+    await turn(ctx, acme.id, "I cut month-end close from 10 days to 4 days.");
+    await turn(ctx, acme.id, "That's all");
+    let current = reload(db, userId, interview);
+    // Remove exp-2 and add another role in the same save: new rows get their id from the server.
+    current = saveStageForm(db, current, "roles", [current.form.roles[0], { id: "new-1", title: "Analyst", company: "Globex", start: "2015-01", end: "2017-12" }]);
+    const globex = current.form.roles.find((r) => r.company === "Globex")!;
+    expect(globex.id).not.toBe("exp-2");
+    expect(current.stages[`role:${globex.id}`]).toBeUndefined();
+    expect(ensureInterviewConversation(ctx, interview.id, "role_deep", globex.id).id).not.toBe(acme.id);
+
+    // The removed role's answers are neither Globex highlights nor free-floating facts.
+    const built = buildProfileFromInterview(current, listAnswers(db, interview.id, { includePrivate: true }), null);
+    const everything = [built.cvText, ...built.data.experience.flatMap((e) => e.highlights), ...built.data.facts.map((f) => f.text)].join("\n");
+    expect(everything).not.toContain("month-end close");
+  });
+
+  it("M1: seeding the current role never reuses an id that already has answers", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    const role1 = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, role1.id, ANSWERS.scope);
+    let current = saveStageForm(db, reload(db, userId, interview), "roles", []);
+    current = saveStageForm(db, current, "current", { status: "employed", title: "Staff Engineer", company: "Initech", start: "2024-01", country: "AU" });
+    expect(current.form.roles.map((r) => r.id)).not.toContain("exp-1");
+  });
+
+  it("M2: answers made private or deleted after Generate leave the saved profile at once", async () => {
+    const { db, userId, ctx, interview } = await interviewOnlyProfile();
+    const doc = await generateBaseCv(ctx, interview.id);
+    const done = reload(db, userId, interview);
+    const target = listAnswers(db, interview.id).find((a) => a.quote === ANSWERS.achievement)!;
+    editAnswer(db, done, target.id, { private: true });
+    applyInterviewEdits(db, userId, reload(db, userId, interview));
+    const profile = getCurrentProfile(db, userId)!;
+    expect([profile.cvText, ...profile.data.experience.flatMap((e) => e.highlights)].join("\n")).not.toContain("page load time");
+    expect(reload(db, userId, interview).profileVersion).toBe(profile.version);
+    // The base CV line that used it no longer verifies, and the CV says it's out of date.
+    const base = latestCvDocument(db, userId, "base", null)!;
+    expect(base.id).toBe(doc.id);
+    expect(base.flags.some((f) => f.kind === "unverified_source")).toBe(true);
+    expect(isCvStale(base, profile)).toBe(true);
+
+    const other = listAnswers(db, interview.id).find((a) => a.quote === ANSWERS.responsibility)!;
+    deleteAnswer(db, reload(db, userId, interview), other.id);
+    applyInterviewEdits(db, userId, reload(db, userId, interview));
+    expect(getCurrentProfile(db, userId)!.cvText).not.toContain("code reviews");
+  });
+
+  it("M2: edits never touch a profile that came from somewhere else (an uploaded CV)", async () => {
+    const { db, userId, ctx, interview } = await interviewOnlyProfile();
+    await generateBaseCv(ctx, interview.id);
+    saveProfileVersion(db, userId, { cvText: "Morgan Ellis — uploaded CV text", data: getCurrentProfile(db, userId)!.data });
+    const before = getCurrentProfile(db, userId)!.version;
+    applyInterviewEdits(db, userId, reload(db, userId, interview));
+    expect(getCurrentProfile(db, userId)!.version).toBe(before);
+  });
+
+  it("M3: the target job is not in the Career record, so it can't be quoted as experience", async () => {
+    const { built } = await interviewOnlyProfile();
+    expect(built.cvText).not.toMatch(/TARGET/);
+    const pctx = buildProvenanceContext({ cvText: built.cvText, data: built.data }, { analysis: null, score: null, plan: null });
+    const line: CvLine = { id: "summary-0", text: "Senior Frontend Engineer.", sourceRefs: [{ source: "cv", quote: "Senior Frontend Engineer · Sydney (AU) · senior", factId: null, verified: false }], requirementIds: [], origin: "ai" };
+    expect(checkLine(line, { roleId: null }, pctx).map((f) => f.kind)).toContain("unverified_source");
+  });
+
+  it("m1: Generate keeps saved search preferences the interview didn't set", () => {
+    const saved = { ...defaultPreferences(), seniority: ["senior" as const], workplace: ["remote" as const], employmentTypes: ["contract" as const], willingToRelocate: true };
+    const merged = mergePreferences(saved, { targetTitles: ["Data Lead"], seniority: [], workplace: [], employmentTypes: [], willingToRelocate: false, markets: [{ country: "AU", primary: true, cities: [], remoteOk: true }] });
+    expect(merged).toMatchObject({ targetTitles: ["Data Lead"], seniority: ["senior"], workplace: ["remote"], employmentTypes: ["contract"] });
   });
 });

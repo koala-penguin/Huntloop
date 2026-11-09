@@ -1,7 +1,10 @@
 import type { InterviewAnswerRow } from "../db/schema";
 import type { AiContext } from "../ai/client";
 import { BASE_CV_PROMPT_VERSION, writeBaseCv } from "../ai/tasks/build-base-cv";
-import { cvProfileHash, insertCvDocument, type StoredBaseCv } from "../repo/cv-documents";
+import { cvProfileHash, insertCvDocument, latestCvDocument, type StoredBaseCv } from "../repo/cv-documents";
+import type { Db } from "../db/database";
+import type { Interview } from "../repo/interviews";
+import { recheckDocument } from "./tailor";
 import { getInterview, listAnswers, updateInterview } from "../repo/interviews";
 import { getCurrentProfile, getPreferences, savePreferences, saveProfileVersion } from "../repo/profile";
 import { rescoreAllJobs } from "../jobs/fit";
@@ -36,7 +39,7 @@ export interface BuiltProfile {
 const clean = (text: string) => text.replace(/\s+/g, " ").trim();
 const orNull = (text: string | null | undefined) => (text && text.trim() ? text.trim() : null);
 
-/** Answers that count as evidence: not private, not replaced by an edit. */
+/** Answers that count as evidence: not private, not replaced by an edit. (Answers of a removed role are dropped by the callers.) */
 export function evidenceAnswers(answers: InterviewAnswerRow[]): InterviewAnswerRow[] {
   return answers.filter((a) => !a.private && a.supersededBy === null && clean(a.quote));
 }
@@ -54,9 +57,8 @@ function roleHeading(role: RoleForm): string {
 export function careerRecord(source: InterviewSource, answers: InterviewAnswerRow[]): string {
   const { form } = source;
   const evidence = evidenceAnswers(answers);
-  const lines: string[] = [`CAREER RECORD — Huntloop interview, ${source.createdAt.toISOString().slice(0, 10)}`];
-  const target = [form.target.titles.join(", "), [form.target.cities.join(", "), `(${form.setup.country})`].filter(Boolean).join(" "), form.target.seniority.join(", ")].filter((p) => p.trim());
-  if (form.target.titles.length) lines.push(`TARGET: ${target.join(" · ")}`);
+  const lines: string[] = [recordHeader(source.createdAt)];
+  // No target line: what the candidate wants is not evidence of what they have done.
   const current = form.current;
   if (current.title) lines.push(`CURRENT: ${[current.title, current.company, current.start ? period(current.start, "") : ""].filter(Boolean).join(", ")}`);
   for (const role of rolesInOrder(form)) {
@@ -68,7 +70,7 @@ export function careerRecord(source: InterviewSource, answers: InterviewAnswerRo
   if (form.languages.length) lines.push(`LANGUAGES: ${form.languages.map((l) => `${l.language} (${l.level})`).join("; ")}`);
   const skills = tickedSkills(form).map((s) => s.name);
   if (skills.length) lines.push(`SKILLS: ${skills.join(", ")}`);
-  const facts = evidence.filter((a) => a.experienceRef === null || !form.roles.some((r) => r.id === a.experienceRef));
+  const facts = evidence.filter((a) => a.experienceRef === null);
   if (facts.length) {
     lines.push("FACTS:");
     for (const a of facts) lines.push(`  ${a.topic}: ${clean(a.quote)}`);
@@ -90,7 +92,6 @@ export function buildProfileFromInterview(source: InterviewSource, answers: Inte
   const { form } = source;
   const evidence = evidenceAnswers(answers);
   const skills = tickedSkills(form);
-  const roleIds = new Set(form.roles.map((r) => r.id));
 
   const experience: ProfileData["experience"] = rolesInOrder(form).map((r) => ({
     id: r.id,
@@ -105,7 +106,8 @@ export function buildProfileFromInterview(source: InterviewSource, answers: Inte
     skills: skills.filter((s) => s.experienceRef === r.id).map((s) => s.name),
     highlights: evidence.filter((a) => a.experienceRef === r.id).map((a) => clean(a.quote)),
   }));
-  const interviewFacts: Fact[] = evidence.filter((a) => a.experienceRef === null || !roleIds.has(a.experienceRef)).map((a) => ({ id: `fact-int-${a.id}`, text: clean(a.quote), source: "interview" }));
+  // Answers about a role that was removed are not used at all: as facts they could land under any role.
+  const interviewFacts: Fact[] = evidence.filter((a) => a.experienceRef === null).map((a) => ({ id: `fact-int-${a.id}`, text: clean(a.quote), source: "interview" }));
 
   const rights = new Map((previous?.workRights ?? []).map((w) => [w.country, w]));
   for (const w of form.target.workRights) rights.set(w.country, w);
@@ -142,8 +144,8 @@ export function buildProfileFromInterview(source: InterviewSource, answers: Inte
     preferences: {
       targetTitles: t.titles,
       seniority: t.seniority,
-      workplace: t.workplace.length ? t.workplace : ["onsite", "hybrid", "remote"],
-      employmentTypes: t.employmentTypes.length ? t.employmentTypes : ["full_time"],
+      workplace: t.workplace,
+      employmentTypes: t.employmentTypes,
       willingToRelocate: t.willingToRelocate,
       markets: [{ country: form.setup.country, primary: true, cities: t.cities, remoteOk: t.remoteOk }],
     },
@@ -153,7 +155,16 @@ export function buildProfileFromInterview(source: InterviewSource, answers: Inte
 /** Merges the interview's search preferences into the saved ones, keeping everything else. */
 export function mergePreferences(saved: Preferences, built: BuiltProfile["preferences"]): Preferences {
   const markets = [...built.markets, ...saved.markets.filter((m) => !built.markets.some((b) => b.country === m.country)).map((m) => ({ ...m, primary: false }))];
-  return { ...saved, ...built, targetTitles: built.targetTitles.length ? built.targetTitles : saved.targetTitles, markets };
+  const or = <T>(value: T[], fallback: T[]) => (value.length ? value : fallback);
+  return {
+    ...saved,
+    targetTitles: or(built.targetTitles, saved.targetTitles),
+    seniority: or(built.seniority, saved.seniority),
+    workplace: or(built.workplace, saved.workplace),
+    employmentTypes: or(built.employmentTypes, saved.employmentTypes),
+    willingToRelocate: built.willingToRelocate,
+    markets,
+  };
 }
 
 export type MissingStage = "target" | "roles" | "role_deep" | "contact";
@@ -168,6 +179,29 @@ export function interviewReady(source: Pick<InterviewSource, "form" | "stages">)
   else if (stages[roleStageKey(current.id)] !== "done") missing.push("role_deep");
   if (!form.contact.name.trim()) missing.push("contact");
   return missing.length ? { ok: false, missing } : { ok: true };
+}
+
+const recordHeader = (createdAt: Date) => `CAREER RECORD — Huntloop interview, ${createdAt.toISOString().slice(0, 10)}`;
+
+/**
+ * After Generate, an answer edited, deleted or made private in the drawer must leave the saved
+ * profile at once — it is sent to every assessment, tailored CV and chat. Rebuilds the profile from
+ * the answers (no AI) when the current profile is this interview's Career record; a profile from an
+ * uploaded CV is never touched. The base CV is re-checked (lines that used removed words are
+ * flagged) and shows as out of date until generated again.
+ */
+export function applyInterviewEdits(db: Db, userId: number, interview: Interview): boolean {
+  if (interview.profileVersion === null) return false;
+  const current = getCurrentProfile(db, userId);
+  if (!current || !current.cvText.startsWith(recordHeader(interview.createdAt))) return false;
+  const built = buildProfileFromInterview(interview, listAnswers(db, interview.id, { includePrivate: true }), current.data);
+  if (cvProfileHash(built.cvText, built.data) === cvProfileHash(current.cvText, current.data)) return false;
+  const saved = saveProfileVersion(db, userId, { cvText: built.cvText, data: built.data, simulated: false });
+  updateInterview(db, interview.id, { profileVersion: saved.version });
+  rescoreAllJobs(db, userId);
+  const base = latestCvDocument(db, userId, "base", null);
+  if (base) recheckDocument(db, userId, base);
+  return true;
 }
 
 /** Below this the Career record can't carry a CV (a name, a title and little else). */

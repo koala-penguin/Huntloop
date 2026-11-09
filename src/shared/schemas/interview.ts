@@ -65,8 +65,11 @@ export const currentFormSchema = z.object({
 });
 
 export const roleFormSchema = z.object({
-  /** "exp-N", stable for the whole interview (answers and the profile's experience ids use it). */
-  id: z.string().regex(/^exp-\d+$/),
+  /**
+   * "exp-N", given out by the server and never reused (answers, chats and the profile's experience
+   * ids hang off it). A row the user just added is sent as "new-…" and gets its id on save.
+   */
+  id: z.string().regex(/^(exp-\d+|new-\w+)$/),
   title: z.string().max(120).default(""),
   company: z.string().max(120).default(""),
   industry: z.string().max(80).default(""),
