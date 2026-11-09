@@ -23,7 +23,7 @@ import { ChatStageControls, PinRole, RoleTabs } from "@/components/interview/cha
 import { ContactForm, CurrentForm, EducationForm, LanguagesForm, RolesForm, SetupForm, TargetForm } from "@/components/interview/stage-forms";
 import { formatUsd } from "@/lib/format";
 import { resolveTaskModel, type Connection } from "@/shared/ai-settings";
-import { INTERVIEW_STAGES, interviewFormSchema, roleStageKey, rolesInOrder, type ChatStage, type InterviewStage, type StageStatus } from "@/shared/schemas/interview";
+import { INTERVIEW_STAGES, answerRole, interviewFormSchema, roleStageKey, rolesInOrder, type ChatStage, type InterviewStage, type StageStatus } from "@/shared/schemas/interview";
 
 /** Profile → Build by interview: the guided CV builder. */
 
@@ -82,10 +82,10 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
     return r ? `${r.title || t("untitledRole")}${r.company ? ` — ${r.company}` : ""}` : t("drawer.general");
   };
   const groups: RecordGroup[] = [
-    ...roles.map((r) => ({ key: r.id, label: roleLabel(r.id), answers: answers.filter((a) => a.experienceRef === r.id) })),
-    { key: "general", label: t("drawer.general"), answers: answers.filter((a) => !a.experienceRef) },
+    ...roles.map((r) => ({ key: r.id, label: roleLabel(r.id), answers: answers.filter((a) => answerRole(form, a) === r.id) })),
+    { key: "general", label: t("drawer.general"), answers: answers.filter((a) => !answerRole(form, a)) },
     // Answers about a role that was removed from the role table: kept for the record, never used.
-    { key: "removed", label: t("drawer.removedRole"), answers: answers.filter((a) => a.experienceRef && !form.roles.some((r) => r.id === a.experienceRef)) },
+    { key: "removed", label: t("drawer.removedRole"), answers: answers.filter((a) => { const ref = answerRole(form, a); return !!ref && !form.roles.some((r) => r.id === ref); }) },
   ].map((g) => ({ ...g, answers: g.answers.map((a) => ({ id: a.id, topic: a.topic, quote: a.quote, private: a.private, edited: a.origin === "user_edit" })) }));
 
   const chat = (chatStage: ChatStage, ref: string | null, status: StageStatus, nextRole: string | null, next: InterviewStage) => {

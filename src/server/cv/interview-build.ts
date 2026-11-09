@@ -14,7 +14,7 @@ import { buildProvenanceContext, validateCv } from "./provenance";
 import { emptyProfile, type Fact, type ProfileData } from "@/shared/schemas/profile";
 import type { Preferences } from "@/shared/schemas/preferences";
 import type { CvChecks, TailoringPlan } from "@/shared/schemas/cv";
-import { currentRole, roleStageKey, rolesInOrder, type InterviewForm, type RoleForm, type StageStatus } from "@/shared/schemas/interview";
+import { answerRole, currentRole, roleStageKey, rolesInOrder, targetFormSchema, type InterviewForm, type RoleForm, type StageStatus } from "@/shared/schemas/interview";
 
 /**
  * From interview to profile and base CV. The interview's answers are the candidate's own typed words; they
@@ -39,9 +39,12 @@ export interface BuiltProfile {
 const clean = (text: string) => text.replace(/\s+/g, " ").trim();
 const orNull = (text: string | null | undefined) => (text && text.trim() ? text.trim() : null);
 
-/** Answers that count as evidence: not private, not replaced by an edit. (Answers of a removed role are dropped by the callers.) */
-export function evidenceAnswers(answers: InterviewAnswerRow[]): InterviewAnswerRow[] {
-  return answers.filter((a) => !a.private && a.supersededBy === null && clean(a.quote));
+/**
+ * Answers that count as evidence: not private, not replaced by an edit, each filed under its role
+ * (answerRole). Answers of a removed role are dropped by the callers.
+ */
+export function evidenceAnswers(answers: InterviewAnswerRow[], form: InterviewForm): InterviewAnswerRow[] {
+  return answers.filter((a) => !a.private && a.supersededBy === null && clean(a.quote)).map((a) => ({ ...a, experienceRef: answerRole(form, a) }));
 }
 
 function period(start: string, end: string): string {
@@ -56,7 +59,7 @@ function roleHeading(role: RoleForm): string {
 /** The Career record: deterministic plain text, one verbatim answer per line, no contact details. */
 export function careerRecord(source: InterviewSource, answers: InterviewAnswerRow[]): string {
   const { form } = source;
-  const evidence = evidenceAnswers(answers);
+  const evidence = evidenceAnswers(answers, form);
   const lines: string[] = [recordHeader(source.createdAt)];
   // No target line: what the candidate wants is not evidence of what they have done.
   const current = form.current;
@@ -90,7 +93,7 @@ function tickedSkills(form: InterviewForm): Array<{ name: string; category: Prof
  */
 export function buildProfileFromInterview(source: InterviewSource, answers: InterviewAnswerRow[], previous: ProfileData | null): BuiltProfile {
   const { form } = source;
-  const evidence = evidenceAnswers(answers);
+  const evidence = evidenceAnswers(answers, form);
   const skills = tickedSkills(form);
 
   const experience: ProfileData["experience"] = rolesInOrder(form).map((r) => ({
@@ -152,6 +155,21 @@ export function buildProfileFromInterview(source: InterviewSource, answers: Inte
   };
 }
 
+/** The target form pre-filled from saved search preferences, cut to the form's limits. */
+export function targetFromPreferences(prefs: Preferences, country: string): InterviewForm["target"] {
+  const market = prefs.markets.find((m) => m.country === country);
+  const list = (values: string[], count: number, length: number) => values.map((v) => v.trim().slice(0, length)).filter(Boolean).slice(0, count);
+  return targetFormSchema.parse({
+    titles: list(prefs.targetTitles, 20, 120),
+    seniority: prefs.seniority,
+    workplace: prefs.workplace,
+    employmentTypes: prefs.employmentTypes,
+    willingToRelocate: prefs.willingToRelocate,
+    cities: list(market?.cities ?? [], 20, 80),
+    remoteOk: market?.remoteOk ?? true,
+  });
+}
+
 /** Merges the interview's search preferences into the saved ones, keeping everything else. */
 export function mergePreferences(saved: Preferences, built: BuiltProfile["preferences"]): Preferences {
   const markets = [...built.markets, ...saved.markets.filter((m) => !built.markets.some((b) => b.country === m.country)).map((m) => ({ ...m, primary: false }))];
@@ -195,8 +213,16 @@ export function applyInterviewEdits(db: Db, userId: number, interview: Interview
   const current = getCurrentProfile(db, userId);
   if (!current || !current.cvText.startsWith(recordHeader(interview.createdAt))) return false;
   const built = buildProfileFromInterview(interview, listAnswers(db, interview.id, { includePrivate: true }), current.data);
-  if (cvProfileHash(built.cvText, built.data) === cvProfileHash(current.cvText, current.data)) return false;
-  const saved = saveProfileVersion(db, userId, { cvText: built.cvText, data: built.data, simulated: false });
+  // Only the interview's evidence changes: the Career record, each interview role's highlights and the
+  // interview facts. Everything the user changed in the profile editor stays as they left it.
+  const highlights = new Map(built.data.experience.map((e) => [e.id, e.highlights]));
+  const data: ProfileData = {
+    ...current.data,
+    experience: current.data.experience.map((e) => (highlights.has(e.id) ? { ...e, highlights: highlights.get(e.id)! } : e)),
+    facts: [...current.data.facts.filter((f) => f.source !== "interview"), ...built.data.facts.filter((f) => f.source === "interview")],
+  };
+  if (cvProfileHash(built.cvText, data) === cvProfileHash(current.cvText, current.data)) return false;
+  const saved = saveProfileVersion(db, userId, { cvText: built.cvText, data, simulated: false });
   updateInterview(db, interview.id, { profileVersion: saved.version });
   rescoreAllJobs(db, userId);
   const base = latestCvDocument(db, userId, "base", null);

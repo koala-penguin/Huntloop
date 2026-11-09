@@ -147,3 +147,13 @@ export function rolesInOrder(form: InterviewForm): RoleForm[] {
   const key = (r: RoleForm) => `${r.end ? "0" : "1"}${r.end || "9999"}${r.start || "0000"}`;
   return [...form.roles].sort((a, b) => key(b).localeCompare(key(a)));
 }
+
+/**
+ * The role an answer is filed under. Answers in the current-situation chat given before any role
+ * was on file belong to the current (or most recent) role once there is one — the same rule used
+ * when they were recorded — never to free-floating facts.
+ */
+export function answerRole(form: InterviewForm, answer: { stage: string; experienceRef: string | null }): string | null {
+  if (answer.experienceRef === null && answer.stage === "current") return currentRole(form)?.id ?? null;
+  return answer.experienceRef;
+}

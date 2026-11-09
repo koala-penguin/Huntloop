@@ -17,7 +17,7 @@ import { createJob } from "@/server/repo/jobs";
 import { processJob } from "@/server/jobs/pipeline";
 import { loadJobFit } from "@/server/jobs/fit";
 import { isCvStale, recheckDocument, tailorCvForJob, writeLinkedinForUser } from "@/server/cv/tailor";
-import { applyInterviewEdits, buildProfileFromInterview, generateBaseCv, interviewReady, mergePreferences } from "@/server/cv/interview-build";
+import { applyInterviewEdits, buildProfileFromInterview, generateBaseCv, interviewReady, mergePreferences, targetFromPreferences } from "@/server/cv/interview-build";
 import { resolveCvLine } from "@/server/cv/resolve";
 import { exportCv } from "@/server/cv/export";
 import { cvProfileHash, latestCvDocument } from "@/server/repo/cv-documents";
@@ -557,5 +557,58 @@ describe("CV interview — review fixes", () => {
     const saved = { ...defaultPreferences(), seniority: ["senior" as const], workplace: ["remote" as const], employmentTypes: ["contract" as const], willingToRelocate: true };
     const merged = mergePreferences(saved, { targetTitles: ["Data Lead"], seniority: [], workplace: [], employmentTypes: [], willingToRelocate: false, markets: [{ country: "AU", primary: true, cities: [], remoteOk: true }] });
     expect(merged).toMatchObject({ targetTitles: ["Data Lead"], seniority: ["senior"], workplace: ["remote"], employmentTypes: ["contract"] });
+  });
+});
+
+describe("CV interview — review round 2", () => {
+  it("R2-1: a drawer edit after Generate keeps the user's own profile edits", async () => {
+    const { db, userId, ctx, interview } = await interviewOnlyProfile();
+    await generateBaseCv(ctx, interview.id);
+    const generated = getCurrentProfile(db, userId)!;
+    const data = structuredClone(generated.data);
+    data.experience[0].title = "Lead Frontend Engineer";
+    data.certifications.push({ name: "AWS Certified Developer", issuer: "AWS", year: "2024" });
+    data.skills.push({ name: "GraphQL", category: "tool" });
+    data.basics.phone = "0400 999 888";
+    data.facts.push({ id: "fact-mine", text: "Typed by me in the editor.", source: "user" });
+    saveProfileVersion(db, userId, { cvText: generated.cvText, data });
+
+    const target = listAnswers(db, interview.id).find((a) => a.quote === ANSWERS.achievement)!;
+    editAnswer(db, reload(db, userId, interview), target.id, { private: true });
+    expect(applyInterviewEdits(db, userId, reload(db, userId, interview))).toBe(true);
+    const after = getCurrentProfile(db, userId)!;
+    expect(after.data.experience[0].title).toBe("Lead Frontend Engineer");
+    expect(after.data.certifications.map((c) => c.name)).toContain("AWS Certified Developer");
+    expect(after.data.skills.map((s) => s.name)).toContain("GraphQL");
+    expect(after.data.basics.phone).toBe("0400 999 888");
+    expect(after.data.facts.map((f) => f.id)).toContain("fact-mine");
+    expect([after.cvText, ...after.data.experience.flatMap((e) => e.highlights)].join("\n")).not.toContain("page load time");
+  });
+
+  it("R2-2: answers about the most recent job, given before any role was on file, belong to that role, not to facts", async () => {
+    const { db, userId } = testDb();
+    const ctx = { db, userId };
+    let interview = createInterview(db, userId, { country: "AU", language: "en" });
+    interview = saveStageForm(db, interview, "current", { status: "between_roles", title: "Frontend Engineer", company: "Koala Commerce" });
+    expect(interview.form.roles).toEqual([]);
+    const conversation = ensureInterviewConversation(ctx, interview.id, "current", null);
+    await turn(ctx, conversation.id, ANSWERS.week);
+    expect(listAnswers(db, interview.id)[0].experienceRef).toBeNull();
+    interview = saveStageForm(db, reload(db, userId, interview), "roles", [{ id: "new-1", title: "Frontend Engineer", company: "Koala Commerce", start: "2018-01", end: "2024-02" }]);
+    const roleId = interview.form.roles[0].id;
+    const built = buildProfileFromInterview(interview, listAnswers(db, interview.id, { includePrivate: true }), null);
+    expect(built.data.experience[0].highlights).toEqual([ANSWERS.week]);
+    expect(built.data.facts).toEqual([]);
+    expect(built.cvText).toContain(`ROLE ${roleId}`);
+    expect(built.cvText).not.toContain("FACTS:");
+  });
+
+  it("R2-3: saved preferences beyond the interview form's limits still pre-fill it", () => {
+    const prefs = { ...defaultPreferences(), targetTitles: Array.from({ length: 30 }, (_, i) => `Title ${i} ${"x".repeat(150)}`), markets: [{ country: "AU", primary: true, cities: Array.from({ length: 25 }, (_, i) => `City ${i}`), remoteOk: false }] };
+    const target = targetFromPreferences(prefs, "AU");
+    expect(target.titles).toHaveLength(20);
+    expect(target.titles[0].length).toBeLessThanOrEqual(120);
+    expect(target.cities).toHaveLength(20);
+    expect(target.remoteOk).toBe(false);
   });
 });
