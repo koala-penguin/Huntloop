@@ -20,10 +20,16 @@ role about its scope, responsibilities, achievements and tools, then education, 
 Recent roles get the full conversation, older ones a brief one; **Quick** depth covers only your current role in depth.
 You can stop at any point and pick up where you left off.
 
+The interviewer asks about your actual role and shows examples of what people in that kind of job usually do; clicking
+one puts it in your reply box for you to make your own. **Skip this question** moves on, **That's all for this part**
+finishes a conversation, and any skip can be undone (a finished part can be reopened).
+
 Your answers are recorded word for word: the interviewer can only store text you typed in that conversation, never its
-own wording. Type numbers as digits ("5", not "five") so they can appear on your CV. Answers about why you're leaving,
-or anything you mark private, never reach your profile or CV. Before generating you can edit or delete any answer and tick
-the skills that belong on your CV.
+own wording. After each answer it may offer a cleaner version; Huntloop checks that it adds no numbers, names or tools
+you didn't type and drops none you did, and it is used only if you accept it (your original stays in the record). Type
+numbers as digits ("5", not "five") so they can appear on your CV. Answers about why you're leaving, or anything you mark
+private, never reach your profile or CV. Before generating you can edit or delete any answer and tick the skills that
+belong on your CV.
 
 **Generate** saves a new profile version (your answers become its "Career record", the text every quote is checked
 against; the previous version stays in the history) and writes a base CV for your target market — the same truthfulness

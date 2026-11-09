@@ -14,7 +14,7 @@ key or your own Claude subscription.
 ## What it does
 
 - Reads your CV into a profile: roles, dates, skills, work rights per country. No CV? An interview builds the profile
-  and a base CV from your own answers, word for word.
+  and a base CV from your own answers, in your words (cleaned up only where you accept it).
 - Takes a job as a link, pasted text, screenshots or a PDF, and rates your chance of an interview: Strong, Good,
   Stretch or Long shot. Every point is backed by a quote from the ad and from your CV.
 - Lets you chat with Claude about any job, and researches the employer with sources.
