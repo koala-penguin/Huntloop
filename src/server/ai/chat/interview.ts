@@ -8,6 +8,7 @@ import { SKILL_CATEGORIES } from "@/shared/schemas/profile";
 import { STYLE_RULES } from "@/shared/cv-style";
 import { openingFor } from "@/shared/role-suggestions";
 import {
+  CONTROL,
   INTERVIEW_TOPICS,
   REQUIRED_TOPICS,
   STAGE_TURN_TARGETS,
@@ -440,6 +441,8 @@ function interviewScope(ctx: AiContext, conversation: ConversationRow): ChatScop
 
       switch (block.name) {
         case "record_answer": {
+          // A quick reply ("Skip this question", "That's all for this part") is an instruction, never evidence.
+          if (Object.values(CONTROL).some((re) => re.test(collapse(String(input.quote))))) return result("Not recorded: that is one of the quick replies, not an answer. Follow it instead.", true);
           const gate = verbatimGate(String(input.quote), candidateMessages(ctx, conversation.id));
           if (!gate.ok) return result(GATE_ERRORS[gate.reason], true);
           const answer = insertAnswer(ctx.db, {

@@ -5,8 +5,39 @@ import { rescoreAllJobs } from "../../jobs/fit";
 import { UserFacingError } from "../../errors";
 import type { AiContext } from "../client";
 import { proceedWithJob } from "../../jobs/proceed";
-import { getInterview, interviewForConversation, setPolished } from "../../repo/interviews";
+import { getInterview, interviewForConversation, setPolished, type Interview } from "../../repo/interviews";
 import { applyInterviewEdits } from "../../cv/interview-build";
+
+/**
+ * The user's own edit of a cleaner version the interviewer offered (their words, so no check beyond
+ * length). Like accepting it as offered: an answer edited or deleted since then has nothing to take
+ * it, so the card is closed instead. Returns whether the profile was rebuilt.
+ */
+export function acceptEditedPolish(ctx: AiContext, interview: Interview, actionId: number, text: string): boolean {
+  const value = text.replace(/\s+/g, " ").trim();
+  if (value.length < 2 || value.length > 4000) throw new UserFacingError("invalid");
+  const action = ctx.db
+    .select()
+    .from(chatActions)
+    .where(and(eq(chatActions.id, actionId), eq(chatActions.kind, "interview_polish")))
+    .get();
+  if (!action || interviewForConversation(ctx.db, action.conversationId)?.interviewId !== interview.id) throw new UserFacingError("not_found");
+  if (action.status !== "pending") return false;
+  const payload = action.payload as Record<string, unknown>;
+  try {
+    setPolished(ctx.db, interview, Number(payload.answerId), value);
+  } catch (error) {
+    if (!(error instanceof UserFacingError) || error.code !== "not_found") throw error;
+    ctx.db.update(chatActions).set({ status: "dismissed", resolvedAt: new Date() }).where(eq(chatActions.id, action.id)).run();
+    return false;
+  }
+  ctx.db
+    .update(chatActions)
+    .set({ status: "accepted", resolvedAt: new Date(), payload: { ...payload, text: value, edited: true } })
+    .where(eq(chatActions.id, action.id))
+    .run();
+  return applyInterviewEdits(ctx.db, ctx.userId, interview);
+}
 
 /**
  * The user's answer to a card the AI proposed. Only this click changes the profile or the job;

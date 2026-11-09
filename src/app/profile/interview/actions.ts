@@ -1,9 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { chatActions } from "@/server/db/schema";
+import { acceptEditedPolish } from "@/server/ai/chat/actions";
 import { appContext } from "@/server/context";
 import { errorCodeOf, UserFacingError } from "@/server/errors";
 import { isConversationBusy } from "@/server/ai/chat/harness";
@@ -15,11 +14,9 @@ import {
   editAnswer,
   getActiveInterview,
   getInterview,
-  interviewForConversation,
   reopenStage,
   saveStageForm,
   setCurrentStage,
-  setPolished,
   setStageStatus,
   stageConversation,
   stageHasAnswers,
@@ -123,24 +120,9 @@ export async function reopenStageAction(interviewId: number, key: string): Promi
 /** The user's own edit of a cleaner version the interviewer offered: their words, so no check beyond length. */
 export async function acceptPolishAction(interviewId: number, actionId: number, text: string): Promise<ActionResult<null>> {
   if (typeof actionId !== "number" || typeof text !== "string") return { ok: false, error: "invalid" };
-  const value = text.replace(/\s+/g, " ").trim();
-  if (value.length < 2 || value.length > 4000) return { ok: false, error: "invalid" };
   try {
-    const { db, interview } = own(interviewId);
-    const action = db
-      .select()
-      .from(chatActions)
-      .where(and(eq(chatActions.id, actionId), eq(chatActions.kind, "interview_polish")))
-      .get();
-    if (!action || interviewForConversation(db, action.conversationId)?.interviewId !== interview.id) return { ok: false, error: "not_found" };
-    if (action.status !== "pending") return done(null);
-    const payload = action.payload as Record<string, unknown>;
-    setPolished(db, interview, Number(payload.answerId), value);
-    db.update(chatActions)
-      .set({ status: "accepted", resolvedAt: new Date(), payload: { ...payload, text: value, edited: true } })
-      .where(eq(chatActions.id, action.id))
-      .run();
-    if (applyInterviewEdits(db, interview.userId, interview)) revalidatePath("/", "layout");
+    const { interview } = own(interviewId);
+    if (acceptEditedPolish(appContext().ai, interview, actionId, text)) revalidatePath("/", "layout");
     return done(null);
   } catch (error) {
     return fail(error);

@@ -9,6 +9,7 @@ import { processJob } from "@/server/jobs/pipeline";
 import { createJobConversation, describeStateChange, listChatActions, listChatMessages, runJobChatTurn, toApiMessages, type ChatEvent } from "@/server/ai/chat/harness";
 import { resolveChatAction } from "@/server/ai/chat/actions";
 import { transcript } from "@/server/ai/chat/render";
+import type { ChatMessageRow } from "@/server/db/schema";
 import { getFakeGenerator, registerFakeGenerator, type FakeGenerator, type FakeRequest } from "@/server/ai/fake/transport";
 import { DEMO_SCREENSHOT_POSTING } from "@/server/ai/fake/generators/jobs";
 import "@/server/ai/fake/generators/chat";
@@ -209,5 +210,21 @@ describe("chat helpers", () => {
     expect(text).toContain("Interview Chance is now strong (eligible)");
     expect(text).toContain("r1: unknown → met");
     expect(describeStateChange(before, before, [])).toBeNull();
+  });
+});
+
+describe("toApiMessages", () => {
+  it("leaves out a turn that ended with nothing to say, so no empty assistant message is sent", () => {
+    const row = (id: number, role: string, content: unknown[]) => ({ id, role, content }) as unknown as ChatMessageRow;
+    const messages = toApiMessages([
+      row(1, "user", [{ type: "text", text: "Hi" }]),
+      row(2, "assistant", [{ type: "text", text: "Question?" }, { type: "tool_use", id: "t1", name: "suggest_options", input: { options: ["A", "B"] } }]),
+      row(3, "user", [{ type: "tool_result", tool_use_id: "t1", content: "Shown." }]),
+      row(4, "assistant", []),
+      row(5, "user", [{ type: "text", text: "My answer." }]),
+    ]);
+    expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+    expect(messages.every((m) => (m.content as unknown[]).length > 0)).toBe(true);
+    expect((messages[2].content as Array<{ type: string }>).map((b) => b.type)).toEqual(["tool_result", "text"]);
   });
 });

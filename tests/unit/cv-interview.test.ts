@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { chatActions, chatMessages, conversations, interviewAnswers, tasks, type InterviewAnswerRow } from "@/server/db/schema";
 import { listChatMessages, runChatTurn, type ChatEvent } from "@/server/ai/chat/harness";
 import { ensureInterviewConversation, interviewOpening, interviewTools, verbatimGate } from "@/server/ai/chat/interview";
-import { resolveChatAction } from "@/server/ai/chat/actions";
+import { acceptEditedPolish, resolveChatAction } from "@/server/ai/chat/actions";
 import { getFakeGenerator, registerFakeGenerator, type FakeGenerator, type FakeRequest } from "@/server/ai/fake/transport";
 import { DEMO_SCREENSHOT_POSTING } from "@/server/ai/fake/generators/jobs";
 import { DEMO_UNSUPPORTED_BULLET } from "@/server/ai/fake/generators/tailoring";
@@ -823,6 +823,36 @@ describe("CV interview — cleaner versions of answers", () => {
     expect(events).toContainEqual(expect.objectContaining({ type: "error", code: "refusal" }));
     expect(polishCards(db, conversation.id)).toEqual([]);
     expect(db.select().from(interviewAnswers).all()).toEqual([]);
+  });
+
+  it("a quick reply is never recorded as an answer", async () => {
+    const { db, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    for (const control of ["Skip this question", "That's all for this part"]) {
+      override = (req) => (toolRound(req) ? { content: [{ type: "text", text: "Ok." }] } : { content: [{ type: "tool_use", id: `toolu_ctl_${Math.random()}`, name: "record_answer", input: { topic: "extra", quote: control, private: false, question: "?" } }] });
+      await turn(ctx, conversation.id, control);
+      const result = requests.flatMap((r) => r.messages.flatMap((m) => (Array.isArray(m.content) ? (m.content as Array<{ type: string; tool_use_id?: string; content?: string; is_error?: boolean }>) : []))).filter((b) => b.type === "tool_result" && b.tool_use_id?.startsWith("toolu_ctl_")).at(-1)!;
+      expect(result).toMatchObject({ is_error: true });
+      expect(result.content).toMatch(/quick replies/);
+    }
+    expect(listAnswers(db, interview.id, { includePrivate: true })).toEqual([]);
+  });
+
+  it("the user's own edit of a cleaner version is used; on an answer changed since, the card just closes", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, conversation.id, ANSWERS.responsibility);
+    await turn(ctx, conversation.id, ANSWERS.scope);
+    const [first, second] = polishCards(db, conversation.id);
+    acceptEditedPolish(ctx, reload(db, userId, interview), first.id, "Owned frontend architecture, code reviews and mentoring 4 engineers.");
+    expect(listAnswers(db, interview.id)[0].polished).toBe("Owned frontend architecture, code reviews and mentoring 4 engineers.");
+    expect(polishCards(db, conversation.id)[0]).toMatchObject({ status: "accepted", payload: { edited: true } });
+
+    const answer = listAnswers(db, interview.id).find((a) => a.quote === ANSWERS.scope)!;
+    editAnswer(db, reload(db, userId, interview), answer.id, { quote: "A team of 6 frontend engineers on the merchant dashboard." });
+    expect(acceptEditedPolish(ctx, reload(db, userId, interview), second.id, "Led 6 frontend engineers.")).toBe(false);
+    expect(polishCards(db, conversation.id)[1].status).toBe("dismissed");
+    expect(listAnswers(db, interview.id).find((a) => a.quote.startsWith("A team of 6"))!.polished).toBeNull();
   });
 
   it("examples with digits are refused", async () => {
