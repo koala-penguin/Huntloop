@@ -24,7 +24,9 @@ function Field({ label, hint, children, className, uid }: { label: string; hint?
   const id = `f-${label.replace(/\W+/g, "-").toLowerCase()}${uid ? `-${uid}` : ""}`;
   return (
     <div className={`flex flex-col gap-1.5 ${className ?? ""}`}>
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} id={`${id}-label`}>
+        {label}
+      </Label>
       {children(id)}
       {hint && <FieldHint>{hint}</FieldHint>}
     </div>
@@ -477,7 +479,7 @@ export function LanguagesForm({
         {languages.map((l, i) => (
           <li key={i} className="grid gap-3 sm:grid-cols-3">
             <Field label={t("languages.language", { n: i + 1 })}>
-              {(id) => <LanguageCombobox id={id} value={l.language} listLocale={cvLanguage} onChange={(language) => setLanguages(languages.map((x, j) => (j === i ? { ...x, language } : x)))} />}
+              {(id) => <LanguageCombobox id={id} labelId={`${id}-label`} value={l.language} listLocale={cvLanguage} onChange={(language) => setLanguages(languages.map((x, j) => (j === i ? { ...x, language } : x)))} />}
             </Field>
             <Field label={t("languages.level", { n: i + 1 })}>
               {(id) => (

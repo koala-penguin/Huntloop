@@ -42,6 +42,7 @@ export function LanguageCombobox({
   onChange,
   listLocale,
   placeholder,
+  labelId,
   "aria-label": ariaLabel,
 }: {
   id: string;
@@ -50,6 +51,8 @@ export function LanguageCombobox({
   /** The language of the stored names; defaults to the page's. */
   listLocale?: string;
   placeholder?: string;
+  /** The id of the field's visible label, which also names the list (else `aria-label` does). */
+  labelId?: string;
   "aria-label"?: string;
 }) {
   const t = useTranslations("interview.languages");
@@ -151,7 +154,7 @@ export function LanguageCombobox({
         aria-label={ariaLabel}
         aria-autocomplete="list"
         aria-expanded={expanded}
-        aria-controls={listId}
+        aria-controls={expanded ? listId : undefined}
         aria-activedescendant={expanded && active >= 0 ? optionId(active) : undefined}
         autoComplete="off"
         value={value}
@@ -169,7 +172,7 @@ export function LanguageCombobox({
         onKeyDown={onKeyDown}
       />
       {expanded && (
-        <ul ref={listRef} id={listId} role="listbox" aria-label={ariaLabel} className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-surface py-1 shadow-lg">
+        <ul ref={listRef} id={listId} role="listbox" aria-label={ariaLabel} aria-labelledby={ariaLabel ? undefined : labelId} className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-surface py-1 shadow-lg">
           {matches.map((o, i) => (
             <li
               key={o.code}

@@ -121,9 +121,11 @@ test("build a profile and base CV by interview", async ({ page }) => {
   const first = page.getByRole("combobox", { name: "Language (1)" });
   await first.fill("Eng");
   await expect(first).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("listbox", { name: "Language (1)" })).toBeVisible();
   await page.getByRole("option", { name: "English", exact: true }).click();
   await expect(first).toHaveValue("English");
   await expect(first).toHaveAttribute("aria-expanded", "false");
+  expect(await first.getAttribute("aria-controls")).toBeNull();
   await page.getByRole("combobox", { name: "Level (1)" }).selectOption("native");
   // …and with the keyboard.
   await page.getByRole("button", { name: "Add a language" }).click();
