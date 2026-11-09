@@ -8,6 +8,10 @@ import { SimpleTabs } from "@/components/ui/tabs";
 import { LinkedinPanel } from "@/components/cv/linkedin-panel";
 import { linkedinPanelData } from "@/server/cv/view";
 import { DemoOutputBadge } from "@/components/ui/demo-output-badge";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { getLatestInterview } from "@/server/repo/interviews";
 
 export default async function ProfilePage({ searchParams }: PageProps<"/profile">) {
   const t = await getTranslations("profile");
@@ -18,6 +22,21 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
   const prefs = getPreferences(db, user.id);
   const linkedin = linkedinPanelData(db, user.id, { headline: tLinkedin("section.headline"), about: tLinkedin("section.about"), skills: tLinkedin("section.skills") });
   const primary = prefs.markets.find((m) => m.primary)?.country ?? prefs.markets[0]?.country;
+  const interview = getLatestInterview(db, user.id);
+  const fromInterview = !!profile && interview?.status === "completed" && interview.profileVersion === profile.version;
+  const interviewCard = (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("interviewTitle")}</CardTitle>
+        <CardDescription>{t(profile ? "interviewDescriptionExisting" : "interviewDescription")}</CardDescription>
+      </CardHeader>
+      <div>
+        <Button asChild size="sm" variant={profile ? "secondary" : "primary"}>
+          <Link href="/profile/interview">{interview?.status === "in_progress" ? t("interviewResume") : t("interviewStart")}</Link>
+        </Button>
+      </div>
+    </Card>
+  );
 
   return (
     <>
@@ -41,11 +60,21 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
                   cvText={profile.cvText}
                   data={profile.data}
                   preferenceCountries={prefs.markets.map((m) => m.country)}
+                  careerRecord={fromInterview}
                 />
               ),
             },
             { value: "preferences", label: t("tabPreferences"), content: <PreferencesEditor initial={prefs} /> },
-            { value: "cv", label: t("tabCv"), content: <CvUpload replacing /> },
+            {
+              value: "cv",
+              label: t("tabCv"),
+              content: (
+                <div className="flex flex-col gap-4">
+                  <CvUpload replacing />
+                  {interviewCard}
+                </div>
+              ),
+            },
             {
               value: "linkedin",
               label: t("tabLinkedin"),
@@ -56,6 +85,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
       ) : (
         <>
           <CvUpload replacing={false} />
+          {interviewCard}
           <PreferencesEditor initial={prefs} />
         </>
       )}

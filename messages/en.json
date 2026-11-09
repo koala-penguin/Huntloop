@@ -66,7 +66,8 @@
     "bestBetsUnranked": "{count, plural, one {Your new job doesn't} other {Your # new jobs don't}} have an Interview Chance yet. It appears once a job is analysed and your CV is in your profile.",
     "bestBetsInPipeline": "No new jobs to rank. {count, plural, one {The job you're working on is} other {The # jobs you're working on are}} in your pipeline.",
     "openPipeline": "Open the pipeline",
-    "spendDetails": "See where it went"
+    "spendDetails": "See where it went",
+    "stepProfileInterview": "No CV? Build one by interview."
   },
   "settings": {
     "title": "Settings",
@@ -440,7 +441,14 @@
     "saveProfile": "Save profile",
     "versionInfo": "Version {version}",
     "savedVersion": "Saved as version {version}",
-    "tabLinkedin": "LinkedIn"
+    "tabLinkedin": "LinkedIn",
+    "careerRecordTitle": "Career record",
+    "careerRecordDescription": "Your interview answers, word for word. Every quote in your assessments and CVs is checked against this text.",
+    "interviewTitle": "No CV? Build your profile by interview",
+    "interviewDescription": "Answer questions about your roles, scope and achievements; Huntloop turns your own words into a profile and a base CV.",
+    "interviewDescriptionExisting": "Rebuild your profile from an interview instead of a CV: useful when your CV is old or thin.",
+    "interviewStart": "Build by interview",
+    "interviewResume": "Resume the interview"
   },
   "preferences": {
     "rolesTitle": "Roles you want",
@@ -939,7 +947,11 @@
       "get_job": "Read a job: {detail}",
       "compare_jobs": "Compared jobs",
       "search_jobs": "Started a search: {detail}",
-      "import_job_url": "Added a job: {detail}"
+      "import_job_url": "Added a job: {detail}",
+      "record_answer": "Recorded: {detail}",
+      "record_skill": "Noted a skill: {detail}",
+      "list_answers": "Read back your answers",
+      "complete_stage": "Finished this part"
     },
     "card": {
       "factTitle": "Add this to your profile?",
@@ -971,6 +983,15 @@
     "runsOn": {
       "api": "Conversation on: API key",
       "subscription": "Conversation on: Claude subscription"
+    },
+    "interview": {
+      "placeholder": "Type your answer… (Enter to send, Shift+Enter for a new line)",
+      "hint": "Your answers are recorded exactly as you type them. Type numbers as digits.",
+      "suggestion": {
+        "thatsAll": "That's all",
+        "noNumber": "I don't have a number",
+        "skip": "Skip"
+      }
     }
   },
   "employer": {
@@ -1541,5 +1562,225 @@
     "blocked": "{site}: {kind, select, captcha {CAPTCHA} login {sign-in required} checkpoint {security check} other {check needed}} — waiting for you",
     "jobLinks": "{site}: {count} job links",
     "read": "{site}: read {done} of {total}"
+  },
+  "interview": {
+    "title": "Build your profile by interview",
+    "subtitle": "No CV, or an old one? Answer questions about your work and Huntloop turns your own words into a profile and a CV. Every line of the CV traces back to something you typed.",
+    "back": "← Profile",
+    "invalidForm": "Something in this step isn't valid. Check the dates (YYYY-MM) and required fields.",
+    "saveContinue": "Save and continue",
+    "save": "Save",
+    "skip": "Skip",
+    "continue": "Continue",
+    "notSet": "Not set",
+    "dateHint": "YYYY-MM, e.g. 2021-03",
+    "endHint": "Leave empty if you still work there.",
+    "untitledRole": "Untitled role",
+    "languageName": {
+      "en": "English",
+      "ko": "Korean"
+    },
+    "discard": "Discard interview",
+    "discardConfirm": "Delete this interview with all its answers and chat messages? Your saved profile and CVs stay.",
+    "setup": {
+      "title": "Before we start",
+      "description": "A few choices that shape the questions. You can change them later.",
+      "language": "Interview language",
+      "country": "Where you want to work",
+      "countryHint": "Sets the CV conventions (length, referees, work-rights line).",
+      "personas": "Which describes you? (any that apply)",
+      "depth": "How deep should we go?",
+      "costHint": "With an API key, a full interview costs about US$2–4 on Opus, or about half on Sonnet 5.5 (Settings → models → CV builder interview). With a Claude subscription it uses your plan instead.",
+      "start": "Start the interview"
+    },
+    "persona": {
+      "no_cv": "I have no CV",
+      "career_changer": "Changing careers",
+      "returning": "Returning to work after a break",
+      "migrant": "New to this country's job market",
+      "graduate": "Recent graduate",
+      "senior_exec": "Senior leader or executive"
+    },
+    "depth": {
+      "full": "Full",
+      "quick": "Quick"
+    },
+    "depthHint": {
+      "full": "— every recent role in depth, 60–90 minutes, in as many sittings as you like.",
+      "quick": "— your current role in depth, the rest briefly, about 25 minutes."
+    },
+    "target": {
+      "title": "The job you're after",
+      "description": "Everything after this is asked with this target in mind. It also becomes your job-search preferences.",
+      "industries": "Industries",
+      "workRights": "Your right to work there",
+      "clearance": "Security clearance",
+      "availability": "Availability or notice period",
+      "availabilityHint": "For the interviewer only; not on the CV."
+    },
+    "current": {
+      "title": "Where you are now",
+      "description": "Save this, then tell the interviewer about it below.",
+      "status": "Right now I am",
+      "titleNow": "Current job title",
+      "titleLast": "Most recent job title",
+      "saveFirst": "Save the form above to start the conversation."
+    },
+    "currentStatus": {
+      "employed": "Employed",
+      "between_roles": "Between roles",
+      "studying": "Studying",
+      "on_break": "On a break",
+      "self_employed": "Self-employed"
+    },
+    "roles": {
+      "title": "Your roles",
+      "description": "Every role, newest first: contracts, self-employment, overseas roles and long internships count too.",
+      "roleTitle": "Job title (role {n})",
+      "companyN": "Employer (role {n})",
+      "company": "Employer",
+      "industry": "Industry",
+      "location": "City",
+      "country": "Country",
+      "start": "Started",
+      "startN": "Started (role {n})",
+      "endN": "Ended (role {n})",
+      "depth": "How much to cover",
+      "remove": "Remove role {n}",
+      "add": "Add a role",
+      "hint": "Next, one short conversation per role: in depth for recent roles, briefly for older ones."
+    },
+    "roleDepth": {
+      "deep": "In depth",
+      "brief": "Briefly"
+    },
+    "education": {
+      "title": "Education and certifications",
+      "description": "Degrees, diplomas and certifications, as facts.",
+      "institution": "Institution ({n})",
+      "degree": "Qualification ({n})",
+      "field": "Field of study ({n})",
+      "start": "Started ({n})",
+      "end": "Finished ({n})",
+      "add": "Add education",
+      "certName": "Certification ({n})",
+      "issuer": "Issued by ({n})",
+      "year": "Year ({n})",
+      "addCert": "Add a certification"
+    },
+    "languages": {
+      "title": "Languages",
+      "description": "Languages you can work in, and how well.",
+      "language": "Language ({n})",
+      "level": "Level ({n})",
+      "add": "Add a language"
+    },
+    "contact": {
+      "title": "How you appear on the CV",
+      "description": "Contact details go in the CV header only; they are never part of the record the AI quotes from.",
+      "cvLanguage": "CV language"
+    },
+    "rail": {
+      "label": "Interview steps",
+      "progress": "{done} of {total} steps done",
+      "answers": "{count, plural, =0 {No answers recorded yet} one {# answer recorded} other {# answers recorded}}",
+      "spend": "AI spend today: {amount}"
+    },
+    "stage": {
+      "setup": "Setup",
+      "target": "Target job",
+      "current": "Where you are now",
+      "roles": "Your roles",
+      "role_deep": "Each role in depth",
+      "education": "Education",
+      "languages": "Languages",
+      "contact": "Contact and CV",
+      "review": "Review and generate"
+    },
+    "stageStatus": {
+      "pending": "To do",
+      "done": "Done",
+      "skipped": "Skipped"
+    },
+    "topic": {
+      "scope": "Scope",
+      "responsibility": "Responsibility",
+      "achievement": "Achievement",
+      "tool": "Tools and methods",
+      "skill": "Skill",
+      "context": "Context",
+      "gap": "Career break",
+      "extra": "Other",
+      "other": "Other"
+    },
+    "drawer": {
+      "title": "What I've recorded ({count})",
+      "description": "Your own words, exactly as typed. Private answers never reach your profile or CV.",
+      "empty": "Nothing recorded yet.",
+      "general": "About you",
+      "private": "Private",
+      "edited": "Edited",
+      "edit": "Edit",
+      "editLabel": "Edit this answer",
+      "saveEdit": "Save answer",
+      "cancel": "Cancel",
+      "makePrivate": "Keep private",
+      "makePublic": "Use on my CV",
+      "delete": "Delete"
+    },
+    "skills": {
+      "title": "Skills",
+      "description": "Skills and tools you named in the interview. Tick the ones that belong on your CV; only ticked skills are used.",
+      "empty": "None noted yet. Add your own below.",
+      "add": "Add a skill",
+      "category": "Kind",
+      "addButton": "Add"
+    },
+    "skillCategory": {
+      "language": "Programming language",
+      "framework": "Framework",
+      "tool": "Tool",
+      "platform": "Platform",
+      "database": "Database",
+      "domain": "Domain knowledge",
+      "method": "Method",
+      "soft": "People skill",
+      "other": "Other"
+    },
+    "generate": {
+      "title": "Generate your profile and CV",
+      "description": "Huntloop saves a new profile version from your answers (your old one stays in its history) and writes a base CV for your target market. Every line is checked against your answers.",
+      "missing": "Still needed: {stages}.",
+      "stage": {
+        "queued": "Waiting to start…",
+        "building": "Saving your profile…",
+        "writing": "Writing your CV…",
+        "checking": "Checking every line against your answers…"
+      },
+      "replaceWarning": "This replaces your current profile's roles, education and skills with the interview's (the old version stays in its history; your own facts are kept).",
+      "replace": "Replace and generate",
+      "button": "Generate my profile and CV",
+      "again": "Generate again",
+      "baseTitle": "Base CV — version {version}",
+      "baseDescription": "Written from your interview for your target roles and market. Huntloop tailors it to each job you go for.",
+      "stale": "Your profile has changed since this CV was written. Generate again to update it.",
+      "allVerified": "Every line is traced to your answers or facts you confirmed.",
+      "linkedin": "Write LinkedIn text",
+      "checkDescription": "Huntloop couldn't trace these to your answers. Remove them, rewrite them in your own words, or confirm they're true.",
+      "startNew": "Start a new interview"
+    },
+    "missing": {
+      "target": "a target job title",
+      "roles": "at least one role",
+      "role_deep": "the conversation about your current role",
+      "contact": "your name"
+    },
+    "roleChat": {
+      "rolesLabel": "Roles",
+      "done": "This part is done. You can still add to it, or continue.",
+      "nextRole": "Next role",
+      "skipRole": "Skip this role",
+      "noRoles": "Add your roles in the previous step first."
+    }
   }
 }

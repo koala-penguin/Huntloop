@@ -29,6 +29,8 @@ interface Props {
   data: ProfileData;
   /** Countries from job preferences: always shown in the work-rights section. */
   preferenceCountries: string[];
+  /** The CV text is the Career record from the CV builder interview (this version came from it). */
+  careerRecord?: boolean;
 }
 
 const blank = (v: string) => (v.trim() === "" ? null : v);
@@ -75,7 +77,7 @@ function Field({ label, children, hint, className }: { label: string; children: 
   );
 }
 
-export function ProfileEditor({ version, cvText: initialCvText, data: initialData, preferenceCountries }: Props) {
+export function ProfileEditor({ version, cvText: initialCvText, data: initialData, preferenceCountries, careerRecord = false }: Props) {
   const t = useTranslations("profile");
   const tMarkets = useTranslations("markets");
   const tCommon = useTranslations("common");
@@ -488,7 +490,7 @@ export function ProfileEditor({ version, cvText: initialCvText, data: initialDat
         </div>
       </Section>
 
-      <Section title={t("cvTextTitle")} description={t("cvTextDescription")}>
+      <Section title={t(careerRecord ? "careerRecordTitle" : "cvTextTitle")} description={t(careerRecord ? "careerRecordDescription" : "cvTextDescription")}>
         <details>
           <summary className="cursor-pointer text-sm text-accent">{t("showCvText")}</summary>
           <Textarea className="mt-3 font-mono text-xs" rows={18} value={cvText} onChange={(e) => { setCvText(e.target.value); setStatus({ kind: "idle" }); }} aria-label={t("cvTextTitle")} />

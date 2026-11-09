@@ -39,10 +39,72 @@ interface Live {
 const KNOWN_ERRORS = ["refusal", "budget", "max_tokens", "chat_busy", "job_not_ready", "api", "session_expired", ...AI_ERROR_CODES];
 const SUGGESTIONS = ["explain", "fit", "improve", "research"] as const;
 const COACH_SUGGESTIONS = ["week", "compare", "followUp", "search"] as const;
-const KNOWN_ACTIVITIES = ["web_search", "web_fetch", "save_job_note", "set_job_status", "start_company_research", "revise_cv_draft", "list_jobs", "get_job", "compare_jobs", "search_jobs", "import_job_url"];
+const INTERVIEW_SUGGESTIONS = ["thatsAll", "noNumber", "skip"] as const;
+const KNOWN_ACTIVITIES = [
+  "web_search",
+  "web_fetch",
+  "save_job_note",
+  "set_job_status",
+  "start_company_research",
+  "revise_cv_draft",
+  "list_jobs",
+  "get_job",
+  "compare_jobs",
+  "search_jobs",
+  "import_job_url",
+  "record_answer",
+  "record_skill",
+  "list_answers",
+  "complete_stage",
+];
 
-/** A job's own chat, or the coach across all jobs. */
-export type ChatScopeProp = { kind: "job"; jobId: number } | { kind: "coach" };
+/** A job's own chat, the coach across all jobs, or one stage (and role) of the CV builder interview. */
+export type ChatScopeProp =
+  | { kind: "job"; jobId: number }
+  | { kind: "coach" }
+  | { kind: "cv_interview"; interviewId: number; stage: "current" | "role_deep"; experienceRef: string | null; opening: string };
+
+/** What differs per kind of chat: where messages go, the input's id and the texts around it. */
+function scopeView(scope: ChatScopeProp, t: (key: string) => string, hasProfile: boolean) {
+  switch (scope.kind) {
+    case "job":
+      return {
+        endpoint: `/api/jobs/${scope.jobId}/chat`,
+        body: {},
+        inputId: `chat-${scope.jobId}`,
+        intro: t("intro"),
+        placeholder: t("placeholder"),
+        hint: t("hint"),
+        suggestions: SUGGESTIONS.filter((s) => hasProfile || s === "explain" || s === "research").map((s) => t(`suggestion.${s}`)),
+        alwaysSuggest: false,
+        canReset: true,
+      };
+    case "coach":
+      return {
+        endpoint: "/api/coach/chat",
+        body: {},
+        inputId: "chat-coach",
+        intro: t("coach.intro"),
+        placeholder: t("coach.placeholder"),
+        hint: t("coach.hint"),
+        suggestions: COACH_SUGGESTIONS.map((s) => t(`coach.suggestion.${s}`)),
+        alwaysSuggest: false,
+        canReset: true,
+      };
+    case "cv_interview":
+      return {
+        endpoint: `/api/cv-interview/${scope.interviewId}/chat`,
+        body: { stage: scope.stage, experienceRef: scope.experienceRef },
+        inputId: `chat-interview-${scope.stage}-${scope.experienceRef ?? "current"}`,
+        intro: null,
+        placeholder: t("interview.placeholder"),
+        hint: t("interview.hint"),
+        suggestions: INTERVIEW_SUGGESTIONS.map((s) => t(`interview.suggestion.${s}`)),
+        alwaysSuggest: true,
+        canReset: false,
+      };
+  }
+}
 
 function Markdown({ text }: { text: string }) {
   return (
@@ -190,7 +252,8 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [resetting, startReset] = useTransition();
 
-  const inputId = scope.kind === "job" ? `chat-${scope.jobId}` : "chat-coach";
+  const view = scopeView(scope, t, hasProfile);
+  const inputId = view.inputId;
   const showLive = live && (!live.finished || items.length <= live.baseCount);
   const sending = !!live && !live.finished;
 
@@ -202,7 +265,7 @@ export function ChatPanel({
     setLive({ user: message, text: "", progress: null, activities: [], baseCount: items.length, finished: false });
     let failed: string | null = null;
     try {
-      const res = await fetch(scope.kind === "job" ? `/api/jobs/${scope.jobId}/chat` : "/api/coach/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: message }) });
+      const res = await fetch(view.endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...view.body, text: message }) });
       if (!res.ok || !res.body) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         failed = body.error ?? "api";
@@ -250,7 +313,8 @@ export function ChatPanel({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-4" aria-live="polite">
-        {items.length === 0 && !showLive && <p className="text-sm text-muted">{scope.kind === "job" ? t("intro") : t("coach.intro")}</p>}
+        {items.length === 0 && !showLive && view.intro && <p className="text-sm text-muted">{view.intro}</p>}
+        {scope.kind === "cv_interview" && <AssistantBubble item={{ text: scope.opening, activities: [], sources: [], actions: [] }} />}
         {items.map((item) => (item.role === "user" ? <UserBubble key={item.id} text={item.text} /> : <AssistantBubble key={item.id} item={item} />))}
         {showLive && (
           <>
@@ -268,9 +332,9 @@ export function ChatPanel({
         )}
       </div>
 
-      {items.length === 0 && !live && (
+      {(view.alwaysSuggest ? !sending : items.length === 0 && !live) && (
         <div className="flex flex-wrap gap-2">
-          {(scope.kind === "job" ? SUGGESTIONS.filter((s) => hasProfile || s === "explain" || s === "research").map((s) => t(`suggestion.${s}`)) : COACH_SUGGESTIONS.map((s) => t(`coach.suggestion.${s}`))).map((text) => (
+          {view.suggestions.map((text) => (
             <Button key={text} type="button" variant="secondary" size="sm" onClick={() => void send(text)}>
               {text}
             </Button>
@@ -292,7 +356,7 @@ export function ChatPanel({
           disabled={sending}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={scope.kind === "job" ? t("placeholder") : t("coach.placeholder")}
+          placeholder={view.placeholder}
         />
         {hasConversation && provider && (
           <div className="flex flex-wrap items-center gap-2">
@@ -301,9 +365,9 @@ export function ChatPanel({
           </div>
         )}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-muted">{scope.kind === "job" ? t("hint") : t("coach.hint")}</span>
+          <span className="text-xs text-muted">{view.hint}</span>
           <div className="flex gap-2">
-            {hasConversation && (
+            {hasConversation && view.canReset && (
               <Button
                 type="button"
                 variant="ghost"

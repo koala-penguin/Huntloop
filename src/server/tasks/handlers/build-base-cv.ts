@@ -33,6 +33,11 @@ function activeTask(db: Db, userId: number, kind: string): number | null {
   return last?.id ?? null;
 }
 
+/** The Generate run in progress, if any (the review page follows it after a reload). */
+export function runningBuildBaseCv(db: Db, userId: number): number | null {
+  return activeTask(db, userId, BUILD_BASE_CV_TASK);
+}
+
 /**
  * Queues Generate (or returns the run already in progress). Refused while a CV upload is being read:
  * both write a new profile version.

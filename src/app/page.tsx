@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
 import { CheckCircle2, Circle } from "lucide-react";
@@ -13,7 +14,7 @@ import { listJobs } from "@/server/repo/jobs";
 import { TierBadge } from "@/components/jobs/tier-badge";
 import type { Tier } from "@/shared/schemas/job";
 
-function Step({ done, title, body }: { done: boolean; title: string; body: string }) {
+function Step({ done, title, body }: { done: boolean; title: string; body: ReactNode }) {
   const Icon = done ? CheckCircle2 : Circle;
   return (
     <li className="flex gap-3">
@@ -57,7 +58,18 @@ export default async function DashboardPage() {
             <Step
               done={!!profile}
               title={t("stepProfile")}
-              body={profile ? t("stepProfileDone", { version: profile.version, years: experienceYears(profile.data.experience) }) : t("stepProfileBody")}
+              body={
+                profile ? (
+                  t("stepProfileDone", { version: profile.version, years: experienceYears(profile.data.experience) })
+                ) : (
+                  <>
+                    {t("stepProfileBody")}{" "}
+                    <Link href="/profile/interview" className="underline">
+                      {t("stepProfileInterview")}
+                    </Link>
+                  </>
+                )
+              }
             />
             <Step done={jobs.length > 0} title={t("stepJob")} body={jobs.length > 0 ? t("stepJobDone", { count: jobs.length }) : t("stepJobBody")} />
           </ol>
