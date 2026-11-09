@@ -41,10 +41,13 @@ const orNull = (text: string | null | undefined) => (text && text.trim() ? text.
 
 /**
  * Answers that count as evidence: not private, not replaced by an edit, each filed under its role
- * (answerRole). Answers of a removed role are dropped by the callers.
+ * (answerRole), in the wording the candidate accepted (a cleaner version they accepted, else their
+ * own words). Answers of a removed role are dropped by the callers.
  */
 export function evidenceAnswers(answers: InterviewAnswerRow[], form: InterviewForm): InterviewAnswerRow[] {
-  return answers.filter((a) => !a.private && a.supersededBy === null && clean(a.quote)).map((a) => ({ ...a, experienceRef: answerRole(form, a) }));
+  return answers
+    .filter((a) => !a.private && a.supersededBy === null && clean(a.polished ?? a.quote))
+    .map((a) => ({ ...a, quote: a.polished ?? a.quote, experienceRef: answerRole(form, a) }));
 }
 
 function period(start: string, end: string): string {

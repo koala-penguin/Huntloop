@@ -6,7 +6,7 @@ import { conversations } from "@/server/db/schema";
 import { appContext } from "@/server/context";
 import { budgetStatus } from "@/server/ai/client";
 import { listChatActions, listChatMessages } from "@/server/ai/chat/harness";
-import { openingQuestion } from "@/server/ai/chat/interview";
+import { interviewOpening } from "@/server/ai/chat/interview";
 import { transcript } from "@/server/ai/chat/render";
 import { getLatestInterview, listAnswers, stageConversation, type Interview } from "@/server/repo/interviews";
 import { getCurrentProfile, getPreferences } from "@/server/repo/profile";
@@ -95,7 +95,7 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
       <Card className="flex flex-col gap-4">
         <ChatPanel
           key={`${chatStage}-${ref ?? "current"}`}
-          scope={{ kind: "cv_interview", interviewId: interview.id, stage: chatStage, experienceRef: ref, opening: openingQuestion(interview.language, chatStage, roleForm) }}
+          scope={{ kind: "cv_interview", interviewId: interview.id, stage: chatStage, experienceRef: ref, opening: interviewOpening(interview, chatStage, ref).text }}
           items={items}
           hasConversation={!!conversation}
           provider={conversation ? (conversation.provider as Connection) : null}

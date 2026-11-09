@@ -110,6 +110,8 @@ export function toApiMessages(rows: ChatMessageRow[]): MessageParam[] {
   const out: MessageParam[] = [];
   for (const row of rows) {
     const content = row.content as ContentBlockParam[];
+    // A turn that ended with nothing to say (e.g. after a tool that only shows something) adds no message.
+    if (!content.length) continue;
     const last = out.at(-1);
     if (last && last.role === row.role) last.content = [...(last.content as ContentBlockParam[]), ...content];
     else out.push({ role: row.role as "user" | "assistant", content: [...content] });

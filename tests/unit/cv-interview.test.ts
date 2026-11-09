@@ -3,15 +3,30 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { chatMessages, conversations, interviewAnswers, tasks, type InterviewAnswerRow } from "@/server/db/schema";
+import { chatActions, chatMessages, conversations, interviewAnswers, tasks, type InterviewAnswerRow } from "@/server/db/schema";
 import { listChatMessages, runChatTurn, type ChatEvent } from "@/server/ai/chat/harness";
-import { ensureInterviewConversation, interviewTools, verbatimGate } from "@/server/ai/chat/interview";
+import { ensureInterviewConversation, interviewOpening, interviewTools, verbatimGate } from "@/server/ai/chat/interview";
+import { resolveChatAction } from "@/server/ai/chat/actions";
 import { getFakeGenerator, registerFakeGenerator, type FakeGenerator, type FakeRequest } from "@/server/ai/fake/transport";
 import { DEMO_SCREENSHOT_POSTING } from "@/server/ai/fake/generators/jobs";
 import { DEMO_UNSUPPORTED_BULLET } from "@/server/ai/fake/generators/tailoring";
-import "@/server/ai/fake/generators/interview";
+import { fakePolish } from "@/server/ai/fake/generators/interview";
 import { countUnionParams } from "@/server/ai/schema-limits";
-import { createInterview, deleteAnswer, discardInterview, editAnswer, getInterview, listAnswers, saveStageForm, updateInterview, type Interview } from "@/server/repo/interviews";
+import {
+  completeChatStage,
+  createInterview,
+  deleteAnswer,
+  discardInterview,
+  editAnswer,
+  getInterview,
+  listAnswers,
+  reopenStage,
+  saveStageForm,
+  setStageStatus,
+  stageHasAnswers,
+  updateInterview,
+  type Interview,
+} from "@/server/repo/interviews";
 import { getCurrentProfile, getPreferences, saveProfileVersion, savePreferences } from "@/server/repo/profile";
 import { createJob } from "@/server/repo/jobs";
 import { processJob } from "@/server/jobs/pipeline";
@@ -30,6 +45,7 @@ import { buildProvenanceContext, checkLine } from "@/server/cv/provenance";
 import { blockingFlags, type CvLine } from "@/shared/schemas/cv";
 import { testDb } from "../helpers/db";
 import { right } from "../helpers/scoring";
+import { ANSWERS } from "../helpers/interview";
 
 const original = process.env.HUNTLOOP_DATA_DIR;
 beforeAll(() => {
@@ -51,14 +67,13 @@ afterEach(() => {
   requests.length = 0;
 });
 
-export const ANSWERS = {
-  scope: "I led a team of 6 frontend engineers building the merchant dashboard in React and TypeScript.",
-  responsibility: "I was accountable for frontend architecture, code reviews and mentoring 4 engineers.",
-  achievement: "I led the rebuild of the merchant dashboard and cut page load time by 40%.",
-  korean: "리액트로 월 200만 명이 쓰는 결제 화면을 만들었습니다.",
-  week: "Planning sprints with product, reviewing pull requests and pairing with junior engineers.",
-  private: "The company is moving its engineering team offshore next year.",
-};
+
+/** The request carries tool results only (the model is called again within a turn), not a new message from the candidate. */
+function toolRound(req: FakeRequest): boolean {
+  const last = req.body.messages.at(-1)!;
+  const blocks = Array.isArray(last.content) ? (last.content as Array<{ type: string; text?: string }>) : [];
+  return blocks.some((b) => b.type === "tool_result") && !blocks.some((b) => b.type === "text" && !b.text?.startsWith("<context_update>"));
+}
 
 async function turn(ctx: Parameters<typeof runChatTurn>[0], conversationId: number, text: string) {
   const events: ChatEvent[] = [];
@@ -88,8 +103,9 @@ async function interviewOnlyProfile() {
   const env = setupInterview();
   const { db, userId, ctx } = env;
   const role1 = ensureInterviewConversation(ctx, env.interview.id, "role_deep", "exp-1");
-  await turn(ctx, role1.id, ANSWERS.scope);
+  // The demo interviewer opens with responsibilities, then asks about scope and an achievement.
   await turn(ctx, role1.id, ANSWERS.responsibility);
+  await turn(ctx, role1.id, ANSWERS.scope);
   await turn(ctx, role1.id, ANSWERS.achievement);
   await turn(ctx, role1.id, "That's all");
   const role2 = ensureInterviewConversation(ctx, env.interview.id, "role_deep", "exp-2");
@@ -112,10 +128,10 @@ describe("CV interview — Phase 0 evidence path (G0)", () => {
     const { db, interview, role1, role2 } = await interviewOnlyProfile();
     const answers = listAnswers(db, interview.id);
     expect(answers.map((a) => [a.experienceRef, a.topic, a.quote])).toEqual([
-      ["exp-1", "scope", ANSWERS.scope],
       ["exp-1", "responsibility", ANSWERS.responsibility],
+      ["exp-1", "scope", ANSWERS.scope],
       ["exp-1", "achievement", ANSWERS.achievement],
-      ["exp-2", "scope", ANSWERS.korean],
+      ["exp-2", "responsibility", ANSWERS.korean],
     ]);
     expect(answers.every((a) => a.origin === "chat" && a.messageId !== null)).toBe(true);
     expect(interview.stages).toMatchObject({ "role:exp-1": "done", "role:exp-2": "done" });
@@ -181,11 +197,14 @@ describe("CV interview — Phase 0 evidence path (G0)", () => {
 
 describe("CV interview — the verbatim gate (A1)", () => {
   const recordOnce = (quote: string): FakeGenerator => (req) => {
-    const last = req.body.messages.at(-1)!;
-    const hasResult = Array.isArray(last.content) && (last.content as Array<{ type: string }>).some((b) => b.type === "tool_result");
-    return hasResult ? demoInterviewer(req) : { content: [{ type: "tool_use", id: `toolu_gate_${Math.random()}`, name: "record_answer", input: { topic: "scope", quote, private: false, question: "Scope?" } }] };
+    return toolRound(req) ? demoInterviewer(req) : { content: [{ type: "tool_use", id: `toolu_gate_${Math.random()}`, name: "record_answer", input: { topic: "scope", quote, private: false, question: "Scope?" } }] };
   };
-  const lastResult = () => (requests.at(-1)!.messages.at(-1)!.content as Array<{ type: string; content?: string; is_error?: boolean }>).find((b) => b.type === "tool_result")!;
+  /** The result of the last record_answer call this test made. */
+  const lastResult = () =>
+    requests
+      .flatMap((r) => r.messages.flatMap((m) => (Array.isArray(m.content) ? (m.content as Array<{ type: string; tool_use_id?: string; content?: string; is_error?: boolean }>) : [])))
+      .filter((b) => b.type === "tool_result" && b.tool_use_id?.startsWith("toolu_gate_"))
+      .at(-1)!;
 
   it("rejects a reworded quote, an elided one and one shorter than three words", async () => {
     const { db, ctx, interview } = setupInterview();
@@ -233,9 +252,7 @@ describe("CV interview — the verbatim gate (A1)", () => {
     const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
     // The follow-up request (carrying the tool result) is refused, so the whole turn is rolled back.
     override = (req) => {
-      const last = req.body.messages.at(-1)!;
-      const hasResult = Array.isArray(last.content) && (last.content as Array<{ type: string }>).some((b) => b.type === "tool_result");
-      return hasResult ? { content: [{ type: "text", text: "" }], stop_reason: "refusal" } : demoInterviewer(req);
+      return toolRound(req) ? { content: [{ type: "text", text: "" }], stop_reason: "refusal" } : demoInterviewer(req);
     };
     const events = await turn(ctx, conversation.id, ANSWERS.scope);
     expect(requests.length).toBe(2);
@@ -449,7 +466,7 @@ describe("CV interview — editing, resuming and discarding", () => {
     const current = reload(db, userId, interview);
 
     const edited = editAnswer(db, current, first.id, { quote: "I led a team of 7 frontend engineers." });
-    expect(edited).toMatchObject({ origin: "user_edit", messageId: null, experienceRef: "exp-1", topic: "scope" });
+    expect(edited).toMatchObject({ origin: "user_edit", messageId: null, experienceRef: "exp-1", topic: "responsibility" });
     expect(listAnswers(db, interview.id).map((a) => a.quote)).toEqual([ANSWERS.responsibility, "I led a team of 7 frontend engineers."]);
     expect(listAnswers(db, interview.id, { includeSuperseded: true })).toHaveLength(3);
     expect(() => editAnswer(db, current, first.id, { quote: "again" })).toThrow("not_found");
@@ -611,5 +628,209 @@ describe("CV interview — review round 2", () => {
     expect(target.titles[0].length).toBeLessThanOrEqual(120);
     expect(target.cities).toHaveLength(20);
     expect(target.remoteOk).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Owner feedback round: skip a question vs finish a part, undo, coverage, cleaner versions
+
+const toolUsesIn = (db: ReturnType<typeof testDb>["db"], conversationId: number, from = 0) =>
+  listChatMessages({ db }, conversationId)
+    .filter((m) => m.kind === "assistant" && m.seq >= from)
+    .flatMap((m) => (m.content as Array<{ type: string; name?: string; input?: Record<string, unknown> }>).filter((b) => b.type === "tool_use"));
+const textsIn = (db: ReturnType<typeof testDb>["db"], conversationId: number, from = 0) =>
+  listChatMessages({ db }, conversationId)
+    .filter((m) => m.kind === "assistant" && m.seq >= from)
+    .flatMap((m) => (m.content as Array<{ type: string; text?: string }>).filter((b) => b.type === "text").map((b) => b.text ?? ""));
+const nextSeq = (db: ReturnType<typeof testDb>["db"], conversationId: number) => listChatMessages({ db }, conversationId).length;
+
+describe("CV interview — skipping a question, finishing a part, undo", () => {
+  it("one answer turn asks exactly one next question, with examples, after offering a cleaner version", async () => {
+    const { db, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, conversation.id, ANSWERS.responsibility);
+    expect(toolUsesIn(db, conversation.id).map((b) => b.name)).toEqual(["record_answer", "propose_polish", "suggest_options"]);
+    const texts = textsIn(db, conversation.id).filter(Boolean);
+    expect(texts).toHaveLength(1);
+    expect(texts[0]).toMatch(/How big was that\?/);
+    expect(texts[0]).not.toContain("—");
+  });
+
+  it("'Skip this question' moves on without recording; a short reply gets a re-ask; 'That's all for this part' finishes once (bug 2)", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, conversation.id, ANSWERS.responsibility);
+    const before = listAnswers(db, interview.id).length;
+
+    let from = nextSeq(db, conversation.id);
+    await turn(ctx, conversation.id, "Skip this question");
+    expect(toolUsesIn(db, conversation.id, from).map((b) => b.name)).toEqual(["suggest_options"]);
+    expect(textsIn(db, conversation.id, from).join(" ")).toMatch(/proudest/);
+    expect(listAnswers(db, interview.id)).toHaveLength(before);
+    expect(reload(db, userId, interview).stages["role:exp-1"]).toBeUndefined();
+
+    from = nextSeq(db, conversation.id);
+    await turn(ctx, conversation.id, "Ok");
+    expect(toolUsesIn(db, conversation.id, from).map((b) => b.name)).toEqual(["suggest_options"]);
+    expect(textsIn(db, conversation.id, from).join(" ")).toMatch(/say a bit more[\s\S]*proudest/);
+
+    from = nextSeq(db, conversation.id);
+    await turn(ctx, conversation.id, "That's all for this part");
+    const finish = toolUsesIn(db, conversation.id, from).filter((b) => b.name === "complete_stage");
+    expect(finish).toHaveLength(1);
+    expect(finish[0].input).toMatchObject({ reason: "candidate_finished" });
+    expect(reload(db, userId, interview).stages["role:exp-1"]).toBe("done");
+
+    from = nextSeq(db, conversation.id);
+    await turn(ctx, conversation.id, "That's all for this part");
+    expect(toolUsesIn(db, conversation.id, from)).toEqual([]);
+    expect(textsIn(db, conversation.id, from).join(" ")).toMatch(/already finished/);
+  });
+
+  it("a skipped part can be undone, and Continue counts a skipped part with answers as done (bug 1)", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    let current = setStageStatus(db, interview, "role:exp-1", "skipped");
+    current = reopenStage(db, current, "role:exp-1");
+    expect(reload(db, userId, interview).stages["role:exp-1"]).toBe("pending");
+    current = reopenStage(db, setStageStatus(db, current, "education", "skipped"), "education");
+    expect(reload(db, userId, interview)).toMatchObject({ stage: "education", stages: { education: "pending" } });
+
+    current = setStageStatus(db, current, "role:exp-1", "skipped");
+    expect(stageHasAnswers(db, current, "role:exp-1")).toBe(false);
+    expect(completeChatStage(db, current, "role:exp-1", false).stages["role:exp-1"]).toBe("skipped");
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, conversation.id, ANSWERS.responsibility);
+    current = reload(db, userId, interview);
+    expect(stageHasAnswers(db, current, "role:exp-1")).toBe(true);
+    expect(stageHasAnswers(db, current, "role:exp-2")).toBe(false);
+    expect(completeChatStage(db, current, "role:exp-1", true).stages["role:exp-1"]).toBe("done");
+  });
+
+  it("after Reopen the interviewer carries on with the next question", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, conversation.id, ANSWERS.responsibility);
+    await turn(ctx, conversation.id, "That's all for this part");
+    reopenStage(db, reload(db, userId, interview), "role:exp-1");
+    const from = nextSeq(db, conversation.id);
+    await turn(ctx, conversation.id, ANSWERS.scope);
+    expect(toolUsesIn(db, conversation.id, from).map((b) => b.name)).toContain("record_answer");
+    expect(listAnswers(db, interview.id).at(-1)).toMatchObject({ quote: ANSWERS.scope, topic: "scope" });
+  });
+
+  it("'covered' is refused while a required topic is missing; the candidate can always finish", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, conversation.id, ANSWERS.responsibility);
+    const finishWith = (reason: string) => (req: FakeRequest) =>
+      toolRound(req) ? { content: [{ type: "text", text: "Ok." }] } : { content: [{ type: "tool_use", id: `toolu_finish_${Math.random()}`, name: "complete_stage", input: { summary: "Done.", reason } }] };
+    override = finishWith("covered");
+    await turn(ctx, conversation.id, "I think we covered it all.");
+    const result = requests.flatMap((r) => r.messages.flatMap((m) => (Array.isArray(m.content) ? (m.content as Array<{ type: string; tool_use_id?: string; content?: string; is_error?: boolean }>) : []))).filter((b) => b.type === "tool_result" && b.tool_use_id?.startsWith("toolu_finish_")).at(-1)!;
+    expect(result).toMatchObject({ is_error: true });
+    expect(result.content).toMatch(/scope, achievement/);
+    expect(reload(db, userId, interview).stages["role:exp-1"]).toBeUndefined();
+    override = finishWith("candidate_finished");
+    await turn(ctx, conversation.id, "Let's stop here please.");
+    expect(reload(db, userId, interview).stages["role:exp-1"]).toBe("done");
+  });
+
+  it("a conversation from the older interviewer is replaced; its answers stay", async () => {
+    const { db, ctx, interview } = setupInterview();
+    const old = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, old.id, ANSWERS.responsibility);
+    db.update(conversations).set({ toolsetVersion: 1 }).where(eq(conversations.id, old.id)).run();
+    const fresh = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    expect(fresh.id).not.toBe(old.id);
+    expect(ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1").id).toBe(fresh.id);
+    expect(listAnswers(db, interview.id).map((a) => a.quote)).toEqual([ANSWERS.responsibility]);
+  });
+
+  it("the opening question names the role and gives examples for it", () => {
+    const { db, userId } = testDb();
+    let interview = createInterview(db, userId, { country: "NZ", language: "en" });
+    interview = saveStageForm(db, interview, "current", { status: "employed", title: "Head of Data", company: "PB" });
+    const opening = interviewOpening(interview, "role_deep", interview.form.roles[0].id);
+    expect(opening.text).toMatch(/Head of Data at PB/);
+    expect(opening.options).toEqual(expect.arrayContaining(["Data governance and quality"]));
+    expect(interviewOpening(interview, "current", null).text).toMatch(/You're Head of Data at PB right now/);
+  });
+});
+
+describe("CV interview — cleaner versions of answers", () => {
+  const polishCards = (db: ReturnType<typeof testDb>["db"], conversationId: number) => db.select().from(chatActions).where(eq(chatActions.conversationId, conversationId)).all();
+
+  it("offers a checked cleaner version as a card; accepting it makes it the evidence, the raw words stay", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, conversation.id, ANSWERS.responsibility);
+    const [card] = polishCards(db, conversation.id);
+    expect(card).toMatchObject({ kind: "interview_polish", status: "pending", payload: { raw: ANSWERS.responsibility, text: fakePolish(ANSWERS.responsibility) } });
+
+    resolveChatAction(ctx, card.id, "accept");
+    const [answer] = listAnswers(db, interview.id);
+    expect(answer).toMatchObject({ quote: ANSWERS.responsibility, polished: fakePolish(ANSWERS.responsibility) });
+    const built = buildProfileFromInterview(reload(db, userId, interview), listAnswers(db, interview.id, { includePrivate: true }), null);
+    expect(built.cvText).toContain(`responsibility: ${fakePolish(ANSWERS.responsibility)}`);
+    expect(built.cvText).not.toContain(ANSWERS.responsibility);
+    expect(built.data.experience[0].highlights).toEqual([fakePolish(ANSWERS.responsibility)]);
+
+    // Editing the answer in the drawer goes back to the user's own (new) words.
+    const edited = editAnswer(db, reload(db, userId, interview), answer.id, { quote: "Frontend architecture and code reviews for the team." });
+    expect(edited.polished).toBeNull();
+  });
+
+  it("keeping their words leaves the answer as typed", async () => {
+    const { db, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, conversation.id, ANSWERS.responsibility);
+    const [card] = polishCards(db, conversation.id);
+    resolveChatAction(ctx, card.id, "dismiss");
+    expect(listAnswers(db, interview.id)[0].polished).toBeNull();
+    expect(polishCards(db, conversation.id)[0].status).toBe("dismissed");
+  });
+
+  it("refuses a version that adds a number or a stock phrase", async () => {
+    const { db, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    for (const [text, why] of [
+      ["Accountable for frontend architecture, code reviews and mentoring 6 engineers.", /adds the number "6"/],
+      ["Spearheaded frontend architecture, code reviews and mentoring 4 engineers.", /style rules/],
+    ] as const) {
+      override = (req) => {
+        if (!toolRound(req)) return demoInterviewer(req);
+        const last = req.body.messages.at(-1)!.content as Array<{ content?: string }>;
+        const id = /Recorded #(\d+)/.exec(last.map((b) => String(b.content)).join(" "))?.[1];
+        return id ? { content: [{ type: "tool_use", id: `toolu_polish_${Math.random()}`, name: "propose_polish", input: { answer_id: Number(id), text } }] } : { content: [{ type: "text", text: "Next?" }] };
+      };
+      await turn(ctx, conversation.id, ANSWERS.responsibility);
+      const result = requests.flatMap((r) => r.messages.flatMap((m) => (Array.isArray(m.content) ? (m.content as Array<{ type: string; tool_use_id?: string; content?: string; is_error?: boolean }>) : []))).filter((b) => b.type === "tool_result" && b.tool_use_id?.startsWith("toolu_polish_")).at(-1)!;
+      expect(result).toMatchObject({ is_error: true });
+      expect(result.content).toMatch(why);
+    }
+    expect(polishCards(db, conversation.id)).toEqual([]);
+  });
+
+  it("a refused turn after a cleaner version was offered leaves no card and no answer behind", async () => {
+    const { db, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    override = (req) => {
+      const reply = demoInterviewer(req) as { content: Array<{ name?: string }> };
+      const polishResult = JSON.stringify(req.body.messages.at(-1)).includes("Shown to the candidate as a card");
+      return polishResult ? { content: [{ type: "text", text: "" }], stop_reason: "refusal" } : reply;
+    };
+    const events = await turn(ctx, conversation.id, ANSWERS.responsibility);
+    expect(events).toContainEqual(expect.objectContaining({ type: "error", code: "refusal" }));
+    expect(polishCards(db, conversation.id)).toEqual([]);
+    expect(db.select().from(interviewAnswers).all()).toEqual([]);
+  });
+
+  it("examples with digits are refused", async () => {
+    const { ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    override = (req) => (toolRound(req) ? { content: [] } : { content: [{ type: "text", text: "How big?" }, { type: "tool_use", id: `toolu_opts_${Math.random()}`, name: "suggest_options", input: { options: ["Team of 10", "Budget"] } }] });
+    await turn(ctx, conversation.id, "Let me think about it.");
+    const result = requests.flatMap((r) => r.messages.flatMap((m) => (Array.isArray(m.content) ? (m.content as Array<{ type: string; tool_use_id?: string; is_error?: boolean }>) : []))).find((b) => b.type === "tool_result" && b.tool_use_id?.startsWith("toolu_opts_"));
+    expect(result).toMatchObject({ is_error: true });
   });
 });
