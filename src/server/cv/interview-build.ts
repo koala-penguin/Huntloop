@@ -1,10 +1,20 @@
 import type { InterviewAnswerRow } from "../db/schema";
+import type { AiContext } from "../ai/client";
+import { BASE_CV_PROMPT_VERSION, writeBaseCv } from "../ai/tasks/build-base-cv";
+import { cvProfileHash, insertCvDocument, type StoredBaseCv } from "../repo/cv-documents";
+import { getInterview, listAnswers, updateInterview } from "../repo/interviews";
+import { getCurrentProfile, getPreferences, savePreferences, saveProfileVersion } from "../repo/profile";
+import { rescoreAllJobs } from "../jobs/fit";
+import { UserFacingError } from "../errors";
+import { assembleCv, cvContentText } from "./assemble";
+import { buildProvenanceContext, validateCv } from "./provenance";
 import { emptyProfile, type Fact, type ProfileData } from "@/shared/schemas/profile";
 import type { Preferences } from "@/shared/schemas/preferences";
+import type { CvChecks, TailoringPlan } from "@/shared/schemas/cv";
 import { currentRole, roleStageKey, rolesInOrder, type InterviewForm, type RoleForm, type StageStatus } from "@/shared/schemas/interview";
 
 /**
- * From interview to profile. The interview's answers are the candidate's own typed words; they
+ * From interview to profile and base CV. The interview's answers are the candidate's own typed words; they
  * become the role highlights and facts verbatim, and the "Career record" — plain text built here
  * from the same words plus the form data — takes the place a CV's text has. Every existing check
  * (quotes, numbers, role scope) then works on interview evidence unchanged. No AI, no database.
@@ -158,4 +168,82 @@ export function interviewReady(source: Pick<InterviewSource, "form" | "stages">)
   else if (stages[roleStageKey(current.id)] !== "done") missing.push("role_deep");
   if (!form.contact.name.trim()) missing.push("contact");
   return missing.length ? { ok: false, missing } : { ok: true };
+}
+
+/** Below this the Career record can't carry a CV (a name, a title and little else). */
+const MIN_RECORD = 100;
+
+export interface GenerateOptions {
+  onStage?: (stage: "building" | "writing" | "checking") => void;
+}
+
+/**
+ * Generate: interview → profile version (+ search preferences) → base CV, checked like any CV.
+ * Saving is idempotent (a retry doesn't add a duplicate profile version). The writer runs under the
+ * daily budget cap; the interview chat before it never does.
+ */
+export async function generateBaseCv(ctx: AiContext, interviewId: number, options: GenerateOptions = {}): Promise<StoredBaseCv> {
+  const { db, userId } = ctx;
+  const interview = getInterview(db, userId, interviewId);
+  if (!interview) throw new UserFacingError("not_found");
+  if (!interviewReady(interview).ok) throw new UserFacingError("interview_too_short");
+
+  options.onStage?.("building");
+  const previous = getCurrentProfile(db, userId);
+  const built = buildProfileFromInterview(interview, listAnswers(db, interview.id, { includePrivate: true }), previous?.data ?? null);
+  if (built.cvText.length < MIN_RECORD) throw new UserFacingError("interview_too_short");
+  const hash = cvProfileHash(built.cvText, built.data);
+  const profile =
+    previous && cvProfileHash(previous.cvText, previous.data) === hash
+      ? previous
+      : // The content is the user's own typed words, so it is never "demo" output, even in demo mode.
+        saveProfileVersion(db, userId, { cvText: built.cvText, data: built.data, cvFileName: null, cvFilePath: null, simulated: false });
+  savePreferences(db, userId, mergePreferences(getPreferences(db, userId), built.preferences));
+  rescoreAllJobs(db, userId);
+
+  options.onStage?.("writing");
+  const { form } = interview;
+  const language = form.contact.cvLanguage;
+  const depth = Object.fromEntries(form.roles.map((r) => [r.id, r.depth]));
+  const { output, model, simulated } = await writeBaseCv(ctx, {
+    profile,
+    target: { titles: form.target.titles, seniority: form.target.seniority, country: form.setup.country },
+    depth,
+    language,
+  });
+
+  options.onStage?.("checking");
+  const lead = currentRole(form)?.id;
+  const plan: TailoringPlan = {
+    summaryAngle: "",
+    targetRequirementIds: [],
+    roles: profile.data.experience.map((e) => ({ experienceId: e.id, include: true, emphasis: depth[e.id] === "brief" ? "brief" : e.id === lead ? "lead" : "normal" })),
+    keywords: [],
+    doNotClaim: [],
+    questions: [],
+    linkedinEmphasis: [],
+    advice: [],
+  };
+  const { doc, dropped, languageFallback } = assembleCv({ profile, job: { country: form.setup.country, postingLanguage: language }, plan, output });
+  const text = cvContentText(doc);
+  const { flags, pageEstimate } = validateCv(doc, buildProvenanceContext(profile, { analysis: null, score: null, plan: null }), text);
+  const checks: CvChecks = { keywordsBefore: null, keywordsAfter: null, pageEstimate, dropped, languageFallback };
+  const stored = insertCvDocument(db, userId, {
+    kind: "base",
+    jobId: null,
+    profileVersion: profile.version,
+    profileHash: cvProfileHash(profile.cvText, profile.data),
+    analysisId: null,
+    language,
+    market: doc.market,
+    model,
+    promptVersion: BASE_CV_PROMPT_VERSION,
+    plan: null,
+    content: doc,
+    flags,
+    checks,
+    simulated,
+  }) as StoredBaseCv;
+  updateInterview(db, interview.id, { profileVersion: profile.version, baseDocId: stored.id, status: "completed", stage: "review", completedAt: new Date() });
+  return stored;
 }

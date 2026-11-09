@@ -12,7 +12,7 @@ export const TAILOR_PROMPT_VERSION = 2;
 
 const LANGUAGE_NAMES: Record<string, string> = { en: "English", ko: "Korean" };
 
-const TRUTH_RULES = `Truthfulness rules — Huntloop's code enforces them and flags every line that breaks one, so follow them exactly:
+export const TRUTH_RULES = `Truthfulness rules — Huntloop's code enforces them and flags every line that breaks one, so follow them exactly:
 - Every sentence or bullet carries "sourceRefs": quotes copied character for character from the candidate's CV text or role highlights (source "cv"), or from a confirmed fact (source "fact" with its factId). A quote must back up what the line says. Quote at least a few words; never paraphrase inside a quote.
 - A role's bullets may only use quotes from that role.
 - Contact details in the CV text are replaced by [name], [email], [phone] and [link]; never quote a passage containing those markers.

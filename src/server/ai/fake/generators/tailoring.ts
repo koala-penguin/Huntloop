@@ -7,14 +7,14 @@ import { between, json, textOf } from "./jobs";
  * truthfulness checks and the "items to check" flow are visible without an API key.
  */
 
-interface Role {
+export interface Role {
   id: string;
   title: string;
   company: string;
   skills: string[];
   highlights: string[];
 }
-interface Profile {
+export interface Profile {
   cvText: string;
   experience: Role[];
   skills: string[];
@@ -38,7 +38,7 @@ function parse<T>(text: string, tag: string, fallback: T): T {
   }
 }
 
-function context(req: FakeRequest) {
+export function context(req: FakeRequest) {
   const text = textOf(req);
   const profile = parse<Profile>(text, "candidate_profile", { cvText: "", experience: [], skills: [] });
   const job = parse<{ requirements: JobReq[] }>(text, "job", { requirements: [] });
@@ -54,13 +54,13 @@ const mentions = (text: string, term: string) => term.length > 1 && text.toLower
 const cvRef = (quote: string) => ({ source: "cv" as const, quote, factId: null });
 
 /** A summary-like sentence from the CV (8+ words, no redacted contact details). */
-function summarySentence(profile: Profile): string | null {
+export function summarySentence(profile: Profile): string | null {
   const lines = profile.cvText.split(/\n+/).map((l) => l.trim());
   return lines.find((l) => l.split(/\s+/).length >= 8 && !/\[(email|phone|link|name)\]/.test(l) && !profile.experience.some((e) => e.highlights.includes(l))) ?? null;
 }
 
 /** The CV line that names a role (e.g. "Senior Frontend Engineer at Harbour Payments — …"). */
-function roleLine(profile: Profile, role: Role): string {
+export function roleLine(profile: Profile, role: Role): string {
   const lines = profile.cvText.split(/\n+/).map((l) => l.trim()).filter((l) => !/\[(email|phone|link|name)\]/.test(l));
   return lines.find((l) => l.includes(role.title) && l.split(/\s+/).length >= 3) ?? `${role.title} ${role.company}`;
 }

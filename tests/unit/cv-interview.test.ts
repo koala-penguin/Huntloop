@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { chatMessages, interviewAnswers } from "@/server/db/schema";
+import { chatMessages, interviewAnswers, tasks, type InterviewAnswerRow } from "@/server/db/schema";
 import { listChatMessages, runChatTurn, type ChatEvent } from "@/server/ai/chat/harness";
 import { ensureInterviewConversation, interviewTools, verbatimGate } from "@/server/ai/chat/interview";
 import { getFakeGenerator, registerFakeGenerator, type FakeGenerator, type FakeRequest } from "@/server/ai/fake/transport";
@@ -16,8 +16,15 @@ import { getCurrentProfile, getPreferences, saveProfileVersion, savePreferences 
 import { createJob } from "@/server/repo/jobs";
 import { processJob } from "@/server/jobs/pipeline";
 import { loadJobFit } from "@/server/jobs/fit";
-import { tailorCvForJob, writeLinkedinForUser } from "@/server/cv/tailor";
-import { buildProfileFromInterview, interviewReady, mergePreferences } from "@/server/cv/interview-build";
+import { isCvStale, recheckDocument, tailorCvForJob, writeLinkedinForUser } from "@/server/cv/tailor";
+import { buildProfileFromInterview, generateBaseCv, interviewReady, mergePreferences } from "@/server/cv/interview-build";
+import { resolveCvLine } from "@/server/cv/resolve";
+import { exportCv } from "@/server/cv/export";
+import { cvProfileHash, latestCvDocument } from "@/server/repo/cv-documents";
+import { enqueueTask } from "@/server/tasks/runner";
+import { EXTRACT_PROFILE_TASK } from "@/server/tasks/handlers/extract-profile";
+import { startBuildBaseCv } from "@/server/tasks/handlers/build-base-cv";
+import { interviewFormSchema } from "@/shared/schemas/interview";
 import { buildProvenanceContext, checkLine } from "@/server/cv/provenance";
 import { blockingFlags, type CvLine } from "@/shared/schemas/cv";
 import { testDb } from "../helpers/db";
@@ -268,5 +275,165 @@ describe("CV interview — numbers must be typed as digits", () => {
     const flagsFor = (quote: string) => checkLine(line(quote), { roleId: "exp-1" }, buildProvenanceContext({ cvText: quote, data: data(quote) }, { analysis: null, score: null, plan: null })).map((f) => f.kind);
     expect(flagsFor(digits)).toEqual([]);
     expect(flagsFor(words)).toEqual(["number"]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// MVP: the profile builder, readiness, Generate and the base CV
+
+const row = (id: number, partial: Partial<InterviewAnswerRow>): InterviewAnswerRow => ({
+  id,
+  interviewId: 1,
+  stage: "role_deep",
+  topic: "achievement",
+  experienceRef: "exp-1",
+  question: "",
+  quote: "",
+  private: false,
+  origin: "chat",
+  messageId: null,
+  supersededBy: null,
+  createdAt: new Date(0),
+  ...partial,
+});
+
+function goldenSource() {
+  const form = interviewFormSchema.parse({
+    setup: { country: "NZ", language: "en" },
+    target: { titles: ["Data Engineering Lead"], seniority: ["lead"], cities: ["Wellington"], workRights: [right("NZ", "citizen", "nz_citizen")] },
+    current: { title: "Senior Data Engineer", company: "Kea Analytics", start: "2021-03" },
+    roles: [
+      { id: "exp-2", title: "Data Analyst", company: "Tui Insurance", start: "2016-02", end: "2021-02", depth: "brief" },
+      { id: "exp-1", title: "Senior Data Engineer", company: "Kea Analytics", location: "Wellington", country: "NZ", start: "2021-03", end: "" },
+    ],
+    education: [{ id: "edu-1", institution: "Example University", degree: "BSc", field: "Statistics", country: "NZ", start: "2012", end: "2015" }],
+    languages: [{ language: "English", level: "native" }],
+    contact: { name: "Morgan Ellis", email: "morgan@example.com", phone: "021 555 0101" },
+    skills: [
+      { name: "SQL", category: "language", experienceRef: "exp-1", ticked: true },
+      { name: "Airflow", category: "tool", experienceRef: "exp-1", ticked: false },
+    ],
+  });
+  const answers = [
+    row(1, { topic: "scope", quote: "I lead a team of 6 data engineers." }),
+    row(2, { quote: "Cut   month-end close from 10 days\nto 4 days." }),
+    row(3, { stage: "current", topic: "context", quote: "My manager is leaving and the team is shrinking.", private: true }),
+    row(4, { experienceRef: "exp-2", topic: "responsibility", quote: "Built weekly claims reports in SQL for 3 regions." }),
+    row(5, { experienceRef: null, stage: "contact", topic: "extra", quote: "Volunteer treasurer for a local rowing club since 2019." }),
+    row(6, { topic: "tool", quote: "Old wording that I edited later.", supersededBy: 7 }),
+    row(7, { topic: "tool", quote: "Mostly SQL, Python and Airflow.", origin: "user_edit" }),
+  ];
+  return { source: { form, stages: { "role:exp-1": "done" as const }, createdAt: new Date("2026-11-09T08:00:00Z") }, answers };
+}
+
+describe("CV interview — building the profile", () => {
+  it("writes the Career record and profile from the answers, verbatim and in CV order", () => {
+    const { source, answers } = goldenSource();
+    const built = buildProfileFromInterview(source, answers, null);
+    expect(built.cvText).toBe(
+      [
+        "CAREER RECORD — Huntloop interview, 2026-11-09",
+        "TARGET: Data Engineering Lead · Wellington (NZ) · lead",
+        "CURRENT: Senior Data Engineer, Kea Analytics, 2021-03 – present",
+        "ROLE exp-1: Senior Data Engineer — Kea Analytics (2021-03 – present, Wellington NZ)",
+        "  scope: I lead a team of 6 data engineers.",
+        "  achievement: Cut month-end close from 10 days to 4 days.",
+        "  tool: Mostly SQL, Python and Airflow.",
+        "ROLE exp-2: Data Analyst — Tui Insurance (2016-02 – 2021-02)",
+        "  responsibility: Built weekly claims reports in SQL for 3 regions.",
+        "EDUCATION: BSc, Statistics — Example University (2012 – 2015)",
+        "LANGUAGES: English (native)",
+        "SKILLS: SQL",
+        "FACTS:",
+        "  extra: Volunteer treasurer for a local rowing club since 2019.",
+      ].join("\n"),
+    );
+    expect(built.data.experience.map((e) => [e.id, e.end, e.highlights])).toEqual([
+      ["exp-1", null, ["I lead a team of 6 data engineers.", "Cut month-end close from 10 days to 4 days.", "Mostly SQL, Python and Airflow."]],
+      ["exp-2", "2021-02", ["Built weekly claims reports in SQL for 3 regions."]],
+    ]);
+    expect(built.data.experience[0].skills).toEqual(["SQL"]);
+    expect(built.data.skills).toEqual([{ name: "SQL", category: "language" }]);
+    expect(built.data.facts).toEqual([{ id: "fact-int-5", text: "Volunteer treasurer for a local rowing club since 2019.", source: "interview" }]);
+    expect(built.data.basics).toMatchObject({ name: "Morgan Ellis", email: "morgan@example.com", phone: "021 555 0101" });
+    expect(built.data.workRights).toEqual([right("NZ", "citizen", "nz_citizen")]);
+    expect(built.preferences).toMatchObject({ targetTitles: ["Data Engineering Lead"], markets: [{ country: "NZ", primary: true, cities: ["Wellington"], remoteOk: true }] });
+    // Same input, same profile: Generate can tell a retry from a change.
+    const again = buildProfileFromInterview(source, answers, null);
+    expect(cvProfileHash(again.cvText, again.data)).toBe(cvProfileHash(built.cvText, built.data));
+  });
+
+  it("replacing a profile keeps the user's own and chat facts and other countries' work rights", () => {
+    const { source, answers } = goldenSource();
+    const previous = {
+      ...buildProfileFromInterview(source, answers, null).data,
+      facts: [
+        { id: "f1", text: "From the old CV.", source: "cv" as const },
+        { id: "f2", text: "Typed by me.", source: "user" as const },
+        { id: "f3", text: "Said in a chat.", source: "chat" as const },
+        { id: "fact-int-9", text: "From an older interview.", source: "interview" as const },
+      ],
+      workRights: [right("AU", "unrestricted_visa", "au_nz_citizen"), right("NZ", "needs_sponsorship")],
+    };
+    const built = buildProfileFromInterview(source, answers, previous);
+    expect(built.data.facts.map((f) => f.id)).toEqual(["f2", "f3", "fact-int-5"]);
+    expect(built.data.workRights).toEqual([right("AU", "unrestricted_visa", "au_nz_citizen"), right("NZ", "citizen", "nz_citizen")]);
+  });
+
+  it("needs a target, a role, the current role's chat and a name before generating", () => {
+    const { source } = goldenSource();
+    expect(interviewReady(source)).toEqual({ ok: true });
+    expect(interviewReady({ ...source, stages: {} })).toEqual({ ok: false, missing: ["role_deep"] });
+    const empty = interviewFormSchema.parse({});
+    expect(interviewReady({ form: empty, stages: {} })).toEqual({ ok: false, missing: ["target", "roles", "contact"] });
+  });
+});
+
+describe("CV interview — Generate and the base CV", () => {
+  it("saves the profile and writes a base CV for the target market; flags block the download until dealt with", async () => {
+    const { db, userId, ctx, interview } = await interviewOnlyProfile();
+    const versionBefore = getCurrentProfile(db, userId)!.version;
+    const doc = await generateBaseCv(ctx, interview.id);
+    // The profile saved by interviewOnlyProfile() is the same: no duplicate version.
+    expect(getCurrentProfile(db, userId)!.version).toBe(versionBefore);
+    expect(doc).toMatchObject({ kind: "base", jobId: null, market: "AU", simulated: true });
+    expect(doc.content).toMatchObject({ market: "AU", paper: "A4", pages: [2, 3], referees: true, workRight: { status: "citizen", country: "AU" } });
+    expect(doc.content.header).toMatchObject({ name: "Morgan Ellis", email: "morgan@example.com", city: "Sydney" });
+    expect(doc.content.roles.map((r) => r.experienceId)).toEqual(["exp-1", "exp-2"]);
+    expect(doc.content.skills).toEqual(["React", "TypeScript"]);
+    const blocking = blockingFlags(doc.flags);
+    expect(blocking.map((f) => f.kind)).toEqual(["number", "number"]);
+    expect(doc.flags.map((f) => f.kind)).not.toContain("unverified_source");
+    expect(getInterview(db, userId, interview.id)).toMatchObject({ status: "completed", baseDocId: doc.id, profileVersion: versionBefore });
+    expect(latestCvDocument(db, userId, "base", null)!.id).toBe(doc.id);
+
+    await expect(exportCv(db, userId, doc.id, "docx")).rejects.toThrow("unresolved_flags");
+    const after = resolveCvLine(db, userId, doc.id, blocking[0].lineId!, { kind: "remove" });
+    expect(after.kind).toBe("base");
+    expect(blockingFlags(after.flags)).toEqual([]);
+    const file = await exportCv(db, userId, doc.id, "docx");
+    expect(file).toMatchObject({ fileName: "Morgan-Ellis-CV.docx", mime: expect.stringContaining("wordprocessingml") });
+    expect(() => recheckDocument(db, userId, latestCvDocument(db, userId, "base", null)!)).not.toThrow();
+
+    // The tailored-CV flow still works on the new profile.
+    const job = await processJob(ctx, createJob(db, userId, { source: "paste", rawText: DEMO_SCREENSHOT_POSTING }));
+    const tailored = await tailorCvForJob(ctx, job.id);
+    expect(tailored.kind).toBe("cv");
+    expect(isCvStale(latestCvDocument(db, userId, "base", null)!, getCurrentProfile(db, userId))).toBe(false);
+  });
+
+  it("refuses to generate an interview that isn't ready", async () => {
+    const { ctx, interview } = setupInterview();
+    await expect(generateBaseCv(ctx, interview.id)).rejects.toThrow("interview_too_short");
+  });
+
+  it("queues one Generate at a time, and none while a CV upload is being read", () => {
+    const { db, userId, interview } = setupInterview();
+    const first = startBuildBaseCv(db, userId, interview.id);
+    expect(startBuildBaseCv(db, userId, interview.id)).toBe(first);
+    db.update(tasks).set({ status: "succeeded" }).where(eq(tasks.id, first)).run();
+    enqueueTask(db, userId, EXTRACT_PROFILE_TASK, { filePath: null, fileName: null, text: "x" });
+    expect(() => startBuildBaseCv(db, userId, interview.id)).toThrow("task_running");
+    expect(() => startBuildBaseCv(db, userId, 999)).toThrow("not_found");
   });
 });

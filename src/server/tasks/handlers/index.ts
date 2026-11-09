@@ -6,3 +6,4 @@ import "./search";
 import "./find-employer-posting";
 import "./tailor-cv";
 import "./watch-check";
+import "./build-base-cv";
