@@ -6,8 +6,9 @@ import type { ProfileData } from "@/shared/schemas/profile";
 import { tailoredCvSchema, type CvLanguage, type TailoredCvOutput } from "@/shared/schemas/cv";
 import { callStructured, settingsFor, type AiContext } from "../client";
 import { TRUTH_RULES, tailoringProfileView } from "./tailor-cv";
+import { STYLE_RULES } from "@/shared/cv-style";
 
-export const BASE_CV_PROMPT_VERSION = 1;
+export const BASE_CV_PROMPT_VERSION = 2;
 
 const LANGUAGE_NAMES: Record<string, string> = { en: "English", ko: "Korean" };
 
@@ -21,7 +22,10 @@ Code adds the name, contact details, job titles, companies, dates, education, ce
 
 The interview answers are tagged by topic in the Career record (scope, responsibility, achievement, tool…). A responsibility must stay a responsibility: never present it as a result. Numbers appear exactly as the candidate wrote them in the quote.
 
-${TRUTH_RULES}`;
+${TRUTH_RULES}
+
+How it should read: ${STYLE_RULES}
+Bullets use the candidate's accepted wording from the Career record; if a highlight is already a clean sentence, use it as is.`;
 
 export interface BaseCvInput {
   profile: { cvText: string; data: ProfileData };
