@@ -12,6 +12,25 @@ preferences tab is where you set the titles, cities, salary floor and kind of wo
 
 ![Profile built from a CV](screenshots/en/02-profile.png)
 
+### Building your profile by interview
+
+No CV, or only an old one? **Profile → Build by interview** (on the CV tab once you have a profile) walks you through
+an interview instead: the job you're after, where you are now, every role (as a table), then one short conversation per
+role about its scope, responsibilities, achievements and tools, then education, languages and how you appear on the CV.
+Recent roles get the full conversation, older ones a brief one; **Quick** depth covers only your current role in depth.
+You can stop at any point and pick up where you left off.
+
+Your answers are recorded word for word: the interviewer can only store text you typed in that conversation, never its
+own wording. Type numbers as digits ("5", not "five") so they can appear on your CV. Answers about why you're leaving,
+or anything you mark private, never reach your profile or CV. Before generating you can edit or delete any answer and tick
+the skills that belong on your CV.
+
+**Generate** saves a new profile version (your answers become its "Career record", the text every quote is checked
+against; the previous version stays in the history) and writes a base CV for your target market — the same truthfulness
+checks as tailored CVs, so any line Huntloop can't trace to your answers is flagged before you can download it. Job
+assessments and tailored CVs then work from this profile as they would from an uploaded CV. A full interview costs about
+US$2–4 on Opus with an API key, roughly half with Sonnet 5.5 for the **CV builder interview** task in Settings.
+
 ## Adding a job
 
 Paste a link or the text of an ad, or drop in screenshots or a PDF of it. Greenhouse, Lever, Ashby and SmartRecruiters
