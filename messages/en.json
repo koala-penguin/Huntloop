@@ -291,6 +291,14 @@
     "coach": {
       "name": "Coach",
       "description": "The conversation across your whole job hunt."
+    },
+    "cvInterview": {
+      "name": "CV builder interview",
+      "description": "Asks about your roles and records your answers word for word (Profile → Build by interview). Sonnet 5.5 halves the cost."
+    },
+    "buildBaseCv": {
+      "name": "Base CV",
+      "description": "Writes your base CV from the interview answers."
     }
   },
   "errors": {
@@ -327,7 +335,9 @@
     "subscription_limit": "Your Claude subscription's usage limit has been reached. Try again after it resets, or switch to the API key in Settings.",
     "model_unavailable": "That model isn't available on your plan. Choose another model for this task in Settings.",
     "interrupted": "Huntloop was closed before this finished. Try again.",
-    "cancelled": "This was stopped before it finished."
+    "cancelled": "This was stopped before it finished.",
+    "interview_too_short": "The interview needs a few more answers before a CV can be written.",
+    "task_running": "Another task is updating your profile. Try again when it has finished."
   },
   "profile": {
     "title": "Your profile",
@@ -418,7 +428,8 @@
     "factSource": {
       "cv": "From CV",
       "user": "Added by you",
-      "chat": "From a chat"
+      "chat": "From a chat",
+      "interview": "From your interview"
     },
     "newFact": "Add a fact",
     "newFactPlaceholder": "e.g. Led a team of 4 engineers for 1 year",

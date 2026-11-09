@@ -453,7 +453,7 @@ export const sourceCalls = sqliteTable(
 );
 
 /**
- * Tailored CVs (per job) and LinkedIn profile drafts (jobId null). Each generation or revision is a
+ * Tailored CVs (per job), LinkedIn profile drafts and base CVs (jobId null). Each generation or revision is a
  * new version; flags are recomputed after every user edit, and exports are rendered on demand.
  */
 export const cvDocuments = sqliteTable(
@@ -464,7 +464,7 @@ export const cvDocuments = sqliteTable(
       .notNull()
       .references(() => users.id),
     jobId: integer("job_id").references(() => jobs.id, { onDelete: "cascade" }),
-    /** "cv" | "linkedin" */
+    /** "cv" | "linkedin" | "base" (the base CV from the interview; jobId null) */
     kind: text("kind").notNull(),
     version: integer("version").notNull(),
     profileVersion: integer("profile_version").notNull(),
@@ -542,3 +542,91 @@ export const boardOpenings = sqliteTable(
   (t) => [uniqueIndex("board_openings_external").on(t.watchId, t.externalId)],
 );
 export type BoardOpeningRow = typeof boardOpenings.$inferSelect;
+
+/**
+ * The guided CV builder: one interview per run. Form answers live in `form`; chat answers in
+ * interview_answers. Generating saves a profile version and a base CV (cv_documents kind "base").
+ */
+export const cvInterviews = sqliteTable(
+  "cv_interviews",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    /** in_progress | completed | abandoned */
+    status: text("status").notNull().default("in_progress"),
+    /** full | quick */
+    depth: text("depth").notNull().default("full"),
+    personas: text("personas", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
+    targetCountry: text("target_country"),
+    language: text("language").notNull().default("en"),
+    /** The stage the user is on (INTERVIEW_STAGES). */
+    stage: text("stage").notNull().default("setup"),
+    /** Per stage (and "role:<exp-N>"): pending | done | skipped. */
+    stages: text("stages", { mode: "json" }).$type<Record<string, string>>().notNull().default(sql`'{}'`),
+    /** The form stages' data (interviewFormSchema). */
+    form: text("form", { mode: "json" }).notNull().default(sql`'{}'`),
+    /** Set once generated: the profile version and base CV it produced. */
+    profileVersion: integer("profile_version"),
+    baseDocId: integer("base_doc_id"),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch('subsec') * 1000)`),
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("cv_interviews_user_status").on(t.userId, t.status)],
+);
+export type CvInterviewRow = typeof cvInterviews.$inferSelect;
+
+/** Which interview, stage and role a chat conversation (kind "cv_interview") belongs to. */
+export const interviewConversations = sqliteTable(
+  "interview_conversations",
+  {
+    conversationId: integer("conversation_id")
+      .primaryKey()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    interviewId: integer("interview_id")
+      .notNull()
+      .references(() => cvInterviews.id, { onDelete: "cascade" }),
+    stage: text("stage").notNull(),
+    /** The role ("exp-N") a role_deep conversation is about; null otherwise. */
+    experienceRef: text("experience_ref"),
+  },
+  (t) => [index("interview_conversations_interview").on(t.interviewId)],
+);
+export type InterviewConversationRow = typeof interviewConversations.$inferSelect;
+
+/**
+ * What the interview recorded: the candidate's own words, verbatim. Chat answers point at the
+ * assistant message that recorded them, so a rolled-back turn takes its answers with it.
+ */
+export const interviewAnswers = sqliteTable(
+  "interview_answers",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    interviewId: integer("interview_id")
+      .notNull()
+      .references(() => cvInterviews.id, { onDelete: "cascade" }),
+    stage: text("stage").notNull(),
+    /** scope | responsibility | achievement | tool | skill | context | gap | extra | other */
+    topic: text("topic").notNull(),
+    /** The role ("exp-N") the answer is about; null = a fact about the candidate. */
+    experienceRef: text("experience_ref"),
+    /** The question as asked (display only). */
+    question: text("question").notNull().default(""),
+    /** The candidate's words, exactly as typed. */
+    quote: text("quote").notNull(),
+    /** Never used for the profile or CV. */
+    private: integer("private", { mode: "boolean" }).notNull().default(false),
+    /** chat | user_edit | form */
+    origin: text("origin").notNull(),
+    messageId: integer("message_id").references(() => chatMessages.id, { onDelete: "cascade" }),
+    /** The answer that replaced this one (an edit). */
+    supersededBy: integer("superseded_by"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("interview_answers_interview").on(t.interviewId)],
+);
+export type InterviewAnswerRow = typeof interviewAnswers.$inferSelect;

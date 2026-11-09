@@ -16,7 +16,7 @@ export type WorkRightStatus = (typeof WORK_RIGHT_STATUSES)[number];
 export const LANGUAGE_LEVELS = ["native", "fluent", "professional", "conversational", "basic"] as const;
 export const SKILL_CATEGORIES = ["language", "framework", "tool", "platform", "database", "domain", "method", "soft", "other"] as const;
 export const CLEARANCE_STATUSES = ["active", "lapsed", "eligible"] as const;
-export const FACT_SOURCES = ["cv", "user", "chat"] as const;
+export const FACT_SOURCES = ["cv", "user", "chat", "interview"] as const;
 
 /** "YYYY-MM" (or "YYYY" when only the year is known). */
 const yearMonth = z.string().regex(/^\d{4}(-\d{2})?$/);

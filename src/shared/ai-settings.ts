@@ -16,6 +16,8 @@ export const AI_TASKS = [
   "planTailoring",
   "tailorCv",
   "linkedinProfile",
+  "cvInterview",
+  "buildBaseCv",
   "parseSearch",
   "translate",
 ] as const;
@@ -35,6 +37,8 @@ export const DEFAULT_TASK_EFFORT: Record<AiTask, Effort> = {
   planTailoring: "medium",
   tailorCv: "high",
   linkedinProfile: "medium",
+  cvInterview: "medium",
+  buildBaseCv: "high",
   parseSearch: "low",
   translate: "low",
 };

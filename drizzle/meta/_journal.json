@@ -99,6 +99,13 @@
       "when": 1793097906984,
       "tag": "0013_dismissed_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1794211894486,
+      "tag": "0014_cv_interviews",
+      "breakpoints": true
     }
   ]
 }

@@ -291,6 +291,14 @@
     "coach": {
       "name": "코치",
       "description": "구직 활동 전체에 대한 대화입니다."
+    },
+    "cvInterview": {
+      "name": "CV 만들기 인터뷰",
+      "description": "경력에 대해 묻고 답을 그대로 기록합니다 (프로필 → 인터뷰로 만들기). Sonnet 5.5로 바꾸면 비용이 절반입니다."
+    },
+    "buildBaseCv": {
+      "name": "기본 CV",
+      "description": "인터뷰 답변으로 기본 CV를 씁니다."
     }
   },
   "errors": {
@@ -327,7 +335,9 @@
     "subscription_limit": "Claude 구독 사용 한도에 도달했습니다. 한도가 초기화된 뒤 다시 시도하거나 설정에서 API 키로 전환하세요.",
     "model_unavailable": "현재 플랜에서는 이 모델을 쓸 수 없습니다. 설정에서 이 작업의 모델을 바꾸세요.",
     "interrupted": "작업이 끝나기 전에 Huntloop가 종료되었습니다. 다시 시도하세요.",
-    "cancelled": "끝나기 전에 중단되었습니다."
+    "cancelled": "끝나기 전에 중단되었습니다.",
+    "interview_too_short": "CV를 쓰려면 인터뷰 답변이 조금 더 필요합니다.",
+    "task_running": "다른 작업이 프로필을 바꾸는 중입니다. 끝난 뒤 다시 시도하세요."
   },
   "profile": {
     "title": "내 프로필",
@@ -418,7 +428,8 @@
     "factSource": {
       "cv": "CV에서",
       "user": "직접 추가",
-      "chat": "대화에서"
+      "chat": "대화에서",
+      "interview": "인터뷰에서"
     },
     "newFact": "사실 추가",
     "newFactPlaceholder": "예: 1년간 엔지니어 4명으로 구성된 팀을 이끎",
