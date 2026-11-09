@@ -21,6 +21,8 @@ import {
   type Interview,
 } from "@/server/repo/interviews";
 import { startBuildBaseCv } from "@/server/tasks/handlers/build-base-cv";
+import { applyInterviewEdits } from "@/server/cv/interview-build";
+import { getPreferences } from "@/server/repo/profile";
 import { FORM_SECTIONS, INTERVIEW_STAGES, interviewSkillSchema, setupFormSchema, type InterviewStage } from "@/shared/schemas/interview";
 import { SKILL_CATEGORIES } from "@/shared/schemas/profile";
 import type { ActionResult } from "@/app/profile/actions";
@@ -61,6 +63,18 @@ export async function startInterviewAction(setup: unknown): Promise<ActionResult
   const active = getActiveInterview(db, user.id);
   if (active) return done({ id: active.id });
   let interview = createInterview(db, user.id, parsed.data);
+  // The target form starts from the saved search preferences, so Generate doesn't undo them.
+  const prefs = getPreferences(db, user.id);
+  const market = prefs.markets.find((m) => m.country === parsed.data.country);
+  interview = saveStageForm(db, interview, "target", {
+    titles: prefs.targetTitles,
+    seniority: prefs.seniority,
+    workplace: prefs.workplace,
+    employmentTypes: prefs.employmentTypes,
+    willingToRelocate: prefs.willingToRelocate,
+    cities: market?.cities ?? [],
+    remoteOk: market?.remoteOk ?? true,
+  });
   interview = setStageStatus(db, interview, "setup", "done", "target");
   return done({ id: interview.id });
 }
@@ -94,15 +108,16 @@ export async function skipStageAction(interviewId: number, key: string): Promise
   }
 }
 
-/** Moves to a stage (the stage rail, or Continue after a chat stage — which also marks it done). */
-export async function goToStageAction(interviewId: number, stage: string, completed?: string): Promise<ActionResult<null>> {
+/** Moves to a stage (the stage rail, or Continue after a chat — which marks that chat, and maybe its stage, done). */
+export async function goToStageAction(interviewId: number, stage: string, completed: string[] = []): Promise<ActionResult<null>> {
   const parsed = stageSchema.safeParse(stage);
-  const finished = completed === undefined ? null : stageSchema.safeParse(completed);
-  if (!parsed.success || (finished && !finished.success)) return { ok: false, error: "invalid" };
+  const keys = Array.isArray(completed) ? completed : [];
+  if (!parsed.success || !keys.every((k) => typeof k === "string" && (stageSchema.safeParse(k).success || /^role:exp-\d+$/.test(k)))) return { ok: false, error: "invalid" };
   try {
     const { db, interview } = own(interviewId);
-    if (finished?.success && interview.stages[finished.data] !== "skipped") setStageStatus(db, interview, finished.data, "done", parsed.data);
-    else setCurrentStage(db, interview, parsed.data);
+    let current = interview;
+    for (const key of keys) if (current.stages[key] !== "skipped") current = setStageStatus(db, current, key, "done");
+    setCurrentStage(db, current, parsed.data);
     return done(null);
   } catch (error) {
     return fail(error);
@@ -118,6 +133,7 @@ export async function editAnswerAction(interviewId: number, answerId: number, pa
   try {
     const { db, interview } = own(interviewId);
     editAnswer(db, interview, answerId, parsed.data);
+    if (applyInterviewEdits(db, interview.userId, interview)) revalidatePath("/", "layout");
     return done(null);
   } catch (error) {
     return fail(error);
@@ -129,6 +145,7 @@ export async function deleteAnswerAction(interviewId: number, answerId: number):
   try {
     const { db, interview } = own(interviewId);
     deleteAnswer(db, interview, answerId);
+    if (applyInterviewEdits(db, interview.userId, interview)) revalidatePath("/", "layout");
     return done(null);
   } catch (error) {
     return fail(error);

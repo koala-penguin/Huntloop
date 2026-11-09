@@ -41,7 +41,8 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
   const query = await searchParams;
   const { db, user, ai, settings } = appContext();
   const latest = getLatestInterview(db, user.id);
-  const interview = latest && latest.status !== "abandoned" ? latest : null;
+  // "Start a new interview" after a finished one goes through setup again (?new=1).
+  const interview = latest && latest.status !== "abandoned" && !(query.new === "1" && latest.status === "completed") ? latest : null;
   const header = (
     <header className="flex flex-col gap-1">
       <p className="text-sm">
@@ -82,7 +83,9 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
   };
   const groups: RecordGroup[] = [
     ...roles.map((r) => ({ key: r.id, label: roleLabel(r.id), answers: answers.filter((a) => a.experienceRef === r.id) })),
-    { key: "general", label: t("drawer.general"), answers: answers.filter((a) => !a.experienceRef || !form.roles.some((r) => r.id === a.experienceRef)) },
+    { key: "general", label: t("drawer.general"), answers: answers.filter((a) => !a.experienceRef) },
+    // Answers about a role that was removed from the role table: kept for the record, never used.
+    { key: "removed", label: t("drawer.removedRole"), answers: answers.filter((a) => a.experienceRef && !form.roles.some((r) => r.id === a.experienceRef)) },
   ].map((g) => ({ ...g, answers: g.answers.map((a) => ({ id: a.id, topic: a.topic, quote: a.quote, private: a.private, edited: a.origin === "user_edit" })) }));
 
   const chat = (chatStage: ChatStage, ref: string | null, status: StageStatus, nextRole: string | null, next: InterviewStage) => {

@@ -116,7 +116,10 @@ export function SetupForm({ interviewId, initial }: { interviewId: number | null
     start(async () => {
       const result = await startInterviewAction(setup);
       if (!result.ok) setError(result.error);
-      else router.refresh();
+      else {
+        router.push("/profile/interview");
+        router.refresh();
+      }
     });
   return (
     <StageCard title={t("setup.title")} description={t("setup.description")}>
@@ -293,7 +296,8 @@ export function CurrentForm({ interviewId, initial }: { interviewId: number; ini
   );
 }
 
-const nextRoleId = (roles: RoleForm[]) => `exp-${Math.max(0, ...roles.map((r) => Number(r.id.slice(4)) || 0)) + 1}`;
+/** A placeholder id for a row added here; the server gives it its real "exp-N" on save. */
+const newRowId = (roles: RoleForm[]) => `new-${roles.length}${Date.now().toString(36)}`;
 
 /** Stage 3: every role, as a table. Ids stay fixed so answers stay with their role. */
 export function RolesForm({ interviewId, initial, quick }: { interviewId: number; initial: RoleForm[]; quick: boolean }) {
@@ -305,7 +309,7 @@ export function RolesForm({ interviewId, initial, quick }: { interviewId: number
   const add = () =>
     setRoles([
       ...roles,
-      { id: nextRoleId(roles), title: "", company: "", industry: "", location: "", country: "", start: "", end: "", employmentType: "full_time", seniority: null, depth: quick && roles.length ? "brief" : "deep" },
+      { id: newRowId(roles), title: "", company: "", industry: "", location: "", country: "", start: "", end: "", employmentType: "full_time", seniority: null, depth: quick && roles.length ? "brief" : "deep" },
     ]);
   return (
     <StageCard title={t("roles.title")} description={t("roles.description")}>

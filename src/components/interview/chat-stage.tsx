@@ -62,11 +62,14 @@ export function ChatStageControls({
   const t = useTranslations("interview");
   const router = useRouter();
   const [pending, start] = useTransition();
+  // Continue is the user's own "this part is done", whether or not the interviewer wrapped up.
   const next = () =>
     start(async () => {
-      if (nextRole) router.push(`/profile/interview?role=${nextRole}`);
-      else {
-        await goToStageAction(interviewId, nextStage, stage);
+      if (nextRole) {
+        await goToStageAction(interviewId, stage, [statusKey]);
+        router.push(`/profile/interview?role=${nextRole}`);
+      } else {
+        await goToStageAction(interviewId, nextStage, stage === "role_deep" ? [statusKey, stage] : [statusKey]);
         router.push("/profile/interview");
       }
       router.refresh();

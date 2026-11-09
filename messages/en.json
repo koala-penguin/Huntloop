@@ -1715,7 +1715,7 @@
     },
     "drawer": {
       "title": "What I've recorded ({count})",
-      "description": "Your own words, exactly as typed. Private answers never reach your profile or CV.",
+      "description": "Your own words, exactly as typed. Private answers never reach your profile or CV. After you generate, changes here update your profile straight away; generate again to rewrite the CV.",
       "empty": "Nothing recorded yet.",
       "general": "About you",
       "private": "Private",
@@ -1726,7 +1726,8 @@
       "cancel": "Cancel",
       "makePrivate": "Keep private",
       "makePublic": "Use on my CV",
-      "delete": "Delete"
+      "delete": "Delete",
+      "removedRole": "From a role you removed (not used)"
     },
     "skills": {
       "title": "Skills",

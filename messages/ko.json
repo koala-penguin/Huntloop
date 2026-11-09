@@ -1715,7 +1715,7 @@
     },
     "drawer": {
       "title": "기록한 내용 ({count})",
-      "description": "내가 입력한 말 그대로입니다. 비공개 답변은 프로필이나 CV에 들어가지 않습니다.",
+      "description": "내가 입력한 말 그대로입니다. 비공개 답변은 프로필이나 CV에 들어가지 않습니다. 만든 뒤에 여기서 바꾸면 프로필에 바로 반영되며, CV를 새로 쓰려면 다시 만드세요.",
       "empty": "아직 기록된 내용이 없습니다.",
       "general": "나에 대해",
       "private": "비공개",
@@ -1726,7 +1726,8 @@
       "cancel": "취소",
       "makePrivate": "비공개로",
       "makePublic": "CV에 사용",
-      "delete": "삭제"
+      "delete": "삭제",
+      "removedRole": "삭제한 역할의 답변 (사용하지 않음)"
     },
     "skills": {
       "title": "기술",

@@ -13,7 +13,7 @@ import { FlagCard } from "@/components/cv/flag-card";
 import type { CvDocView } from "@/components/cv/cv-workspace";
 import { useTask } from "@/components/tasks/use-task";
 import { TaskErrorAlert, taskStopped } from "@/components/tasks/task-error";
-import { discardInterviewAction, generateBaseCvAction, startInterviewAction } from "@/app/profile/interview/actions";
+import { discardInterviewAction, generateBaseCvAction } from "@/app/profile/interview/actions";
 
 const KNOWN_ERRORS = ["interview_too_short", "task_running", "not_found", "budget", "chat_busy"];
 
@@ -181,8 +181,8 @@ export function GenerateCard({
 
       <div className="flex flex-wrap gap-2">
         {completed && (
-          <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => act(() => startInterviewAction({}))}>
-            {t("generate.startNew")}
+          <Button asChild size="sm" variant="secondary">
+            <Link href="/profile/interview?new=1">{t("generate.startNew")}</Link>
           </Button>
         )}
         <Button
