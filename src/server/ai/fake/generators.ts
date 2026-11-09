@@ -11,3 +11,4 @@ import "./generators/search";
 import "./generators/browser-agent";
 import "./generators/tailoring";
 import "./generators/coach";
+import "./generators/interview";
