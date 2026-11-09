@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { chatMessages, interviewAnswers, tasks, type InterviewAnswerRow } from "@/server/db/schema";
+import { chatMessages, conversations, interviewAnswers, tasks, type InterviewAnswerRow } from "@/server/db/schema";
 import { listChatMessages, runChatTurn, type ChatEvent } from "@/server/ai/chat/harness";
 import { ensureInterviewConversation, interviewTools, verbatimGate } from "@/server/ai/chat/interview";
 import { getFakeGenerator, registerFakeGenerator, type FakeGenerator, type FakeRequest } from "@/server/ai/fake/transport";
@@ -11,7 +11,7 @@ import { DEMO_SCREENSHOT_POSTING } from "@/server/ai/fake/generators/jobs";
 import { DEMO_UNSUPPORTED_BULLET } from "@/server/ai/fake/generators/tailoring";
 import "@/server/ai/fake/generators/interview";
 import { countUnionParams } from "@/server/ai/schema-limits";
-import { createInterview, getInterview, listAnswers, saveStageForm, updateInterview, type Interview } from "@/server/repo/interviews";
+import { createInterview, deleteAnswer, discardInterview, editAnswer, getInterview, listAnswers, saveStageForm, updateInterview, type Interview } from "@/server/repo/interviews";
 import { getCurrentProfile, getPreferences, saveProfileVersion, savePreferences } from "@/server/repo/profile";
 import { createJob } from "@/server/repo/jobs";
 import { processJob } from "@/server/jobs/pipeline";
@@ -435,5 +435,52 @@ describe("CV interview — Generate and the base CV", () => {
     enqueueTask(db, userId, EXTRACT_PROFILE_TASK, { filePath: null, fileName: null, text: "x" });
     expect(() => startBuildBaseCv(db, userId, interview.id)).toThrow("task_running");
     expect(() => startBuildBaseCv(db, userId, 999)).toThrow("not_found");
+  });
+});
+
+describe("CV interview — editing, resuming and discarding", () => {
+  it("an edit supersedes the answer, a delete removes it with its history, and the interviewer hears about both", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, conversation.id, ANSWERS.scope);
+    await turn(ctx, conversation.id, ANSWERS.responsibility);
+    const [first, second] = listAnswers(db, interview.id);
+    const current = reload(db, userId, interview);
+
+    const edited = editAnswer(db, current, first.id, { quote: "I led a team of 7 frontend engineers." });
+    expect(edited).toMatchObject({ origin: "user_edit", messageId: null, experienceRef: "exp-1", topic: "scope" });
+    expect(listAnswers(db, interview.id).map((a) => a.quote)).toEqual([ANSWERS.responsibility, "I led a team of 7 frontend engineers."]);
+    expect(listAnswers(db, interview.id, { includeSuperseded: true })).toHaveLength(3);
+    expect(() => editAnswer(db, current, first.id, { quote: "again" })).toThrow("not_found");
+
+    deleteAnswer(db, current, edited.id);
+    expect(listAnswers(db, interview.id, { includeSuperseded: true }).map((a) => a.id)).toEqual([second.id]);
+
+    await turn(ctx, conversation.id, ANSWERS.achievement);
+    const update = (requests.find((r) => JSON.stringify(r.messages).includes("review drawer"))?.messages.at(-1)!.content as Array<{ text?: string }>).find((b) => b.text?.startsWith("<context_update>"));
+    expect(update?.text).toContain("edited or deleted answers in the review drawer");
+  });
+
+  it("a conversation picked up on a later day is told it resumed", async () => {
+    const { db, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "role_deep", "exp-1");
+    await turn(ctx, conversation.id, ANSWERS.scope);
+    const digest = JSON.parse(db.select().from(conversations).where(eq(conversations.id, conversation.id)).get()!.stateDigest!);
+    db.update(conversations).set({ stateDigest: JSON.stringify({ ...digest, day: "2000-01-01" }) }).where(eq(conversations.id, conversation.id)).run();
+    await turn(ctx, conversation.id, ANSWERS.responsibility);
+    expect(JSON.stringify(requests.at(-1)!.messages)).toContain("The candidate resumed the interview on");
+    // The same conversation continues: its earlier answer is still in the transcript.
+    expect(listChatMessages({ db }, conversation.id).filter((m) => m.kind === "user").map((m) => m.text)).toEqual([ANSWERS.scope, ANSWERS.responsibility]);
+  });
+
+  it("discarding deletes the interview, its answers and every message of its conversations", async () => {
+    const { db, userId, ctx, interview } = setupInterview();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "current", null);
+    await turn(ctx, conversation.id, ANSWERS.private);
+    discardInterview(db, reload(db, userId, interview));
+    expect(getInterview(db, userId, interview.id)).toBeNull();
+    expect(db.select().from(interviewAnswers).all()).toEqual([]);
+    expect(db.select().from(chatMessages).where(eq(chatMessages.conversationId, conversation.id)).all()).toEqual([]);
+    expect(db.select().from(conversations).where(eq(conversations.id, conversation.id)).get()).toBeUndefined();
   });
 });
