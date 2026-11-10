@@ -12,13 +12,24 @@ preferences tab is where you set the titles, cities, salary floor and kind of wo
 
 ![Profile built from a CV](screenshots/en/02-profile.png)
 
-### Building your profile by interview
+### The CV-building interview
 
-No CV, or only an old one? **Profile → Build by interview** (on the CV tab once you have a profile) walks you through
-an interview instead: the job you're after, where you are now, every role (as a table), then one short conversation per
-role about its scope, responsibilities, achievements and tools, then education, languages and how you appear on the CV.
-Recent roles get the full conversation, older ones a brief one; **Quick** depth covers only your current role in depth.
-You can stop at any point and pick up where you left off.
+No CV, or only an old one? **Profile → CV-building interview** (on the CV tab once you have a profile) builds your
+profile and a first CV by talking with you. It is for writing your CV, not practice for a job interview. Every step is a
+short conversation: your situation, the job you're after, where you are now, your roles, then one conversation per role
+about its scope, responsibilities, achievements and tools, then education and languages. Recent roles get the full
+conversation, older ones a brief one; **Quick** depth covers only your current role in depth. You can stop at any point
+and pick up where you left off.
+
+In the steps that collect facts, the interviewer puts what you typed (job titles, employers, dates) on a card. You check
+it, correct it and press **Use this**; nothing is saved before that, and the card can only show what you typed or pick
+yourself. A date is kept only if you typed it, and anything the interviewer couldn't find in your messages is left blank
+and listed on the card. The card checks each value, not which title belongs to which employer, so read it before you use
+it. Dates, country, work rights and language levels are set on the card. What is saved shows under the chat as **On
+file**, where you can edit or remove it. **Continue** tells you what a step still needs.
+
+The last step, how you appear on the CV, is asked by Huntloop itself, one thing at a time: name and email (both needed
+to generate), then phone, city and a link if you want them. What you enter in that step is not sent to the AI.
 
 The interviewer asks about your actual role and shows examples of what people in that kind of job usually do; clicking
 one puts it in your reply box for you to make your own. **Skip this question** moves on, **That's all for this part**
@@ -34,8 +45,8 @@ belong on your CV.
 **Generate** saves a new profile version (your answers become its "Career record", the text every quote is checked
 against; the previous version stays in the history) and writes a base CV for your target market — the same truthfulness
 checks as tailored CVs, so any line Huntloop can't trace to your answers is flagged before you can download it. Job
-assessments and tailored CVs then work from this profile as they would from an uploaded CV. A full interview costs about
-US$2–4 on Opus with an API key, roughly half with Sonnet 5.5 for the **CV builder interview** task in Settings.
+assessments and tailored CVs then work from this profile as they would from an uploaded CV. A full CV-building interview costs about
+US$2–4 on Opus with an API key, roughly half with Sonnet 5.5 for the **CV-building interview** task in Settings.
 
 ## Adding a job
 
