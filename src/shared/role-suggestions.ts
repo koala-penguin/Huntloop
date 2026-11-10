@@ -152,6 +152,23 @@ const COMMON: Record<Lang, Topics> = {
   },
 };
 
+/**
+ * Job titles people in each kind of role often held before, offered when the interviewer asks about
+ * earlier jobs. Like every example: a starting point for the candidate's own answer, never a fact.
+ */
+export const EARLIER_ROLES: Record<RoleFamily, Record<Lang, string[]>> = {
+  data_leadership: { en: ["Analytics Manager", "Senior Data Analyst", "BI Lead"], ko: ["분석 매니저", "시니어 데이터 분석가", "BI 리드"] },
+  data: { en: ["Junior Data Analyst", "Reporting Analyst", "Business Analyst"], ko: ["주니어 데이터 분석가", "리포팅 담당", "비즈니스 분석가"] },
+  engineering: { en: ["Software Engineer", "Junior Developer", "Graduate Engineer"], ko: ["소프트웨어 엔지니어", "주니어 개발자", "신입 엔지니어"] },
+  product: { en: ["Associate Product Manager", "Business Analyst", "Project Coordinator"], ko: ["주니어 PM", "비즈니스 분석가", "프로젝트 코디네이터"] },
+  design: { en: ["Junior Designer", "Graphic Designer", "UX Researcher"], ko: ["주니어 디자이너", "그래픽 디자이너", "UX 리서처"] },
+  sales_marketing: { en: ["Account Executive", "Sales Representative", "Marketing Coordinator"], ko: ["영업 담당", "영업 사원", "마케팅 코디네이터"] },
+  operations: { en: ["Operations Coordinator", "Team Leader", "Supervisor"], ko: ["운영 코디네이터", "팀 리더", "현장 관리자"] },
+  finance: { en: ["Assistant Accountant", "Accounts Officer", "Financial Analyst"], ko: ["회계 담당", "경리 담당", "재무 분석가"] },
+  people: { en: ["HR Coordinator", "Recruiter", "HR Advisor"], ko: ["인사 코디네이터", "채용 담당", "인사 담당"] },
+  generic: { en: [], ko: [] },
+};
+
 /** Example prompts for one topic and kind of role (3–6 short phrases). */
 export function suggestionsFor(family: RoleFamily, topic: InterviewTopic, language: string): string[] {
   const lang: Lang = language === "ko" ? "ko" : "en";

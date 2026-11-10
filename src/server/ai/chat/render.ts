@@ -13,7 +13,7 @@ export interface TranscriptItem {
 }
 
 /** Tools shown as something else (a card, chips), not as an activity line. */
-const SHOWN_ELSEWHERE = ["propose_profile_fact", "propose_proceed", "propose_polish", "suggest_options"];
+const SHOWN_ELSEWHERE = ["propose_profile_fact", "propose_proceed", "propose_polish", "suggest_options", "propose_target", "propose_current", "propose_roles", "propose_education", "propose_languages"];
 
 type Block = Record<string, unknown> & { type: string };
 

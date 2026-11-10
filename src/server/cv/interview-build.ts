@@ -215,6 +215,11 @@ export function interviewReady(source: Pick<InterviewSource, "form" | "stages">,
   return missing.length ? { ok: false, missing } : { ok: true };
 }
 
+/** Readiness for this interview as it stands: a finished one is being generated again. */
+export function interviewReadiness(interview: Pick<Interview, "form" | "stages" | "status">) {
+  return interviewReady(interview, { regenerate: interview.status === "completed" });
+}
+
 const recordHeader = (createdAt: Date) => `CAREER RECORD — Huntloop interview, ${createdAt.toISOString().slice(0, 10)}`;
 
 /**
@@ -262,7 +267,7 @@ export async function generateBaseCv(ctx: AiContext, interviewId: number, option
   const { db, userId } = ctx;
   const interview = getInterview(db, userId, interviewId);
   if (!interview) throw new UserFacingError("not_found");
-  if (!interviewReady(interview, { regenerate: interview.status === "completed" }).ok) throw new UserFacingError("interview_too_short");
+  if (!interviewReadiness(interview).ok) throw new UserFacingError("interview_too_short");
 
   options.onStage?.("building");
   const previous = getCurrentProfile(db, userId);

@@ -1,26 +1,18 @@
 import { termPresent } from "../../../scoring/keywords";
 import { polishGate } from "../../../cv/polish";
 import { CONTROL, REQUIRED_TOPICS, type InterviewTopic } from "@/shared/schemas/interview";
-import { roleFamily, suggestionsFor, type RoleFamily } from "@/shared/role-suggestions";
+import { openingFor, roleFamily, suggestionsFor, type RoleFamily } from "@/shared/role-suggestions";
 import { containsHangul, registerFakeGenerator, type FakeRequest } from "../transport";
+import { blocksOf, dataInterviewer, failures, isTyped, parseCurrent, snippet, toolUse, typedText, type Block, type Message } from "./interview-data";
 
 /**
  * Demo-mode CV interviewer: a fixed plan of topics per part, asked in a conversational way from the
  * role and the candidate's last answer, each with example prompts. Each typed answer is recorded
  * verbatim (and known skill names noted), then a cleaner version is offered. "Skip this question"
  * moves on, "That's all for this part" finishes, short replies get a re-ask. Deterministic, so tests
- * and the e2e suite can drive a whole interview without a key.
+ * and the e2e suite can drive a whole interview without a key. The data steps, and the parsers the
+ * intake of the current-situation chat uses, are in interview-data.ts.
  */
-
-type Block = Record<string, unknown> & { type: string };
-type Message = FakeRequest["body"]["messages"][number];
-
-const blocksOf = (message: { content: unknown }): Block[] =>
-  typeof message.content === "string" ? [{ type: "text", text: message.content }] : Array.isArray(message.content) ? (message.content as Block[]) : [];
-
-const CONTEXT = /^<(context_update|interview_form|timeline|this_conversation|recorded_answers|market_notes)>/;
-const isTyped = (b: Block) => b.type === "text" && !CONTEXT.test(String(b.text));
-const typedText = (m: Message) => (m.role === "user" ? blocksOf(m).filter(isTyped).map((b) => String(b.text)).at(-1) : undefined);
 
 const SKILLS: Array<[string, string]> = [
   ["React", "framework"],
@@ -42,7 +34,9 @@ const SKILLS: Array<[string, string]> = [
 ];
 
 interface Info {
-  stage: "current" | "role_deep";
+  stage: "current" | "role_deep" | "target" | "roles" | "education" | "languages";
+  /** The current-situation chat started with no job on file: it asks for it first. */
+  intake?: boolean;
   role: { depth: "deep" | "brief"; title: string } | null;
   about: { title: string; company: string } | null;
   targetTitles: string[];
@@ -78,6 +72,8 @@ export function fakePolish(text: string): string {
 interface Step {
   topic: InterviewTopic;
   private?: boolean;
+  /** Asks what the candidate does now; the reply becomes a card (propose_current), not a recorded answer. */
+  intake?: boolean;
   text: string;
   options: string[];
 }
@@ -141,17 +137,16 @@ function apply(state: State, text: string, steps: Step[], required: InterviewTop
   if (CONTROL.finished.test(t)) return { ...state, finished: true };
   const stepsNow = [...state.steps];
   if (CONTROL.skipQuestion.test(t) || CONTROL.noNumber.test(t)) stepsNow[state.asked] = stepsNow[state.asked] === "open" ? "skipped" : "dropped";
+  // The intake question is answered by the card it leads to, not by the reply itself.
+  else if (steps[state.asked].intake) return state;
   else if (substantial(t)) stepsNow[state.asked] = "answered";
   else return state;
   const next = nextStep({ ...state, steps: stepsNow }, steps, required);
   return { ...state, steps: stepsNow, asked: next?.index ?? state.asked, lastCall: next?.lastCall ?? false };
 }
 
-let counter = 0;
-const toolUse = (name: string, input: Record<string, unknown>) => ({ type: "tool_use", id: `toolu_demo_interview_${Date.now().toString(36)}_${counter++}`, name, input });
-
 /** tool_use ids whose result was an error. */
-const failedIds = (messages: Message[]) => new Set(messages.flatMap((m) => blocksOf(m).filter((b) => b.type === "tool_result" && b.is_error).map((b) => String(b.tool_use_id))));
+const failedIds = (messages: Message[]) => new Set(failures(messages).keys());
 
 /** Quotes recorded so far in this conversation (tool calls whose result wasn't an error). */
 function recorded(messages: Message[]): string[] {
@@ -162,25 +157,40 @@ function recorded(messages: Message[]): string[] {
     .map((b) => String((b.input as { quote?: string }).quote ?? ""));
 }
 
-const snippet = (text: string) => {
-  const t = text.replace(/\s+/g, " ").trim().replace(/[.!?]$/, "");
-  if (t.length <= 60) return t;
-  const cut = t.slice(0, 60);
-  return `${cut.slice(0, cut.lastIndexOf(" ") > 30 ? cut.lastIndexOf(" ") : 60)}…`;
-};
+/** What the candidate typed that led to the intake card (the message before the first propose_current that went through). */
+function intakeReply(messages: Message[], failed: Set<string>): string | null {
+  let typed: string | null = null;
+  for (const m of messages) {
+    if (m.role === "assistant") {
+      if (blocksOf(m).some((b) => b.type === "tool_use" && b.name === "propose_current" && !failed.has(String(b.id)))) return typed;
+    } else typed = typedText(m) ?? typed;
+  }
+  return null;
+}
 
 registerFakeGenerator("cvInterview", (req) => {
   const messages = req.body.messages;
   const last = messages.at(-1);
-  const conv = info(req);
+  let conv = info(req);
+  if (conv.stage !== "current" && conv.stage !== "role_deep") return dataInterviewer(req, conv);
   const tools = new Set((req.body.tools ?? []).map((t) => String((t as { name?: string }).name)));
   const typed = messages.map(typedText).filter((t): t is string => t !== undefined);
   const said = typed.at(-1) ?? "";
   const ko = conv.language === "ko" || containsHangul(said);
-  const family = roleFamily(conv.about?.title || conv.targetTitles?.[0]);
-  const steps = plan(conv, ko, family);
-  const required = REQUIRED_TOPICS[conv.stage === "current" ? "current" : (conv.role?.depth ?? "deep")];
   const failed = failedIds(messages);
+  // Intake: the first step asks what they do now. Once its card is out, the questions that follow
+  // are about the job they typed (the frozen context has none).
+  const intake: Step | null = conv.intake ? { topic: "other", intake: true, text: conv.openingQuestion, options: conv.openingOptions } : null;
+  if (intake) {
+    const reply = intakeReply(messages, failed);
+    const job = reply ? parseCurrent(reply) : null;
+    const about = job?.title ? { title: job.title, company: job.company } : null;
+    const opening = openingFor({ stage: "current", role: about, depth: null, targetTitles: conv.targetTitles ?? [], language: ko ? "ko" : "en", past: !!job && !["employed", "self_employed"].includes(job.status) });
+    conv = { ...conv, about, openingQuestion: opening.text, openingTopic: opening.topic, openingOptions: opening.options };
+  }
+  const family = roleFamily(conv.about?.title || conv.targetTitles?.[0]);
+  const steps = [...(intake ? [intake] : []), ...plan(conv, ko, family)];
+  const required = REQUIRED_TOPICS[conv.stage === "current" ? "current" : (conv.role?.depth ?? "deep")];
 
   // Replay the conversation: each typed message moves the plan on; a finished part stays finished
   // until the candidate reopens it.
@@ -192,7 +202,15 @@ registerFakeGenerator("cvInterview", (req) => {
   });
   messages.forEach((m, i) => {
     if (m.role === "assistant") {
-      if (blocksOf(m).some((b) => b.type === "tool_use" && b.name === "complete_stage" && !failed.has(String(b.id)))) state = { ...state, finished: true };
+      const uses = blocksOf(m).filter((b) => b.type === "tool_use");
+      if (uses.some((b) => b.name === "complete_stage")) state = { ...state, finished: uses.some((b) => b.name === "complete_stage" && !failed.has(String(b.id))) };
+      // The intake card is out: on to the questions about that job.
+      if (intake && state.steps[0] === "open" && uses.some((b) => b.name === "propose_current" && !failed.has(String(b.id)))) {
+        const stepsNow = [...state.steps];
+        stepsNow[0] = "answered";
+        const next = nextStep({ ...state, steps: stepsNow }, steps, required);
+        state = { ...state, steps: stepsNow, asked: next?.index ?? state.asked, lastCall: next?.lastCall ?? false };
+      }
       return;
     }
     if (blocksOf(m).some((b) => b.type === "text" && /^<context_update>[\s\S]*reopened this part/.test(String(b.text)))) state = { ...state, finished: false };
@@ -234,6 +252,11 @@ registerFakeGenerator("cvInterview", (req) => {
       if (results.some((r) => r.is_error)) return question();
       return { content: [{ type: "text", text: ko ? "감사합니다. 다음 단계로 넘어가세요." : "Thanks, on to the next step." }] };
     }
+    if (uses.includes("propose_current")) {
+      const errors = results.filter((r) => r.is_error).map((r) => String(r.content));
+      if (errors.length) return question(ko ? `그 내용은 쓸 수 없었습니다: ${errors.join(" ")} ` : `I couldn't use that: ${errors.join(" ")} `);
+      return askNext(ko ? "그 카드를 확인하시는 동안: " : "While you check that card: ");
+    }
     if (uses.includes("record_answer")) {
       const errors = results.filter((r) => r.is_error).map((r) => String(r.content));
       if (errors.length) {
@@ -256,6 +279,12 @@ registerFakeGenerator("cvInterview", (req) => {
   if (CONTROL.finished.test(t)) return wrap("candidate_finished");
   if (CONTROL.skipQuestion.test(t)) return askNext(ko ? "네, 넘어갈게요. " : "Sure, let's move on. ");
   if (CONTROL.noNumber.test(t)) return askNext(ko ? "괜찮습니다. 숫자 없이 기록할게요.\n\n" : "No problem, we'll keep it without a number.\n\n");
+  if (steps[before.asked].intake) {
+    const job = parseCurrent(said);
+    if (tools.has("propose_current") && (job.title || job.status !== "employed")) return { content: [thinking, toolUse("propose_current", job)] };
+    state = before;
+    return question(ko ? "조금 더 자세히 말씀해 주실 수 있나요? " : "Could you say a bit more? ");
+  }
   if (!substantial(t)) {
     state = before;
     return question(ko ? "조금 더 자세히 말씀해 주실 수 있나요? 한 문장이면 충분합니다.\n\n" : "Could you say a bit more? Even one sentence helps.\n\n");

@@ -7,6 +7,7 @@ import type { AiContext } from "../client";
 import { proceedWithJob } from "../../jobs/proceed";
 import { getInterview, interviewForConversation, setPolished, type Interview } from "../../repo/interviews";
 import { applyInterviewEdits } from "../../cv/interview-build";
+import { acceptFormCard, dismissFormCard } from "./interview-forms";
 
 /**
  * The user's own edit of a cleaner version the interviewer offered (their words, so no check beyond
@@ -54,6 +55,17 @@ export function resolveChatAction(ctx: AiContext, actionId: number, choice: "acc
   if (!row) throw new UserFacingError("not_found");
   if (row.action.status !== "pending") return;
   const payload = row.action.payload as Record<string, unknown>;
+
+  if (row.action.kind === "interview_form") {
+    // A card of interview data: accepting saves it through the same checks as the card's own button
+    // (never the proposed value unchecked); dismissing saves nothing.
+    if (decision === "dismiss") return dismissFormCard(ctx, row.action);
+    const link = interviewForConversation(ctx.db, row.conversation.id);
+    const interview = link ? getInterview(ctx.db, ctx.userId, link.interviewId) : null;
+    if (!interview) throw new UserFacingError("not_found");
+    if (!acceptFormCard(ctx, interview, row.action.id).ok) throw new UserFacingError("invalid");
+    return;
+  }
 
   if (decision === "accept") {
     if (row.action.kind === "profile_fact") {

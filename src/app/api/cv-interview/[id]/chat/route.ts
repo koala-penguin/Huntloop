@@ -5,17 +5,17 @@ import { isConversationBusy, runChatTurn, type ChatEvent } from "@/server/ai/cha
 import { ensureInterviewConversation } from "@/server/ai/chat/interview";
 import { getInterview } from "@/server/repo/interviews";
 import { errorCodeOf } from "@/server/errors";
-import { CHAT_STAGES } from "@/shared/schemas/interview";
+import { CONVERSATION_STAGES } from "@/shared/schemas/interview";
 
 export const runtime = "nodejs";
 
 const bodySchema = z.object({
   text: z.string().trim().min(1).max(8000),
-  stage: z.enum(CHAT_STAGES),
+  stage: z.enum(CONVERSATION_STAGES),
   experienceRef: z.string().regex(/^exp-\d+$/).nullable(),
 });
 
-/** Sends an answer to the CV interviewer (one conversation per stage and role) and streams the reply as server-sent events. */
+/** Sends a message to the CV interviewer (one conversation per step, and per role in the role chats) and streams the reply as server-sent events. */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/cv-interview/[id]/chat">) {
   const { id } = await ctx.params;
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));

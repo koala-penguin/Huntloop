@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { acceptEditedPolish } from "@/server/ai/chat/actions";
+import { acceptFormCard, continueBlockers, continueDataStage, saveOnFile } from "@/server/ai/chat/interview-forms";
 import { appContext } from "@/server/context";
 import { errorCodeOf, UserFacingError } from "@/server/errors";
 import { isConversationBusy } from "@/server/ai/chat/harness";
@@ -27,7 +28,19 @@ import {
 import { startBuildBaseCv } from "@/server/tasks/handlers/build-base-cv";
 import { applyInterviewEdits, targetFromPreferences } from "@/server/cv/interview-build";
 import { getPreferences } from "@/server/repo/profile";
-import { FORM_SECTIONS, INTERVIEW_STAGES, interviewSkillSchema, setupFormSchema, type InterviewStage } from "@/shared/schemas/interview";
+import {
+  CONVERSATION_STAGES,
+  DATA_CHAT_STAGES,
+  FORM_CARD_STAGES,
+  FORM_SECTIONS,
+  INTERVIEW_STAGES,
+  contactFormSchema,
+  interviewSkillSchema,
+  setupFormSchema,
+  stageFormIssues,
+  stageRequirements,
+  type InterviewStage,
+} from "@/shared/schemas/interview";
 import { SKILL_CATEGORIES } from "@/shared/schemas/profile";
 import type { ActionResult } from "@/app/profile/actions";
 
@@ -51,6 +64,9 @@ function own(interviewId: number): { db: ReturnType<typeof appContext>["db"]; in
   return { db, interview };
 }
 
+/** Like ActionResult, with the fields that stopped it ("roles.1.start", "contact.email") when there are any. */
+export type StageResult = { ok: true; value: null } | { ok: false; error: string; fields?: string[] };
+
 const stageSchema = z.enum(INTERVIEW_STAGES);
 const formStageSchema = z.enum(Object.keys(FORM_SECTIONS) as [FormStage, ...FormStage[]]);
 
@@ -73,16 +89,73 @@ export async function startInterviewAction(setup: unknown): Promise<ActionResult
   return done({ id: interview.id });
 }
 
-/** Saves a form stage; with `advance`, marks it done and moves on to the next stage. */
-export async function saveStageFormAction(interviewId: number, stage: string, value: unknown, advance = false): Promise<ActionResult<null>> {
+/**
+ * Saves a form stage; with `advance`, marks it done and moves on to the next stage. The contact
+ * step is checked here: a malformed email or phone is never saved, and moving on needs a name and an email.
+ */
+export async function saveStageFormAction(interviewId: number, stage: string, value: unknown, advance = false): Promise<StageResult> {
   const parsedStage = formStageSchema.safeParse(stage);
   if (!parsedStage.success) return { ok: false, error: "invalid" };
   try {
     const { db, interview } = own(interviewId);
     if (interview.status === "abandoned") return { ok: false, error: "not_found" };
+    if (parsedStage.data === "contact") {
+      const contact = contactFormSchema.safeParse(value ?? {});
+      if (!contact.success) return { ok: false, error: "invalid" };
+      const issues = stageFormIssues("contact", contact.data);
+      if (issues.length) return { ok: false, error: "invalid", fields: issues };
+      const missing = advance ? stageRequirements("contact", { ...interview.form, contact: contact.data }) : [];
+      if (missing.length) return { ok: false, error: "stage_incomplete", fields: missing };
+    }
     const saved = saveStageForm(db, interview, parsedStage.data, value);
     if (advance) setStageStatus(db, saved, parsedStage.data, "done", nextStage(parsedStage.data));
     return done(null);
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/**
+ * The candidate takes a card from a data chat, with whatever they changed on it. The only way a
+ * chat's proposal reaches the interview form.
+ */
+export async function acceptFormCardAction(interviewId: number, actionId: number, value: unknown): Promise<StageResult> {
+  if (typeof actionId !== "number") return { ok: false, error: "invalid" };
+  try {
+    const { db, interview } = own(interviewId);
+    if (interview.status !== "in_progress") return { ok: false, error: "invalid" };
+    const result = acceptFormCard({ db }, interview, actionId, value);
+    if (!result.ok) return result;
+    return done(null);
+  } catch (error) {
+    revalidatePath("/profile/interview");
+    return fail(error);
+  }
+}
+
+/** Saves a step's data from the "On file" editor: the whole section as edited, so a removed row stays removed. */
+export async function saveOnFileAction(interviewId: number, stage: string, value: unknown): Promise<StageResult> {
+  const parsedStage = z.enum(FORM_CARD_STAGES).safeParse(stage);
+  if (!parsedStage.success) return { ok: false, error: "invalid" };
+  try {
+    const { db, interview } = own(interviewId);
+    if (interview.status !== "in_progress") return { ok: false, error: "invalid" };
+    const result = saveOnFile(db, interview, parsedStage.data, value);
+    return result.ok ? done(null) : result;
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** Continue on a data step: refused while something required is missing or a card is still waiting. */
+export async function completeDataStageAction(interviewId: number, stage: string): Promise<StageResult> {
+  const parsedStage = z.enum(DATA_CHAT_STAGES).safeParse(stage);
+  if (!parsedStage.success) return { ok: false, error: "invalid" };
+  try {
+    const { db, interview } = own(interviewId);
+    if (interview.status !== "in_progress") return { ok: false, error: "invalid" };
+    const result = continueDataStage(db, interview, parsedStage.data);
+    return result.ok ? done(null) : result;
   } catch (error) {
     return fail(error);
   }
@@ -130,13 +203,18 @@ export async function acceptPolishAction(interviewId: number, actionId: number, 
 }
 
 /** Moves to a stage (the stage rail, or Continue after a chat — which marks that chat, and maybe its stage, done). */
-export async function goToStageAction(interviewId: number, stage: string, completed: string[] = []): Promise<ActionResult<null>> {
+export async function goToStageAction(interviewId: number, stage: string, completed: string[] = []): Promise<StageResult> {
   const parsed = stageSchema.safeParse(stage);
   const keys = Array.isArray(completed) ? completed : [];
   if (!parsed.success || !keys.every((k) => typeof k === "string" && (stageSchema.safeParse(k).success || /^role:exp-\d+$/.test(k)))) return { ok: false, error: "invalid" };
   try {
     const { db, interview } = own(interviewId);
     let current = interview;
+    // Continue after the current-situation chat needs the job on file, and no card left waiting.
+    if (keys.includes("current") && interview.status === "in_progress") {
+      const blocked = continueBlockers(db, interview, "current");
+      if (!blocked.ok) return blocked;
+    }
     // A part skipped and then answered anyway counts as done; skipped and empty stays skipped.
     for (const key of keys) current = completeChatStage(db, current, key, key === "role_deep" ? true : stageHasAnswers(db, current, key));
     setCurrentStage(db, current, parsed.data);
@@ -216,8 +294,8 @@ export async function generateBaseCvAction(interviewId: number): Promise<ActionR
 export async function discardInterviewAction(interviewId: number): Promise<ActionResult<null>> {
   try {
     const { db, interview } = own(interviewId);
-    for (const stage of ["current", "role_deep"] as const) {
-      for (const ref of stage === "current" ? [null] : interview.form.roles.map((r) => r.id)) {
+    for (const stage of CONVERSATION_STAGES) {
+      for (const ref of stage === "role_deep" ? interview.form.roles.map((r) => r.id) : [null]) {
         const link = stageConversation(db, interview.id, stage, ref);
         if (link && isConversationBusy(link.conversationId)) return { ok: false, error: "chat_busy" };
       }

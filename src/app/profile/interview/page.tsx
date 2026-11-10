@@ -6,11 +6,11 @@ import { conversations } from "@/server/db/schema";
 import { appContext } from "@/server/context";
 import { budgetStatus } from "@/server/ai/client";
 import { listChatActions, listChatMessages } from "@/server/ai/chat/harness";
-import { INTERVIEW_TOOLSET_VERSION, interviewOpening } from "@/server/ai/chat/interview";
+import { MIN_TOOLSET, conversationOpening, interviewOpening } from "@/server/ai/chat/interview";
 import { transcript } from "@/server/ai/chat/render";
 import { getLatestInterview, listAnswers, stageConversation, type Interview } from "@/server/repo/interviews";
 import { getCurrentProfile, getPreferences } from "@/server/repo/profile";
-import { interviewReady } from "@/server/cv/interview-build";
+import { interviewReadiness } from "@/server/cv/interview-build";
 import { baseCvData } from "@/server/cv/view";
 import { runningBuildBaseCv } from "@/server/tasks/handlers/build-base-cv";
 import { Card } from "@/components/ui/card";
@@ -30,10 +30,12 @@ import { INTERVIEW_STAGES, answerRole, interviewFormSchema, roleStageKey, rolesI
 function chatItems(db: ReturnType<typeof appContext>["db"], interview: Interview, stage: ChatStage, ref: string | null) {
   const link = stageConversation(db, interview.id, stage, stage === "role_deep" ? ref : null);
   const conversation = link ? db.select().from(conversations).where(eq(conversations.id, link.conversationId)).get() : undefined;
-  // A chat with the older interviewer is replaced on the next message; while the interview is still
-  // going, show the new opening instead (a finished interview keeps its transcript to read).
-  if (!conversation || (interview.status === "in_progress" && conversation.toolsetVersion !== INTERVIEW_TOOLSET_VERSION)) return { items: [], conversation: null };
-  return { items: transcript(listChatMessages({ db }, conversation.id), listChatActions({ db }, conversation.id)), conversation };
+  // A chat with an interviewer too old for this step is replaced on the next message; while the
+  // interview is still going, show the new opening instead (a finished interview keeps its transcript to read).
+  if (!conversation || (interview.status === "in_progress" && conversation.toolsetVersion < MIN_TOOLSET[stage])) return { items: [], conversation: null, opening: interviewOpening(interview, stage, ref) };
+  // The first question stays the one that was asked, whatever has been saved since.
+  const opening = conversationOpening(db, conversation.id) ?? interviewOpening(interview, stage, ref);
+  return { items: transcript(listChatMessages({ db }, conversation.id), listChatActions({ db }, conversation.id)), conversation, opening };
 }
 
 export default async function InterviewPage({ searchParams }: PageProps<"/profile/interview">) {
@@ -91,12 +93,12 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
   ].map((g) => ({ ...g, answers: g.answers.map((a) => ({ id: a.id, topic: a.topic, quote: a.quote, polished: a.polished, private: a.private, edited: a.origin === "user_edit" })) }));
 
   const chat = (chatStage: ChatStage, ref: string | null, status: StageStatus, nextRole: string | null, next: InterviewStage) => {
-    const { items, conversation } = chatItems(db, interview, chatStage, ref);
+    const { items, conversation, opening } = chatItems(db, interview, chatStage, ref);
     return (
       <Card className="flex flex-col gap-4">
         <ChatPanel
           key={`${chatStage}-${ref ?? "current"}`}
-          scope={{ kind: "cv_interview", interviewId: interview.id, stage: chatStage, experienceRef: ref, opening: interviewOpening(interview, chatStage, ref), status }}
+          scope={{ kind: "cv_interview", interviewId: interview.id, stage: chatStage, experienceRef: ref, opening, status }}
           items={items}
           hasConversation={!!conversation}
           provider={conversation ? (conversation.provider as Connection) : null}
@@ -151,7 +153,7 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
       main = <ContactForm interviewId={interview.id} initial={form.contact} />;
       break;
     case "review": {
-      const ready = interviewReady(interview, { regenerate: interview.status === "completed" });
+      const ready = interviewReadiness(interview);
       main = (
         <>
           <SkillsCard interviewId={interview.id} skills={form.skills} />

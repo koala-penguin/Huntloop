@@ -39,7 +39,7 @@ import { cvProfileHash, latestCvDocument } from "@/server/repo/cv-documents";
 import { enqueueTask } from "@/server/tasks/runner";
 import { EXTRACT_PROFILE_TASK } from "@/server/tasks/handlers/extract-profile";
 import { startBuildBaseCv } from "@/server/tasks/handlers/build-base-cv";
-import { interviewFormSchema } from "@/shared/schemas/interview";
+import { CONVERSATION_STAGES, interviewFormSchema } from "@/shared/schemas/interview";
 import { defaultPreferences } from "@/shared/schemas/preferences";
 import { buildProvenanceContext, checkLine } from "@/server/cv/provenance";
 import { blockingFlags, type CvLine } from "@/shared/schemas/cv";
@@ -269,8 +269,10 @@ describe("CV interview — the verbatim gate (A1)", () => {
   });
 
   it("the interview tools have no union-typed parameters", () => {
-    const unions = interviewTools().reduce((n, t) => n + countUnionParams(t.input_schema), 0);
-    expect(unions).toBe(0);
+    for (const stage of CONVERSATION_STAGES) {
+      const unions = interviewTools(stage, { intake: true }).reduce((n, t) => n + countUnionParams(t.input_schema), 0);
+      expect(unions, stage).toBe(0);
+    }
   });
 });
 

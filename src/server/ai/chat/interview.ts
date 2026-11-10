@@ -7,16 +7,22 @@ import { stableStringify } from "@/shared/stable-json";
 import { SKILL_CATEGORIES } from "@/shared/schemas/profile";
 import { STYLE_RULES } from "@/shared/cv-style";
 import { openingFor } from "@/shared/role-suggestions";
+import { dataOpeningFor } from "@/shared/interview-openings";
 import {
   CONTROL,
+  DATA_CHAT_STAGES,
   INTERVIEW_TOPICS,
   REQUIRED_TOPICS,
   STAGE_TURN_TARGETS,
   currentRole,
   roleStageKey,
   rolesInOrder,
+  stageRequirements,
   type ChatOpening,
   type ChatStage,
+  type ConversationStage,
+  type DataChatStage,
+  type FormCardStage,
   type InterviewStage,
   type InterviewTopic,
 } from "@/shared/schemas/interview";
@@ -39,25 +45,33 @@ import {
   type Interview,
 } from "../../repo/interviews";
 import { registerChatScope, type ChatEvent, type ChatScope } from "./harness";
+import { FORM_TOOLS, FORM_TOOL_STAGE, INTAKE_PARAGRAPH, dataStageSystem, formCardStates, onFileLine, pendingFormCard, requirementWords, runProposeTool, strict, typedMessages } from "./interview-forms";
 
 /**
  * The CV builder's interviewer: one conversation per chat stage (and per role). It asks, probes for
  * specifics and records the candidate's answers with record_answer — which code accepts only when
  * the quote is the candidate's own words, copied from one of their messages in this conversation.
  * Nothing the model writes itself can become evidence. Stage and role come from the conversation
- * (interview_conversations), never from the model.
+ * (interview_conversations), never from the model. The data steps (target, roles, education,
+ * languages) and the intake of the current-situation chat work the same way for structured data:
+ * see interview-forms.ts.
  */
 
-export const INTERVIEW_TOOLSET_VERSION = 2;
+export const INTERVIEW_TOOLSET_VERSION = 3;
+
+/**
+ * The oldest interviewer a stage's conversation may have been started with and still be continued.
+ * The story chats did not change in version 3, so a chat in progress keeps its transcript.
+ */
+export const MIN_TOOLSET: Record<ConversationStage, number> = { current: 2, role_deep: 2, target: 3, roles: 3, education: 3, languages: 3 };
+
+const isDataStage = (stage: string): stage is DataChatStage => (DATA_CHAT_STAGES as readonly string[]).includes(stage);
 
 type Tool = Anthropic.Beta.Messages.BetaTool;
 type ToolResult = Anthropic.Beta.Messages.BetaToolResultBlockParam;
 type ContentBlockParam = Anthropic.Beta.Messages.BetaContentBlockParam;
 
 const LANGUAGE_NAMES: Record<string, string> = { en: "English", ko: "Korean" };
-
-const strict = (name: string, description: string, properties: Record<string, unknown>): Tool =>
-  ({ name, description, strict: true, input_schema: { type: "object", properties, required: Object.keys(properties), additionalProperties: false } }) as Tool;
 
 /** No nullable or union parameters: the strict-schema union limit is shared by every tool in a request. */
 const INTERVIEW_TOOLS: Tool[] = [
@@ -106,8 +120,13 @@ const inputSchemas = {
   complete_stage: z.object({ summary: z.string().max(1000), reason: z.enum(["covered", "candidate_finished"]) }),
 } as const;
 
-export function interviewTools(): Tool[] {
-  return INTERVIEW_TOOLS;
+/**
+ * The tools a stage's conversation is started with. A data step gets its own propose_* tool and the
+ * examples tool; the current-situation chat gets propose_current only when the job isn't on file yet.
+ */
+export function interviewTools(stage: ConversationStage, options: { intake?: boolean } = {}): Tool[] {
+  if (isDataStage(stage)) return [FORM_TOOLS[stage], INTERVIEW_TOOLS.find((t) => t.name === "suggest_options")!];
+  return stage === "current" && options.intake ? [...INTERVIEW_TOOLS, FORM_TOOLS.current] : INTERVIEW_TOOLS;
 }
 
 const STAGE_TOPICS: Record<ChatStage, string> = {
@@ -136,9 +155,11 @@ export interface InterviewSystemInput {
   /** The role this conversation is about (the current one for the current-situation chat). */
   role: { title: string; company: string } | null;
   targetTitles: string[];
+  /** The current-situation chat when the job isn't on file: ask for it first. */
+  intake?: boolean;
 }
 
-export function interviewSystem({ language, stage, depth, personas, today, role, targetTitles }: InterviewSystemInput): string {
+export function interviewSystem({ language, stage, depth, personas, today, role, targetTitles, intake }: InterviewSystemInput): string {
   const target = stage === "current" ? STAGE_TURN_TARGETS.current : STAGE_TURN_TARGETS[depth ?? "deep"];
   const required = REQUIRED_TOPICS[stage === "current" ? "current" : (depth ?? "deep")];
   const hints = personas.map((p) => PERSONA_HINTS[p]).filter(Boolean);
@@ -147,7 +168,7 @@ export function interviewSystem({ language, stage, depth, personas, today, role,
   return `You are Huntloop's CV interviewer. You help a candidate who has no up-to-date CV build one by talking with them, one part at a time. Their answers (their own typed words) are the only evidence their CV may use, so your job is to draw out specifics and record them faithfully.
 
 This conversation covers ${STAGE_TOPICS[stage]}
-${who}${aim}. Ask about what someone in this role actually does, in their terms.
+${who}${aim}. Ask about what someone in this role actually does, in their terms.${intake ? `\n${INTAKE_PARAGRAPH}` : ""}
 Aim for about ${target} questions in this conversation, then wrap up.${hints.length ? `\n\nAbout this candidate:\n${hints.map((h) => `- ${h}`).join("\n")}` : ""}
 
 How to talk:
@@ -192,8 +213,16 @@ function chatRole(interview: Interview, stage: ChatStage, experienceRef: string 
   return interview.form.current.title ? interview.form.current : null;
 }
 
+/** The current-situation chat starts by asking what the candidate does, when that isn't on file yet. */
+export function needsIntake(interview: Interview): boolean {
+  const { current, roles } = interview.form;
+  return !current.title.trim() && current.status === "employed" && !roles.length;
+}
+
 /** The first question, shown in the app before the candidate types anything (the model is told it was asked). */
-export function interviewOpening(interview: Interview, stage: ChatStage, experienceRef: string | null): ChatOpening {
+export function interviewOpening(interview: Interview, stage: ConversationStage, experienceRef: string | null): ChatOpening {
+  if (isDataStage(stage)) return dataOpeningFor({ stage, form: interview.form, language: interview.language });
+  if (stage === "current" && needsIntake(interview)) return dataOpeningFor({ stage: "current", form: interview.form, language: interview.language });
   const role = interview.form.roles.find((r) => r.id === experienceRef);
   return openingFor({
     stage,
@@ -206,13 +235,26 @@ export function interviewOpening(interview: Interview, stage: ChatStage, experie
 }
 
 /** What this conversation is for: its stage, role and how much depth it gets. */
-function conversationInfo(interview: Interview, stage: ChatStage, experienceRef: string | null) {
+function conversationInfo(interview: Interview, stage: ConversationStage, experienceRef: string | null) {
+  const opening = interviewOpening(interview, stage, experienceRef);
+  if (isDataStage(stage)) {
+    const { form } = interview;
+    return {
+      stage,
+      targetTitles: form.target.titles,
+      language: interview.language,
+      onFile: { roles: form.roles.length, education: form.education.length, certifications: form.certifications.length, languages: form.languages.length },
+      openingQuestion: opening.text,
+      openingTopic: opening.topic,
+      openingOptions: opening.options,
+    };
+  }
   const role = experienceRef ? (interview.form.roles.find((r) => r.id === experienceRef) ?? null) : null;
   const depth = stage === "role_deep" ? (role?.depth ?? "deep") : null;
   const about = chatRole(interview, stage, experienceRef);
-  const opening = interviewOpening(interview, stage, experienceRef);
   return {
     stage,
+    ...(stage === "current" && needsIntake(interview) ? { intake: true } : {}),
     role: role ? { id: role.id, title: role.title, company: role.company, start: role.start || null, end: role.end || null, depth } : null,
     about: about ? { title: about.title, company: about.company } : null,
     targetTitles: interview.form.target.titles,
@@ -241,7 +283,7 @@ function scopeAnswers(ctx: Pick<AiContext, "db">, interview: Interview, stage: s
   return listAnswers(ctx.db, interview.id, { includePrivate: true }).filter((a) => a.stage === stage && (stage !== "role_deep" || a.experienceRef === experienceRef));
 }
 
-function interviewContext(ctx: Pick<AiContext, "db">, interview: Interview, stage: ChatStage, experienceRef: string | null): ContentBlockParam[] {
+function interviewContext(ctx: Pick<AiContext, "db">, interview: Interview, stage: ConversationStage, experienceRef: string | null): ContentBlockParam[] {
   const { setup, target, current, education, certifications, languages } = interview.form;
   const timeline = rolesInOrder(interview.form).map((r) => ({ id: r.id, title: r.title, company: r.company, industry: r.industry || null, country: r.country || null, start: r.start || null, end: r.end || "present", depth: r.depth }));
   const all = listAnswers(ctx.db, interview.id, { includePrivate: true });
@@ -251,7 +293,8 @@ function interviewContext(ctx: Pick<AiContext, "db">, interview: Interview, stag
     { type: "text", text: `<interview_form>\n${stableStringify({ setup, target, current, education, certifications, languages }, 1)}\n</interview_form>` },
     { type: "text", text: `<timeline>\n${stableStringify(timeline, 1)}\n</timeline>` },
     { type: "text", text: `<this_conversation>\n${stableStringify(conversationInfo(interview, stage, experienceRef), 1)}\n</this_conversation>` },
-    { type: "text", text: `<recorded_answers>\n${stableStringify(compactAnswers(shown), 1)}\n</recorded_answers>` },
+    // A data step records no answers and needs none of the stories.
+    ...(isDataStage(stage) ? [] : [{ type: "text" as const, text: `<recorded_answers>\n${stableStringify(compactAnswers(shown), 1)}\n</recorded_answers>` }]),
     { type: "text", text: `<market_notes>\n${marketPack(setup.country).promptNotes}\n</market_notes>`, cache_control: { type: "ephemeral" } },
   ];
 }
@@ -276,14 +319,25 @@ function coverageLine(c: { covered: string[]; missing: string[] }): string {
   return `Covered so far: ${c.covered.join(", ") || "nothing"}. ${c.missing.length ? `Still needed before "covered": ${c.missing.join(", ")}.` : "All required topics covered."}`;
 }
 
-function interviewDigest(ctx: Pick<AiContext, "db">, interview: Interview, stage: InterviewStage, experienceRef: string | null, now = new Date()): Record<string, unknown> {
+/**
+ * What the interviewer was last told about. `cards` (the conversation whose cards these are) is
+ * given only for conversations that can have form cards: the data steps and a current-situation
+ * chat with intake. Every other digest is exactly what it was before those existed.
+ */
+function interviewDigest(ctx: Pick<AiContext, "db">, interview: Interview, stage: InterviewStage, experienceRef: string | null, now = new Date(), cards: number | "new" | null = null): Record<string, unknown> {
   const { setup, target, current, roles, education, certifications, languages } = interview.form;
-  return {
+  const base = {
     day: now.toISOString().slice(0, 10),
     status: interview.stages[stageKey(stage, experienceRef)] ?? "pending",
     form: hashJson({ setup, target, current, roles, education, certifications, languages }),
+  };
+  const forms = cards === null ? {} : { cards: cards === "new" ? {} : formCardStates(ctx.db, cards), missing: stageRequirements(stage, interview.form) };
+  if (isDataStage(stage)) return { ...base, ...forms };
+  return {
+    ...base,
     answers: scopeAnswers(ctx, interview, stage, experienceRef).map((a) => a.id),
     covered: coverage(ctx, interview, stage, experienceRef).covered,
+    ...forms,
   };
 }
 
@@ -305,6 +359,19 @@ export function describeInterviewChange(ctx: Pick<AiContext, "db">, interview: I
   if (stableStringify(before.answers ?? []) !== stableStringify(after.answers ?? []) || stableStringify(before.covered ?? []) !== stableStringify(after.covered ?? [])) {
     lines.push(coverageLine(coverage(ctx, interview, stage, experienceRef)));
   }
+  // Form cards and required fields: only between two digests that both carry them (a chat started
+  // before they existed has neither, and must not be told about them out of the blue).
+  if ("cards" in before && "cards" in after) {
+    const was = (before.cards ?? {}) as Record<string, string>;
+    const now = (after.cards ?? {}) as Record<string, string>;
+    const resolved = Object.keys(now).filter((id) => now[id] !== "pending" && was[id] !== now[id]);
+    if (resolved.some((id) => now[id] === "accepted")) lines.push(`The candidate saved the card. On file now: ${onFileLine(interview.form, stage as FormCardStage)}.`);
+    if (resolved.some((id) => now[id] === "dismissed")) lines.push("The candidate dismissed the card; nothing was saved. Ask what was wrong.");
+  }
+  if ("missing" in before && "missing" in after && stableStringify(before.missing) !== stableStringify(after.missing)) {
+    const missing = (after.missing ?? []) as string[];
+    lines.push(missing.length ? `Still required before they can continue: ${requirementWords(missing)}.` : "Nothing required is missing; they can press Continue.");
+  }
   if (before.status !== after.status) {
     if (after.status === "skipped") lines.push("The candidate skipped this part; they may still add answers.");
     else if (after.status === "pending") lines.push("The candidate reopened this part. Continue with what is still missing, or ask what they want to add.");
@@ -314,13 +381,18 @@ export function describeInterviewChange(ctx: Pick<AiContext, "db">, interview: I
 }
 
 /** Starts the conversation for one stage (and role), freezing its system prompt, tools, model and context. */
-export function createInterviewConversation(ctx: AiContext, interviewId: number, stage: ChatStage, experienceRef: string | null, now = new Date()): ConversationRow {
+export function createInterviewConversation(ctx: AiContext, interviewId: number, stage: ConversationStage, experienceRef: string | null, now = new Date()): ConversationRow {
   const interview = getInterview(ctx.db, ctx.userId, interviewId);
   if (!interview) throw new UserFacingError("not_found");
   if (stage === "role_deep" && !interview.form.roles.some((r) => r.id === experienceRef)) throw new UserFacingError("not_found");
   const ref = stage === "role_deep" ? experienceRef : null;
   const { model, effort, connection } = resolveTaskModel(settingsFor(ctx), "cvInterview");
   const depth = stage === "role_deep" ? (interview.form.roles.find((r) => r.id === ref)?.depth ?? "deep") : null;
+  const today = now.toISOString().slice(0, 10);
+  const intake = stage === "current" && needsIntake(interview);
+  const system = isDataStage(stage)
+    ? dataStageSystem({ stage, language: interview.language, personas: interview.personas, today })
+    : interviewSystem({ language: interview.language, stage, depth, personas: interview.personas, today, role: chatRole(interview, stage, ref), targetTitles: interview.form.target.titles, ...(intake ? { intake } : {}) });
   return ctx.db.transaction((tx) => {
     const conversation = tx
       .insert(conversations)
@@ -332,17 +404,9 @@ export function createInterviewConversation(ctx: AiContext, interviewId: number,
         effort,
         provider: connection,
         toolsetVersion: INTERVIEW_TOOLSET_VERSION,
-        system: interviewSystem({
-          language: interview.language,
-          stage,
-          depth,
-          personas: interview.personas,
-          today: now.toISOString().slice(0, 10),
-          role: chatRole(interview, stage, ref),
-          targetTitles: interview.form.target.titles,
-        }),
-        tools: interviewTools(),
-        stateDigest: stableStringify(interviewDigest({ db: tx as unknown as AiContext["db"] }, interview, stage, ref, now)),
+        system,
+        tools: interviewTools(stage, { intake }),
+        stateDigest: stableStringify(interviewDigest({ db: tx as unknown as AiContext["db"] }, interview, stage, ref, now, isDataStage(stage) || intake ? "new" : null)),
         updatedAt: now,
       })
       .returning()
@@ -354,15 +418,36 @@ export function createInterviewConversation(ctx: AiContext, interviewId: number,
 }
 
 /**
- * The stage's conversation, created on first use. One started with an older interviewer (another
- * toolset version) is left as it is and a new one begins: its prompt and tools are frozen. Answers
- * belong to the interview, so nothing recorded is lost.
+ * The stage's conversation, created on first use. One started with an interviewer older than the
+ * stage can still use (MIN_TOOLSET) is left as it is and a new one begins: its prompt and tools are
+ * frozen. Answers belong to the interview, so nothing recorded is lost.
  */
-export function ensureInterviewConversation(ctx: AiContext, interviewId: number, stage: ChatStage, experienceRef: string | null): ConversationRow {
+export function ensureInterviewConversation(ctx: AiContext, interviewId: number, stage: ConversationStage, experienceRef: string | null): ConversationRow {
   const ref = stage === "role_deep" ? experienceRef : null;
   const link = stageConversation(ctx.db, interviewId, stage, ref);
   const existing = link ? ctx.db.select().from(conversations).where(and(eq(conversations.id, link.conversationId), eq(conversations.userId, ctx.userId))).get() : undefined;
-  return existing && existing.toolsetVersion === INTERVIEW_TOOLSET_VERSION ? existing : createInterviewConversation(ctx, interviewId, stage, ref);
+  return existing && existing.toolsetVersion >= MIN_TOOLSET[stage] ? existing : createInterviewConversation(ctx, interviewId, stage, ref);
+}
+
+/**
+ * The first question as it was asked when the conversation started (kept in its context message).
+ * The page shows this one, not a freshly built opening: openings are built from what is on file,
+ * which changes as cards are accepted, and the first answer below it replied to the original.
+ */
+export function conversationOpening(db: AiContext["db"], conversationId: number): ChatOpening | null {
+  const row = db
+    .select({ content: chatMessages.content })
+    .from(chatMessages)
+    .where(and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.seq, 0)))
+    .get();
+  const text = ((row?.content ?? []) as Array<{ type?: string; text?: string }>).map((b) => String(b.text ?? "")).join("\n");
+  try {
+    const info = JSON.parse(/<this_conversation>\n([\s\S]*?)\n<\/this_conversation>/.exec(text)?.[1] ?? "") as { openingQuestion?: string; openingOptions?: string[]; openingTopic?: InterviewTopic };
+    if (!info.openingQuestion) return null;
+    return { text: info.openingQuestion, options: Array.isArray(info.openingOptions) ? info.openingOptions.map(String) : [], topic: info.openingTopic ?? "other" };
+  } catch {
+    return null;
+  }
 }
 
 // ---- The verbatim gate ----
@@ -372,13 +457,7 @@ const collapse = (text: string) => text.replace(/\s+/g, " ").trim();
 
 /** What the candidate typed in this conversation (never context blocks, context updates or the assistant's words). */
 function candidateMessages(ctx: Pick<AiContext, "db">, conversationId: number): string[] {
-  return ctx.db
-    .select({ text: chatMessages.text })
-    .from(chatMessages)
-    .where(and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.kind, "user")))
-    .all()
-    .map((r) => r.text ?? "")
-    .filter(Boolean);
+  return typedMessages(ctx, conversationId).map((m) => m.text);
 }
 
 /** Like the CV checks: 3+ words, or 4+ Hangul characters. Anything shorter is useless as evidence. */
@@ -425,13 +504,19 @@ function interviewScope(ctx: AiContext, conversation: ConversationRow): ChatScop
   };
   const stage = link.stage as InterviewStage;
   const ref = link.experienceRef;
+  const toolNames = new Set(((conversation.tools ?? []) as Array<{ name?: string }>).map((t) => String(t.name)));
+  // Conversations that can show form cards: the data steps, and a current-situation chat with intake.
+  const hasCards = [...toolNames].some((name) => name in FORM_TOOL_STAGE);
 
   return {
     task: "cvInterview",
-    digest: () => interviewDigest(ctx, load(), stage, ref),
+    digest: () => interviewDigest(ctx, load(), stage, ref, new Date(), hasCards ? conversation.id : null),
     contextUpdate: (previous, digest) => describeInterviewChange(ctx, load(), previous, digest, stage, ref),
     async runTool(block, emit: (e: ChatEvent) => void, messageId): Promise<ToolResult> {
       const result = (content: string, isError = false): ToolResult => ({ type: "tool_result", tool_use_id: block.id, content, ...(isError ? { is_error: true } : {}) });
+      // Only the tools this conversation was started with (a data step has no record_answer; a story chat no propose_roles).
+      if (!toolNames.has(block.name)) return result(`Unknown tool ${block.name}`, true);
+      if (block.name in FORM_TOOL_STAGE) return runProposeTool(ctx, conversation, load(), FORM_TOOL_STAGE[block.name], block, emit, messageId);
       if (!(block.name in inputSchemas)) return result(`Unknown tool ${block.name}`, true);
       const parsed = inputSchemas[block.name as keyof typeof inputSchemas].safeParse(block.input);
       if (!parsed.success) return result(`Invalid input: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`, true);
@@ -514,6 +599,13 @@ function interviewScope(ctx: AiContext, conversation: ConversationRow): ChatScop
         case "complete_stage": {
           const key = stageKey(stage, ref);
           if (interview.stages[key] === "done") return result("Already finished. Ask nothing more; tell the candidate to press Continue, or Reopen to add more.");
+          // The current-situation chat can't be finished with no job on file, or with a card still waiting.
+          if (stage === "current") {
+            if (stageRequirements("current", interview.form).length) {
+              return result(`Not finished: their job title is not on file yet. ${toolNames.has("propose_current") ? "Ask what they do now and call propose_current." : "Ask them to add it under On file, below this chat."}`, true);
+            }
+            if (pendingFormCard(ctx.db, conversation.id)) return result("Not finished: a card is waiting for the candidate. Ask them to use it or dismiss it first.", true);
+          }
           const { missing } = coverage(ctx, interview, stage, ref);
           if (input.reason === "covered" && missing.length) {
             return result(`Not finished: still nothing recorded for ${missing.join(", ")}. Ask about ${missing.length > 1 ? "them" : "it"} (or the candidate can say that's all for this part).`, true);
