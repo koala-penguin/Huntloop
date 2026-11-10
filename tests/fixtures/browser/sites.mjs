@@ -8,6 +8,9 @@ const page = (title, body, head = "") =>
 
 const jsonLd = (posting) => `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "JobPosting", ...posting })}</script>`;
 
+// Posting dates are relative to today: a fixed date ages past the "posted too long ago" limit.
+const daysAgo = (days) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+
 const SEEK_JOBS = {
   "81000001": () =>
     page(
@@ -15,7 +18,7 @@ const SEEK_JOBS = {
       `<main><h1 data-automation="job-detail-title">Senior Frontend Engineer</h1><p>Posted 2d ago</p></main>`,
       jsonLd({
         title: "Senior Frontend Engineer",
-        datePosted: "2026-10-11",
+        datePosted: daysAgo(2),
         employmentType: "FULL_TIME",
         hiringOrganization: { "@type": "Organization", name: "Harbour Lights Health" },
         jobLocation: { "@type": "Place", address: { addressLocality: "Sydney", addressRegion: "NSW", addressCountry: "AU" } },
@@ -74,7 +77,7 @@ const LINKEDIN_JOBS = {
        <div class="show-more-less-html__markup"><p>Tidal Labs builds tools for ocean researchers.</p></div></main>`,
       jsonLd({
         title: "Frontend Engineer",
-        datePosted: "2026-10-09",
+        datePosted: daysAgo(4),
         hiringOrganization: { "@type": "Organization", name: "Tidal Labs" },
         jobLocation: { "@type": "Place", address: { addressLocality: "Sydney", addressRegion: "New South Wales", addressCountry: "AU" } },
         description:
