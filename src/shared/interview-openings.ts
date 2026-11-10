@@ -49,7 +49,7 @@ export function dataOpeningFor({ stage, form, language }: DataOpeningInput): Cha
     case "target": {
       const titles = form.target.titles.filter((t) => t.trim());
       const cities = form.target.cities.filter((c) => c.trim());
-      if (!titles.length) return opening(ko ? "다음에는 어떤 일을 하고 싶으신가요? 직무명 한두 개면 시작하기에 충분합니다." : "What job are you going for next? One or two job titles is enough to start.", []);
+      if (!titles.length) return opening(ko ? "다음에는 어떤 일을 하고 싶으신가요? 직함 한두 개면 시작하기에 충분합니다." : "What job are you going for next? One or two job titles is enough to start.", []);
       const list = titles.slice(0, 3).join(", ");
       const where = cities.slice(0, 3).join(", ");
       return opening(
@@ -62,7 +62,7 @@ export function dataOpeningFor({ stage, form, language }: DataOpeningInput): Cha
     case "current":
       return opening(
         ko
-          ? "지금은 무엇을 하고 계신가요? 재직 중인지, 구직 중인지, 공부 중인지, 쉬는 중인지 알려 주세요. 일하고 계시면 직무명과 회사도 알려 주세요."
+          ? "지금은 무엇을 하고 계신가요? 재직 중인지, 구직 중인지, 공부 중인지, 쉬는 중인지 알려 주세요. 일하고 계시면 직함과 회사도 알려 주세요."
           : "What are you doing right now: working, between jobs, studying or taking a break? If you're working, tell me your job title and employer.",
         ko ? ["…에서 …로 일하고 있어요", "구직 중이에요. 마지막 직장은 …에서 …였어요", ...none] : ["I work as … at …", "I'm between jobs. My last job was … at …", ...none],
       );
@@ -70,7 +70,7 @@ export function dataOpeningFor({ stage, form, language }: DataOpeningInput): Cha
       const role = currentRole(form);
       if (!role) {
         return opening(
-          ko ? "최근 직장부터 차례로 알려 주세요. 직무명, 회사, 그리고 언제부터 언제까지 일하셨는지요." : "Walk me through your jobs, newest first: job title, employer, and from when to when.",
+          ko ? "최근 직장부터 차례로 알려 주세요. 직함, 회사, 그리고 언제부터 언제까지 일하셨는지요." : "Walk me through your jobs, newest first: job title, employer, and from when to when.",
           ko ? ["…에서 …로 …부터 …까지 일했어요"] : ["I was … at … from … to …"],
         );
       }
@@ -79,7 +79,7 @@ export function dataOpeningFor({ stage, form, language }: DataOpeningInput): Cha
       const company = role.company.trim();
       return opening(
         ko
-          ? `${company ? `${company}의 ` : ""}${title}${role.start ? ` (${role.start}부터)` : ""} 이력이 있습니다. 그 전에는 어떤 일을 하셨나요? 직무명, 회사, 대략의 기간을 하나씩 또는 한꺼번에 알려 주세요.`
+          ? `${company ? `${company}의 ` : ""}${title}${role.start ? ` (${role.start}부터)` : ""} 이력이 있습니다. 그 전에는 어떤 일을 하셨나요? 직함, 회사, 대략의 기간을 하나씩 또는 한꺼번에 알려 주세요.`
           : `I have ${title}${company ? ` at ${company}` : ""}${role.start ? ` since ${role.start}` : ""}. What did you do before that? Job title, employer and rough dates, one job at a time or all at once.`,
         [ko ? "그 전에는 …에서 …로 일했어요" : "Before that I was … at …", ...earlier, ...none],
       );

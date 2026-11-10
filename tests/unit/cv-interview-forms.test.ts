@@ -4,6 +4,7 @@ import { groundDate, groundProposal, groundText } from "@/server/cv/form-ground"
 import { completeDataStage, createInterview, getInterview, mergeStagePatch, reopenStage, saveStageForm, setStageStatus, type Interview } from "@/server/repo/interviews";
 import { interviewReady } from "@/server/cv/interview-build";
 import { FORM_CARD_SCHEMAS, cardValueOf, interviewFormSchema, rowIssues, stageFormIssues, stageRequirements, type FormCardValue } from "@/shared/schemas/interview";
+import { nextContactQuestion, validEmail } from "@/shared/contact-guide";
 import { testDb } from "../helpers/db";
 
 const dates = (text: string) => dateMentions(text).map((d) => d.value);
@@ -351,5 +352,28 @@ describe("ready to generate", () => {
     const noStart = ready({ roles: [{ id: "exp-1", title: "Senior Frontend Engineer", company: "Harbour Payments" }] });
     expect(interviewReady(noStart)).toEqual({ ok: false, missing: ["roles"] });
     expect(interviewReady(noStart, { regenerate: true })).toEqual({ ok: true });
+  });
+});
+
+describe("the contact step's questions", () => {
+  const contact = (patch: Record<string, unknown> = {}) => interviewFormSchema.parse({ contact: patch }).contact;
+
+  it("asks for the name and email first, then what is optional, and stops when all is given or skipped", () => {
+    expect(nextContactQuestion(contact())).toBe("name");
+    expect(nextContactQuestion(contact({ name: "Morgan Ellis" }))).toBe("email");
+    // Required questions can't be skipped, and a malformed email is asked for again.
+    expect(nextContactQuestion(contact(), ["name", "email"])).toBe("name");
+    expect(nextContactQuestion(contact({ name: "Morgan Ellis", email: "morgan@" }))).toBe("email");
+    const basics = { name: "Morgan Ellis", email: "morgan@example.com" };
+    expect(nextContactQuestion(contact(basics))).toBe("phone");
+    expect(nextContactQuestion(contact(basics), ["phone"])).toBe("city");
+    expect(nextContactQuestion(contact({ ...basics, phone: "0400 111 222", city: "Sydney" }))).toBe("links");
+    expect(nextContactQuestion(contact({ ...basics, phone: "0400 111 222", city: "Sydney" }), ["links"])).toBeNull();
+    expect(nextContactQuestion(contact({ ...basics, phone: "0400 111 222", city: "Sydney", links: ["https://example.com/morgan"] }))).toBeNull();
+  });
+
+  it("tells an email address from something else", () => {
+    for (const ok of ["morgan@example.com", " a.b+c@sub.example.co.nz "]) expect(validEmail(ok), ok).toBe(true);
+    for (const bad of ["", "morgan", "morgan@", "@example.com", "morgan@example", "mor gan@example.com"]) expect(validEmail(bad), bad).toBe(false);
   });
 });

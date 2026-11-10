@@ -953,7 +953,12 @@
       "list_answers": "Read back your answers",
       "complete_stage": "Finished this part",
       "suggest_options": "Suggested examples: {detail}",
-      "propose_polish": "Offered a cleaner version"
+      "propose_polish": "Offered a cleaner version",
+      "propose_target": "Put your target job on a card",
+      "propose_current": "Put your current job on a card",
+      "propose_roles": "Put your roles on a card",
+      "propose_education": "Put your education on a card",
+      "propose_languages": "Put your languages on a card"
     },
     "card": {
       "factTitle": "Add this to your profile?",
@@ -973,7 +978,51 @@
       "polishKept": "Kept your words",
       "polishEditLabel": "Edit the cleaner version",
       "polishSaveEdit": "Use my edit",
-      "polishCancel": "Cancel"
+      "polishCancel": "Cancel",
+      "formTitle": {
+        "target": "The job you're after",
+        "current": "Where you are now",
+        "roles": "Your roles",
+        "education": "Education and certifications",
+        "languages": "Languages"
+      },
+      "formHint": "This is what I read from your messages. Change anything that's off. Nothing is saved until you press Use this.",
+      "formUse": "Use this",
+      "formDismiss": "Not right",
+      "formSaved": "Saved",
+      "formDismissed": "Not used",
+      "formReplaced": "Replaced by a newer card",
+      "formLeftOut": "I left out: {items}. You didn't type it.",
+      "formCheck": "Check",
+      "formInvalid": "Something on this card needs fixing before it can be saved.",
+      "leftOutOf": "{field} of {row}",
+      "field": {
+        "titles": "a job title",
+        "industries": "an industry",
+        "cities": "a city",
+        "availability": "your availability",
+        "status": "your status",
+        "title": "the job title",
+        "company": "the employer",
+        "industry": "the industry",
+        "location": "the city",
+        "start": "the start date",
+        "end": "the end date",
+        "institution": "the institution",
+        "degree": "the qualification",
+        "field": "the field of study",
+        "name": "the certification name",
+        "issuer": "the issuer",
+        "year": "the year",
+        "language": "the language",
+        "level": "the level"
+      },
+      "row": {
+        "roles": "role {n}",
+        "education": "education {n}",
+        "certifications": "certification {n}",
+        "languages": "language {n}"
+      }
     },
     "coach": {
       "title": "Coach",
@@ -1005,7 +1054,9 @@
         "skipQuestion": "Skip this question",
         "thatsAll": "That's all for this part",
         "noNumber": "I don't have a number"
-      }
+      },
+      "cardReady": "A card with your details is ready to check below the reply.",
+      "dataHint": "What you type is put on a card for you to check. Nothing is saved until you use the card."
     }
   },
   "employer": {
@@ -1582,13 +1633,11 @@
     "subtitle": "No CV, or an old one? Answer questions about your work and Huntloop turns your own words into a profile and a CV. Every line of the CV traces back to something you typed.",
     "back": "← Profile",
     "invalidForm": "Something in this step isn't valid. Check the dates (YYYY-MM) and required fields.",
-    "saveContinue": "Save and continue",
     "save": "Save",
     "skip": "Skip",
     "continue": "Continue",
     "notSet": "Not set",
     "dateHint": "YYYY-MM, e.g. 2021-03",
-    "endHint": "Leave empty if you still work there.",
     "untitledRole": "Untitled role",
     "languageName": {
       "en": "English",
@@ -1598,14 +1647,14 @@
     "discardConfirm": "Delete this interview with all its answers and chat messages? Your saved profile and CVs stay.",
     "setup": {
       "title": "Before we start",
-      "description": "A few choices that shape the questions. You can change them later.",
       "language": "Interview language",
       "country": "Where you want to work",
       "countryHint": "Sets the CV conventions (length, referees, work-rights line).",
       "personas": "Which describes you? (any that apply)",
       "depth": "How deep should we go?",
       "costHint": "With an API key, a full interview costs about US$2–4 on Opus, or about half on Sonnet 5.5 (Settings → models → CV builder interview). With a Claude subscription it uses your plan instead.",
-      "start": "Start the interview"
+      "start": "Start the interview",
+      "ask": "Before the first question: which language should we talk in, where do you want to work, and how deep should we go? Tick anything that describes you. You can change these later."
     },
     "persona": {
       "no_cv": "I have no CV",
@@ -1630,15 +1679,14 @@
       "workRights": "Your right to work there",
       "clearance": "Security clearance",
       "availability": "Availability or notice period",
-      "availabilityHint": "For the interviewer only; not on the CV."
+      "availabilityHint": "For the interviewer only; not on the CV.",
+      "more": "More about this job: seniority, industry, workplace, availability"
     },
     "current": {
       "title": "Where you are now",
-      "description": "Save this, then tell the interviewer about it below.",
       "status": "Right now I am",
       "titleNow": "Current job title",
-      "titleLast": "Most recent job title",
-      "saveFirst": "Save the form above to start the conversation."
+      "titleLast": "Most recent job title"
     },
     "currentStatus": {
       "employed": "Employed",
@@ -1662,7 +1710,10 @@
       "depth": "How much to cover",
       "remove": "Remove role {n}",
       "add": "Add a role",
-      "hint": "Next, one short conversation per role: in depth for recent roles, briefly for older ones."
+      "stillThere": "I still work here",
+      "stillThereN": "I still work here (role {n})",
+      "rowLegend": "Role {n}",
+      "more": "More about role {n}: industry, city, country, type"
     },
     "roleDepth": {
       "deep": "In depth",
@@ -1670,7 +1721,7 @@
     },
     "education": {
       "title": "Education and certifications",
-      "description": "Degrees, diplomas and certifications, as facts.",
+      "description": "Degrees, diplomas and certifications.",
       "institution": "Institution ({n})",
       "degree": "Qualification ({n})",
       "field": "Field of study ({n})",
@@ -1680,7 +1731,11 @@
       "certName": "Certification ({n})",
       "issuer": "Issued by ({n})",
       "year": "Year ({n})",
-      "addCert": "Add a certification"
+      "addCert": "Add a certification",
+      "rowLegend": "Education {n}",
+      "certLegend": "Certification {n}",
+      "remove": "Remove education {n}",
+      "removeCert": "Remove certification {n}"
     },
     "languages": {
       "title": "Languages",
@@ -1690,12 +1745,27 @@
       "add": "Add a language",
       "placeholder": "Start typing a language",
       "noMatch": "No matching language. You can keep what you typed.",
-      "matches": "{count, plural, one {# language matches} other {# languages match}}"
+      "matches": "{count, plural, one {# language matches} other {# languages match}}",
+      "pickLevel": "Pick a level",
+      "remove": "Remove language {n}"
     },
     "contact": {
       "title": "How you appear on the CV",
-      "description": "Contact details go in the CV header only; they are never part of the record the AI quotes from.",
-      "cvLanguage": "CV language"
+      "description": "Huntloop asks these itself. What you enter here goes in the CV header only and is not sent to the AI.",
+      "cvLanguage": "CV language",
+      "ask": {
+        "name": "Last part: the header of your CV. What name should go at the top?",
+        "email": "Thanks, {name}. Which email should employers reply to?",
+        "phone": "And a phone number for the header?",
+        "city": "Which city should the header show?",
+        "links": "Any link to add, such as LinkedIn or a portfolio?",
+        "done": "That's the header covered. Check it below, then continue."
+      },
+      "add": "Add",
+      "optional": "(optional)",
+      "badEmail": "That doesn't look like an email address. Check it and try again.",
+      "badPhone": "That phone number looks too short.",
+      "skippedAnswer": "Skipped"
     },
     "rail": {
       "label": "Interview steps",
@@ -1792,7 +1862,7 @@
       "target": "a target job title",
       "roles": "at least one role",
       "role_deep": "the conversation about your current role",
-      "contact": "your name"
+      "contact": "your name and email"
     },
     "roleChat": {
       "rolesLabel": "Roles",
@@ -1804,6 +1874,50 @@
       "reopen": "Reopen"
     },
     "undoSkip": "Undo skip",
-    "skippedForm": "You skipped this step. You can still fill it in."
+    "fieldError": {
+      "generic": "Check this field.",
+      "targetTitle": "Add at least one job title.",
+      "title": "Add a job title.",
+      "start": "Pick the year this started (and the month if you know it).",
+      "end": "Pick when it ended, or tick that you still work here.",
+      "order": "This ends before it starts. Check the dates.",
+      "level": "Pick a level."
+    },
+    "onFile": {
+      "title": "On file",
+      "empty": "Nothing saved for this step yet.",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "since": "since {start}",
+      "present": "present"
+    },
+    "need": {
+      "target": {
+        "title": "a job title you're going for"
+      },
+      "current": {
+        "title": "your job title"
+      },
+      "roles": {
+        "none": "at least one role",
+        "title": "the job title of role {n}",
+        "start": "the start date of role {n}",
+        "end": "the end date of role {n} (or that you still work there)",
+        "order": "the dates of role {n} (it ends before it starts)"
+      },
+      "contact": {
+        "name": "your name",
+        "email": "an email address"
+      }
+    },
+    "stillNeeded": "Still needed: {items}.",
+    "cardPending": "Use or dismiss the card above first.",
+    "month": {
+      "month": "month",
+      "year": "year",
+      "none": "Month (optional)",
+      "yearPlaceholder": "Year"
+    }
   }
 }

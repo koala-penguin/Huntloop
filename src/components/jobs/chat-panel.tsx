@@ -14,7 +14,8 @@ import { cn } from "@/lib/cn";
 import { newConversationAction, resolveChatActionAction } from "@/app/jobs/[id]/actions";
 import { newCoachConversationAction } from "@/app/coach/actions";
 import { acceptPolishAction } from "@/app/profile/interview/actions";
-import type { ChatOpening, StageStatus } from "@/shared/schemas/interview";
+import { DATA_CHAT_STAGES, type ChatOpening, type ConversationStage, type StageStatus } from "@/shared/schemas/interview";
+import { FormProposalCard, type CardContext } from "@/components/interview/form-card";
 
 import { AI_ERROR_CODES } from "@/shared/ai-errors";
 import type { Connection } from "@/shared/ai-settings";
@@ -45,6 +46,9 @@ const SUGGESTIONS = ["explain", "fit", "improve", "research"] as const;
 const COACH_SUGGESTIONS = ["week", "compare", "followUp", "search"] as const;
 /** Quick replies under an interview chat: skip one question, finish the part, no number to give. */
 const INTERVIEW_CONTROLS = ["skipQuestion", "thatsAll", "noNumber"] as const;
+/** A data step has nothing to finish from the chat (Continue does that) and no numbers to ask for. */
+const DATA_CONTROLS = ["skipQuestion"] as const;
+const isDataStage = (stage: string) => (DATA_CHAT_STAGES as readonly string[]).includes(stage);
 const KNOWN_ACTIVITIES = [
   "web_search",
   "web_fetch",
@@ -63,13 +67,18 @@ const KNOWN_ACTIVITIES = [
   "complete_stage",
   "suggest_options",
   "propose_polish",
+  "propose_target",
+  "propose_current",
+  "propose_roles",
+  "propose_education",
+  "propose_languages",
 ];
 
 /** A job's own chat, the coach across all jobs, or one stage (and role) of the CV builder interview. */
 export type ChatScopeProp =
   | { kind: "job"; jobId: number }
   | { kind: "coach" }
-  | { kind: "cv_interview"; interviewId: number; stage: "current" | "role_deep"; experienceRef: string | null; opening: ChatOpening; status: StageStatus };
+  | { kind: "cv_interview"; interviewId: number; stage: ConversationStage; experienceRef: string | null; opening: ChatOpening; status: StageStatus; card: CardContext };
 
 /** What differs per kind of chat: where messages go, the input's id and the texts around it. */
 function scopeView(scope: ChatScopeProp, t: (key: string) => string, hasProfile: boolean) {
@@ -83,6 +92,7 @@ function scopeView(scope: ChatScopeProp, t: (key: string) => string, hasProfile:
         placeholder: t("placeholder"),
         hint: t("hint"),
         suggestions: SUGGESTIONS.filter((s) => hasProfile || s === "explain" || s === "research").map((s) => t(`suggestion.${s}`)),
+        controls: [] as readonly string[],
         alwaysSuggest: false,
         canReset: true,
       };
@@ -95,22 +105,26 @@ function scopeView(scope: ChatScopeProp, t: (key: string) => string, hasProfile:
         placeholder: t("coach.placeholder"),
         hint: t("coach.hint"),
         suggestions: COACH_SUGGESTIONS.map((s) => t(`coach.suggestion.${s}`)),
+        controls: [] as readonly string[],
         alwaysSuggest: false,
         canReset: true,
       };
-    case "cv_interview":
+    case "cv_interview": {
+      const controls: readonly string[] = isDataStage(scope.stage) ? DATA_CONTROLS : INTERVIEW_CONTROLS;
       return {
         endpoint: `/api/cv-interview/${scope.interviewId}/chat`,
         body: { stage: scope.stage, experienceRef: scope.experienceRef },
         inputId: `chat-interview-${scope.stage}-${scope.experienceRef ?? "current"}`,
         intro: null,
         placeholder: t("interview.placeholder"),
-        hint: t("interview.hint"),
-        suggestions: INTERVIEW_CONTROLS.map((s) => t(`interview.control.${s}`)),
+        hint: isDataStage(scope.stage) ? t("interview.dataHint") : t("interview.hint"),
+        suggestions: controls.map((s) => t(`interview.control.${s}`)),
+        controls,
         // Hidden once the part is done: there is no question left to skip.
         alwaysSuggest: scope.status !== "done",
         canReset: false,
       };
+    }
   }
 }
 
@@ -213,12 +227,23 @@ function PolishCard({ action, interviewId }: { action: ChatItem["actions"][numbe
   );
 }
 
-function ActionCard({ action, interviewId }: { action: ChatItem["actions"][number]; interviewId: number | null }) {
+/** What a form card needs from the chat around it. */
+interface FormCards {
+  context: CardContext;
+  /** The chat's newest form card: the only one that can still be used. */
+  newest: number | null;
+  onDone: () => void;
+}
+
+function ActionCard({ action, interviewId, forms }: { action: ChatItem["actions"][number]; interviewId: number | null; forms?: FormCards }) {
   const t = useTranslations("chat.card");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   if (action.kind === "interview_polish") return <PolishCard action={action} interviewId={interviewId} />;
+  if (action.kind === "interview_form") {
+    return interviewId !== null && forms ? <FormProposalCard action={action} interviewId={interviewId} context={forms.context} newest={action.id === forms.newest} onDone={forms.onDone} /> : null;
+  }
   const decide = (decision: "accept" | "dismiss") =>
     start(async () => {
       const result = await resolveChatActionAction(action.id, decision);
@@ -260,7 +285,7 @@ function ActionCard({ action, interviewId }: { action: ChatItem["actions"][numbe
   );
 }
 
-function AssistantBubble({ item, interviewId = null }: { item: Pick<ChatItem, "text" | "activities" | "sources" | "actions">; interviewId?: number | null }) {
+function AssistantBubble({ item, interviewId = null, forms }: { item: Pick<ChatItem, "text" | "activities" | "sources" | "actions">; interviewId?: number | null; forms?: FormCards }) {
   const t = useTranslations("chat");
   return (
     <div className="flex flex-col gap-2" data-role="assistant">
@@ -287,7 +312,7 @@ function AssistantBubble({ item, interviewId = null }: { item: Pick<ChatItem, "t
         </details>
       )}
       {item.actions.map((a) => (
-        <ActionCard key={a.id} action={a} interviewId={interviewId} />
+        <ActionCard key={a.id} action={a} interviewId={interviewId} forms={forms} />
       ))}
     </div>
   );
@@ -338,6 +363,11 @@ export function ChatPanel({
   const lastItem = items.at(-1);
   const examples =
     scope.kind !== "cv_interview" || scope.status === "done" || showLive ? [] : items.length === 0 ? scope.opening.options : lastItem?.role === "assistant" ? (lastItem.suggestions ?? []) : [];
+  // Form cards: only the newest can be used; after it is used or dismissed the cursor returns to the reply box.
+  const formCards = items.flatMap((i) => i.actions.filter((a) => a.kind === "interview_form"));
+  const newestCard = formCards.at(-1) ?? null;
+  const forms: FormCards | undefined = scope.kind === "cv_interview" ? { context: scope.card, newest: newestCard?.id ?? null, onDone: () => inputRef.current?.focus() } : undefined;
+  const cardWaiting = newestCard?.status === "pending" && lastItem?.role === "assistant" && lastItem.actions.some((a) => a.id === newestCard.id);
   const addExample = (text: string) => {
     setInput((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text}` : text));
     inputRef.current?.focus();
@@ -401,7 +431,8 @@ export function ChatPanel({
       <div className="flex flex-col gap-4" aria-live="polite">
         {items.length === 0 && !showLive && view.intro && <p className="text-sm text-muted">{view.intro}</p>}
         {scope.kind === "cv_interview" && <AssistantBubble item={{ text: scope.opening.text, activities: [], sources: [], actions: [] }} />}
-        {items.map((item) => (item.role === "user" ? <UserBubble key={item.id} text={item.text} /> : <AssistantBubble key={item.id} item={item} interviewId={interviewId} />))}
+        {items.map((item) => (item.role === "user" ? <UserBubble key={item.id} text={item.text} /> : <AssistantBubble key={item.id} item={item} interviewId={interviewId} forms={forms} />))}
+        {cardWaiting && !showLive && <p className="sr-only">{t("interview.cardReady")}</p>}
         {showLive && (
           <>
             <UserBubble text={live.user} />
@@ -439,7 +470,7 @@ export function ChatPanel({
               type="button"
               variant={scope.kind === "cv_interview" ? "ghost" : "secondary"}
               size="sm"
-              data-control={scope.kind === "cv_interview" ? INTERVIEW_CONTROLS[i] : undefined}
+              data-control={scope.kind === "cv_interview" ? view.controls[i] : undefined}
               onClick={() => void send(text)}
             >
               {text}

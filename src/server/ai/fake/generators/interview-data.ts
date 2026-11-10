@@ -199,7 +199,7 @@ function parseFor(stage: FormCardStage, text: string, step: number): Record<stri
 
 const FOLLOW_UPS: Partial<Record<FormCardStage, { en: string; ko: string }>> = {
   target: { en: "Where do you want to work? Cities, or remote.", ko: "어디에서 일하고 싶으신가요? 도시 이름이나 재택 여부를 알려 주세요." },
-  roles: { en: "Any job before that? Same again: job title, employer, dates. Or skip if that's all.", ko: "그 전에 다른 직장도 있었나요? 같은 식으로 직무명, 회사, 기간을 알려 주세요. 없으면 건너뛰어도 됩니다." },
+  roles: { en: "Any job before that? Same again: job title, employer, dates. Or skip if that's all.", ko: "그 전에 다른 직장도 있었나요? 같은 식으로 직함, 회사, 기간을 알려 주세요. 없으면 건너뛰어도 됩니다." },
 };
 
 export function dataInterviewer(req: FakeRequest, conv: DataInfo) {

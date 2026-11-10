@@ -953,7 +953,12 @@
       "list_answers": "답변을 다시 읽음",
       "complete_stage": "이 부분을 마침",
       "suggest_options": "예시 제안: {detail}",
-      "propose_polish": "다듬은 문장 제안"
+      "propose_polish": "다듬은 문장 제안",
+      "propose_target": "지원하려는 일을 카드에 정리함",
+      "propose_current": "지금 하는 일을 카드에 정리함",
+      "propose_roles": "경력을 카드에 정리함",
+      "propose_education": "학력을 카드에 정리함",
+      "propose_languages": "언어를 카드에 정리함"
     },
     "card": {
       "factTitle": "프로필에 추가할까요?",
@@ -973,7 +978,51 @@
       "polishKept": "내 말 그대로 둠",
       "polishEditLabel": "다듬은 문장 고치기",
       "polishSaveEdit": "고친 문장 쓰기",
-      "polishCancel": "취소"
+      "polishCancel": "취소",
+      "formTitle": {
+        "target": "지원하려는 일",
+        "current": "지금 하는 일",
+        "roles": "경력",
+        "education": "학력과 자격증",
+        "languages": "언어"
+      },
+      "formHint": "보내신 글에서 읽은 내용입니다. 틀린 곳은 고쳐 주세요. 이대로 사용을 누르기 전에는 저장되지 않습니다.",
+      "formUse": "이대로 사용",
+      "formDismiss": "맞지 않아요",
+      "formSaved": "저장됨",
+      "formDismissed": "사용 안 함",
+      "formReplaced": "새 카드로 대체됨",
+      "formLeftOut": "비워 둔 항목: {items}. 입력하신 글에 없었습니다.",
+      "formCheck": "확인",
+      "formInvalid": "저장하려면 이 카드에서 고칠 곳이 있습니다.",
+      "leftOutOf": "{row}의 {field}",
+      "field": {
+        "titles": "직함",
+        "industries": "업종",
+        "cities": "도시",
+        "availability": "근무 가능 시기",
+        "status": "현재 상태",
+        "title": "직함",
+        "company": "회사",
+        "industry": "업종",
+        "location": "도시",
+        "start": "시작 시기",
+        "end": "종료 시기",
+        "institution": "학교",
+        "degree": "학위",
+        "field": "전공",
+        "name": "자격증 이름",
+        "issuer": "발급 기관",
+        "year": "연도",
+        "language": "언어",
+        "level": "수준"
+      },
+      "row": {
+        "roles": "역할 {n}",
+        "education": "학력 {n}",
+        "certifications": "자격증 {n}",
+        "languages": "언어 {n}"
+      }
     },
     "coach": {
       "title": "코치",
@@ -1005,7 +1054,9 @@
         "skipQuestion": "이 질문 건너뛰기",
         "thatsAll": "이 부분은 다 했어요",
         "noNumber": "숫자는 없어요"
-      }
+      },
+      "cardReady": "입력하신 내용을 정리한 카드가 답변 아래에 있습니다. 확인해 주세요.",
+      "dataHint": "입력한 내용은 확인할 수 있도록 카드에 정리됩니다. 카드를 사용하기 전에는 저장되지 않습니다."
     }
   },
   "employer": {
@@ -1582,13 +1633,11 @@
     "subtitle": "CV가 없거나 오래됐나요? 일에 대한 질문에 답하면 Huntloop가 내 말 그대로 프로필과 CV를 만듭니다. CV의 모든 줄은 내가 직접 쓴 답으로 거슬러 올라갑니다.",
     "back": "← 프로필",
     "invalidForm": "이 단계에 올바르지 않은 값이 있습니다. 날짜(YYYY-MM)와 필수 항목을 확인하세요.",
-    "saveContinue": "저장하고 계속",
     "save": "저장",
     "skip": "건너뛰기",
     "continue": "계속",
     "notSet": "선택 안 함",
     "dateHint": "YYYY-MM 형식, 예: 2021-03",
-    "endHint": "지금도 다니고 있으면 비워 두세요.",
     "untitledRole": "이름 없는 역할",
     "languageName": {
       "en": "영어",
@@ -1598,14 +1647,14 @@
     "discardConfirm": "이 인터뷰와 모든 답변, 대화 메시지를 삭제할까요? 저장된 프로필과 CV는 남습니다.",
     "setup": {
       "title": "시작하기 전에",
-      "description": "질문의 방향을 정하는 몇 가지 선택입니다. 나중에 바꿀 수 있습니다.",
       "language": "인터뷰 언어",
       "country": "일하고 싶은 국가",
       "countryHint": "CV 관례(분량, 추천인 문구, 취업 자격 줄)가 정해집니다.",
       "personas": "해당하는 것을 모두 고르세요",
       "depth": "얼마나 자세히 할까요?",
       "costHint": "API 키로는 풀 인터뷰가 Opus 기준 약 2~4달러, Sonnet 5.5로는 그 절반 정도입니다 (설정 → 모델 → CV 만들기 인터뷰). Claude 구독을 쓰면 요금 대신 플랜 사용량이 쓰입니다.",
-      "start": "인터뷰 시작"
+      "start": "인터뷰 시작",
+      "ask": "첫 질문 전에 정할 것이 있습니다. 어떤 언어로 이야기할지, 어디에서 일하고 싶은지, 얼마나 자세히 할지 골라 주세요. 해당하는 설명이 있으면 표시해 주세요. 나중에 바꿀 수 있습니다."
     },
     "persona": {
       "no_cv": "CV가 없어요",
@@ -1630,15 +1679,14 @@
       "workRights": "그 나라에서의 취업 자격",
       "clearance": "보안 인가",
       "availability": "시작 가능 시기 / 퇴사 통보 기간",
-      "availabilityHint": "인터뷰용 참고 정보이며 CV에는 들어가지 않습니다."
+      "availabilityHint": "인터뷰용 참고 정보이며 CV에는 들어가지 않습니다.",
+      "more": "더 보기: 직급, 산업, 근무 형태, 시작 가능 시기"
     },
     "current": {
       "title": "지금 상황",
-      "description": "저장한 뒤 아래에서 인터뷰어에게 이야기해 주세요.",
       "status": "지금 나는",
       "titleNow": "현재 직함",
-      "titleLast": "가장 최근 직함",
-      "saveFirst": "위 양식을 저장하면 대화를 시작할 수 있습니다."
+      "titleLast": "가장 최근 직함"
     },
     "currentStatus": {
       "employed": "재직 중",
@@ -1662,7 +1710,10 @@
       "depth": "얼마나 자세히",
       "remove": "역할 {n} 삭제",
       "add": "역할 추가",
-      "hint": "다음 단계에서 역할마다 짧은 대화를 합니다. 최근 역할은 자세히, 오래된 역할은 간단히."
+      "stillThere": "지금도 근무 중",
+      "stillThereN": "지금도 근무 중 (역할 {n})",
+      "rowLegend": "역할 {n}",
+      "more": "역할 {n} 더 보기: 산업, 도시, 국가, 고용 형태"
     },
     "roleDepth": {
       "deep": "자세히",
@@ -1670,7 +1721,7 @@
     },
     "education": {
       "title": "학력과 자격증",
-      "description": "학위, 수료, 자격증을 사실 그대로 적어 주세요.",
+      "description": "학위, 수료 과정, 자격증.",
       "institution": "학교 ({n})",
       "degree": "학위 ({n})",
       "field": "전공 ({n})",
@@ -1680,7 +1731,11 @@
       "certName": "자격증 ({n})",
       "issuer": "발급 기관 ({n})",
       "year": "연도 ({n})",
-      "addCert": "자격증 추가"
+      "addCert": "자격증 추가",
+      "rowLegend": "학력 {n}",
+      "certLegend": "자격증 {n}",
+      "remove": "학력 {n} 삭제",
+      "removeCert": "자격증 {n} 삭제"
     },
     "languages": {
       "title": "언어",
@@ -1690,12 +1745,27 @@
       "add": "언어 추가",
       "placeholder": "언어 이름을 입력하세요",
       "noMatch": "맞는 언어가 없습니다. 입력한 그대로 둘 수 있습니다.",
-      "matches": "{count, plural, other {언어 #개}}"
+      "matches": "{count, plural, other {언어 #개}}",
+      "pickLevel": "수준 선택",
+      "remove": "언어 {n} 삭제"
     },
     "contact": {
       "title": "CV에 표시될 정보",
-      "description": "연락처는 CV 상단에만 들어가며, AI가 인용하는 기록에는 포함되지 않습니다.",
-      "cvLanguage": "CV 언어"
+      "description": "이 단계는 Huntloop가 직접 묻습니다. 여기에 입력한 내용은 CV 머리말에만 쓰이며 AI에 보내지 않습니다.",
+      "cvLanguage": "CV 언어",
+      "ask": {
+        "name": "마지막으로 CV 머리말입니다. 맨 위에 넣을 이름은 무엇인가요?",
+        "email": "{name} 님, 감사합니다. 채용 담당자가 답장할 이메일은 무엇인가요?",
+        "phone": "머리말에 넣을 전화번호도 알려 주세요.",
+        "city": "머리말에 표시할 도시는 어디인가요?",
+        "links": "LinkedIn이나 포트폴리오처럼 넣을 링크가 있나요?",
+        "done": "머리말은 다 됐습니다. 아래 내용을 확인한 뒤 계속해 주세요."
+      },
+      "add": "추가",
+      "optional": "(선택)",
+      "badEmail": "이메일 주소 형식이 아닌 것 같습니다. 확인 후 다시 입력해 주세요.",
+      "badPhone": "전화번호가 너무 짧습니다.",
+      "skippedAnswer": "건너뜀"
     },
     "rail": {
       "label": "인터뷰 단계",
@@ -1792,7 +1862,7 @@
       "target": "목표 직함",
       "roles": "역할 1개 이상",
       "role_deep": "현재 역할에 대한 대화",
-      "contact": "이름"
+      "contact": "이름과 이메일"
     },
     "roleChat": {
       "rolesLabel": "역할",
@@ -1804,6 +1874,50 @@
       "reopen": "다시 열기"
     },
     "undoSkip": "건너뛰기 취소",
-    "skippedForm": "이 단계를 건너뛰었습니다. 지금 채워도 됩니다."
+    "fieldError": {
+      "generic": "이 항목을 확인해 주세요.",
+      "targetTitle": "직함을 하나 이상 넣어 주세요.",
+      "title": "직함을 넣어 주세요.",
+      "start": "시작한 연도를 넣어 주세요. 월을 알면 월도 골라 주세요.",
+      "end": "끝난 시기를 넣거나, 지금도 근무 중이면 표시해 주세요.",
+      "order": "끝난 시기가 시작보다 빠릅니다. 날짜를 확인해 주세요.",
+      "level": "수준을 골라 주세요."
+    },
+    "onFile": {
+      "title": "저장된 내용",
+      "empty": "이 단계에 저장된 내용이 아직 없습니다.",
+      "edit": "수정",
+      "save": "저장",
+      "cancel": "취소",
+      "since": "{start}부터",
+      "present": "현재"
+    },
+    "need": {
+      "target": {
+        "title": "지원하려는 직함"
+      },
+      "current": {
+        "title": "직함"
+      },
+      "roles": {
+        "none": "역할 1개 이상",
+        "title": "역할 {n}의 직함",
+        "start": "역할 {n}의 시작 시기",
+        "end": "역할 {n}의 종료 시기(또는 재직 중 표시)",
+        "order": "역할 {n}의 날짜(끝이 시작보다 빠름)"
+      },
+      "contact": {
+        "name": "이름",
+        "email": "이메일 주소"
+      }
+    },
+    "stillNeeded": "아직 필요한 것: {items}.",
+    "cardPending": "먼저 위 카드를 사용하거나 닫아 주세요.",
+    "month": {
+      "month": "월",
+      "year": "연도",
+      "none": "월 (선택)",
+      "yearPlaceholder": "연도"
+    }
   }
 }

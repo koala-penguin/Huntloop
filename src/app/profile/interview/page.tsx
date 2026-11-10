@@ -20,14 +20,28 @@ import { RecordDrawer, type RecordGroup } from "@/components/interview/record-dr
 import { SkillsCard } from "@/components/interview/skills-card";
 import { GenerateCard } from "@/components/interview/generate-card";
 import { ChatStageControls, PinRole, RoleTabs } from "@/components/interview/chat-stage";
-import { ContactForm, CurrentForm, EducationForm, LanguagesForm, RolesForm, SetupForm, TargetForm } from "@/components/interview/stage-forms";
+import { SetupForm } from "@/components/interview/stage-forms";
+import { DataStageControls, OnFile } from "@/components/interview/data-stage";
+import { ContactChat } from "@/components/interview/contact-chat";
 import { formatUsd } from "@/lib/format";
 import { resolveTaskModel, type Connection } from "@/shared/ai-settings";
-import { INTERVIEW_STAGES, answerRole, interviewFormSchema, roleStageKey, rolesInOrder, type ChatStage, type InterviewStage, type StageStatus } from "@/shared/schemas/interview";
+import {
+  INTERVIEW_STAGES,
+  answerRole,
+  cardValueOf,
+  interviewFormSchema,
+  roleStageKey,
+  rolesInOrder,
+  type ChatStage,
+  type ConversationStage,
+  type DataChatStage,
+  type InterviewStage,
+  type StageStatus,
+} from "@/shared/schemas/interview";
 
 /** Profile → Build by interview: the guided CV builder. */
 
-function chatItems(db: ReturnType<typeof appContext>["db"], interview: Interview, stage: ChatStage, ref: string | null) {
+function chatItems(db: ReturnType<typeof appContext>["db"], interview: Interview, stage: ConversationStage, ref: string | null) {
   const link = stageConversation(db, interview.id, stage, stage === "role_deep" ? ref : null);
   const conversation = link ? db.select().from(conversations).where(eq(conversations.id, link.conversationId)).get() : undefined;
   // A chat with an interviewer too old for this step is replaced on the next message; while the
@@ -92,21 +106,41 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
     { key: "removed", label: t("drawer.removedRole"), answers: answers.filter((a) => { const ref = answerRole(form, a); return !!ref && !form.roles.some((r) => r.id === ref); }) },
   ].map((g) => ({ ...g, answers: g.answers.map((a) => ({ id: a.id, topic: a.topic, quote: a.quote, polished: a.polished, private: a.private, edited: a.origin === "user_edit" })) }));
 
-  const chat = (chatStage: ChatStage, ref: string | null, status: StageStatus, nextRole: string | null, next: InterviewStage) => {
+  const inProgress = interview.status === "in_progress";
+  const card = { country: form.setup.country, cvLanguage: form.contact.cvLanguage || interview.language, quick: form.setup.depth === "quick" };
+  const panel = (chatStage: ConversationStage, ref: string | null, status: StageStatus) => {
     const { items, conversation, opening } = chatItems(db, interview, chatStage, ref);
     return (
+      <ChatPanel
+        key={`${chatStage}-${ref ?? "current"}`}
+        scope={{ kind: "cv_interview", interviewId: interview.id, stage: chatStage, experienceRef: ref, opening, status, card }}
+        items={items}
+        hasConversation={!!conversation}
+        provider={conversation ? (conversation.provider as Connection) : null}
+        activeConnection={connection}
+      />
+    );
+  };
+  /** A story chat: the current situation (with what is on file about the job under it), or one role. */
+  const chat = (chatStage: ChatStage, ref: string | null, status: StageStatus, nextRole: string | null, next: InterviewStage) => (
+    <Card className="flex flex-col gap-4">
+      {panel(chatStage, ref, status)}
+      {chatStage === "current" && <OnFile interviewId={interview.id} stage="current" value={cardValueOf(form, "current")} context={card} editable={inProgress} />}
+      {inProgress && <ChatStageControls interviewId={interview.id} stage={chatStage} statusKey={chatStage === "role_deep" ? roleStageKey(ref!) : "current"} status={status} nextRole={nextRole} nextStage={next} />}
+    </Card>
+  );
+  /** A data step: the chat, what is saved so far, and Continue. */
+  const dataChat = (dataStage: DataChatStage, skippable: boolean) => {
+    const status = (interview.stages[dataStage] ?? "pending") as StageStatus;
+    return (
       <Card className="flex flex-col gap-4">
-        <ChatPanel
-          key={`${chatStage}-${ref ?? "current"}`}
-          scope={{ kind: "cv_interview", interviewId: interview.id, stage: chatStage, experienceRef: ref, opening, status }}
-          items={items}
-          hasConversation={!!conversation}
-          provider={conversation ? (conversation.provider as Connection) : null}
-          activeConnection={connection}
-        />
-        {interview.status === "in_progress" && (
-          <ChatStageControls interviewId={interview.id} stage={chatStage} statusKey={chatStage === "role_deep" ? roleStageKey(ref!) : "current"} status={status} nextRole={nextRole} nextStage={next} />
-        )}
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-semibold">{t(`${dataStage}.title`)}</h2>
+          <p className="text-sm text-muted">{t(`${dataStage}.description`)}</p>
+        </div>
+        {panel(dataStage, null, status)}
+        <OnFile interviewId={interview.id} stage={dataStage} value={cardValueOf(form, dataStage)} context={card} editable={inProgress} />
+        {inProgress && <DataStageControls interviewId={interview.id} stage={dataStage} status={status} skippable={skippable} />}
       </Card>
     );
   };
@@ -117,20 +151,13 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
       main = <SetupForm interviewId={interview.id} initial={form.setup} />;
       break;
     case "target":
-      main = <TargetForm interviewId={interview.id} initial={form.target} country={form.setup.country} />;
+      main = dataChat("target", false);
       break;
-    case "current": {
-      const saved = !!form.current.title || !["employed", "self_employed"].includes(form.current.status);
-      main = (
-        <>
-          <CurrentForm interviewId={interview.id} initial={form.current} />
-          {saved ? chat("current", null, (interview.stages.current ?? "pending") as StageStatus, null, "roles") : <p className="text-sm text-muted">{t("current.saveFirst")}</p>}
-        </>
-      );
+    case "current":
+      main = chat("current", null, (interview.stages.current ?? "pending") as StageStatus, null, "roles");
       break;
-    }
     case "roles":
-      main = <RolesForm interviewId={interview.id} initial={form.roles} quick={form.setup.depth === "quick"} />;
+      main = dataChat("roles", false);
       break;
     case "role_deep":
       main = role ? (
@@ -144,13 +171,13 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
       );
       break;
     case "education":
-      main = <EducationForm interviewId={interview.id} initial={form} status={interview.stages.education as StageStatus | undefined} />;
+      main = dataChat("education", true);
       break;
     case "languages":
-      main = <LanguagesForm interviewId={interview.id} initial={form.languages} cvLanguage={form.contact.cvLanguage || interview.language} status={interview.stages.languages as StageStatus | undefined} />;
+      main = dataChat("languages", true);
       break;
     case "contact":
-      main = <ContactForm interviewId={interview.id} initial={form.contact} />;
+      main = <ContactChat interviewId={interview.id} initial={form.contact} />;
       break;
     case "review": {
       const ready = interviewReadiness(interview);

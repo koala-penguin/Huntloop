@@ -2,44 +2,116 @@
 
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
-import { ArrowRight, Plus, SkipForward, Trash2, Undo2 } from "lucide-react";
+import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
+import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Alert } from "@/components/ui/badge";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { FieldHint, Input, Label, Select } from "@/components/ui/form";
 import { TagInput } from "@/components/ui/tag-input";
 import { CountrySelect } from "@/components/ui/country-select";
 import { LanguageCombobox } from "@/components/ui/language-combobox";
+import { MonthField } from "@/components/ui/month-field";
 import { marketPack } from "@/shared/markets";
 import { EMPLOYMENT_TYPES, WORKPLACE_TYPES } from "@/shared/schemas/preferences";
 import { LANGUAGE_LEVELS, SENIORITY_LEVELS, type WorkRight } from "@/shared/schemas/profile";
 import { CV_LANGUAGES } from "@/shared/schemas/cv";
-import { CURRENT_STATUSES, INTERVIEW_DEPTHS, INTERVIEW_PERSONAS, ROLE_DEPTHS, type InterviewForm, type RoleForm, type StageStatus } from "@/shared/schemas/interview";
-import { reopenStageAction, saveStageFormAction, skipStageAction, startInterviewAction } from "@/app/profile/interview/actions";
+import { CURRENT_STATUSES, INTERVIEW_DEPTHS, INTERVIEW_PERSONAS, ROLE_DEPTHS, type FormCardValue, type InterviewForm, type RoleCard } from "@/shared/schemas/interview";
+import { saveStageFormAction, startInterviewAction } from "@/app/profile/interview/actions";
 
-/** The CV builder's form stages. Each saves through one server action; "Save and continue" also moves on. */
+/**
+ * The fields of the CV builder's steps, as controlled groups: a card in the chat and the "On file"
+ * editor under it show the same ones. Plus the setup step, which is picks only.
+ */
 
-function Field({ label, hint, children, className, uid }: { label: string; hint?: string; children: (id: string) => ReactNode; className?: string; uid?: string }) {
-  const id = `f-${label.replace(/\W+/g, "-").toLowerCase()}${uid ? `-${uid}` : ""}`;
+/** What to mark on a group's fields, by path ("titles", "roles.1.start"): values to check, and values that stopped a save. */
+export interface FieldFlags {
+  inferred: string[];
+  invalid: string[];
+}
+const NO_FLAGS: FieldFlags = { inferred: [], invalid: [] };
+
+/** Keeps field ids apart when two editors with the same labels are on one page (a card and "On file"). */
+export const FieldScope = createContext("");
+
+interface FieldAria {
+  "aria-describedby"?: string;
+  "aria-invalid"?: true;
+}
+
+export function Field({
+  label,
+  hint,
+  children,
+  className,
+  uid,
+  check = false,
+  error,
+}: {
+  label: string;
+  hint?: string;
+  children: (id: string, aria: FieldAria) => ReactNode;
+  className?: string;
+  uid?: string;
+  /** The value was read from the candidate's words, not picked: ask them to look at it. */
+  check?: boolean;
+  error?: string | null;
+}) {
+  const t = useTranslations("chat.card");
+  const scope = useContext(FieldScope);
+  const id = `${scope}f-${label.replace(/\W+/g, "-").toLowerCase()}${uid ? `-${uid}` : ""}`;
+  const notes = [check ? `${id}-check` : null, error ? `${id}-error` : null].filter(Boolean).join(" ");
   return (
-    <div className={`flex flex-col gap-1.5 ${className ?? ""}`}>
-      <Label htmlFor={id} id={`${id}-label`}>
-        {label}
-      </Label>
-      {children(id)}
+    <div className={`flex min-w-0 flex-col gap-1.5 ${className ?? ""}`}>
+      <span className="flex items-center gap-2">
+        <Label htmlFor={id} id={`${id}-label`}>
+          {label}
+        </Label>
+        {check && (
+          <Badge tone="outline" id={`${id}-check`}>
+            {t("formCheck")}
+          </Badge>
+        )}
+      </span>
+      {children(id, {
+        ...(notes ? { "aria-describedby": notes } : {}),
+        ...(error ? { "aria-invalid": true as const } : {}),
+      })}
+      {error && (
+        <p id={`${id}-error`} className="text-xs text-danger">
+          {error}
+        </p>
+      )}
       {hint && <FieldHint>{hint}</FieldHint>}
     </div>
   );
 }
 
-function Checks<T extends string>({ legend, values, selected, label, onChange }: { legend: string; values: readonly T[]; selected: T[]; label: (v: T) => string; onChange: (next: T[]) => void }) {
+export function Checks<T extends string>({
+  legend,
+  values,
+  selected,
+  label,
+  onChange,
+  check = false,
+}: {
+  legend: string;
+  values: readonly T[];
+  selected: T[];
+  label: (v: T) => string;
+  onChange: (next: T[]) => void;
+  check?: boolean;
+}) {
+  const t = useTranslations("chat.card");
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 text-sm font-medium">{legend}</legend>
+      <legend className="mb-1 flex items-center gap-2 text-sm font-medium">
+        {legend}
+        {check && <Badge tone="outline">{t("formCheck")}</Badge>}
+      </legend>
       <div className="flex flex-wrap gap-x-4 gap-y-2">
         {values.map((v) => (
-          <label key={v} className="flex items-center gap-1.5 text-sm">
+          <label key={v} className="flex min-h-8 items-center gap-1.5 text-sm">
             <input type="checkbox" checked={selected.includes(v)} onChange={(e) => onChange(e.target.checked ? [...selected, v] : selected.filter((s) => s !== v))} />
             {label(v)}
           </label>
@@ -49,103 +121,25 @@ function Checks<T extends string>({ legend, values, selected, label, onChange }:
   );
 }
 
-function useStageSave(interviewId: number) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const run = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
-    start(async () => {
-      setError(null);
-      const result = await fn();
-      if (!result.ok) setError(result.error ?? "invalid");
-      else router.refresh();
-    });
-  return {
-    pending,
-    error,
-    save: (stage: string, value: unknown, advance: boolean) => run(() => saveStageFormAction(interviewId, stage, value, advance)),
-    skip: (key: string) => run(() => skipStageAction(interviewId, key)),
-    undoSkip: (key: string) => run(() => reopenStageAction(interviewId, key)),
-  };
-}
-
-function StageCard({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <div className="flex flex-col gap-5">{children}</div>
-    </Card>
-  );
-}
-
-function Actions({
-  pending,
-  error,
-  onSave,
-  onContinue,
-  onSkip,
-  skipped = false,
-  onUndoSkip,
-}: {
-  pending: boolean;
-  error: string | null;
-  onSave?: () => void;
-  onContinue: () => void;
-  onSkip?: () => void;
-  /** This step was skipped: say so, with a way back. */
-  skipped?: boolean;
-  onUndoSkip?: () => void;
-}) {
+/** The text shown under a field that stopped a save. */
+function useFieldError(flags: FieldFlags) {
   const t = useTranslations("interview");
-  const tErrors = useTranslations("errors");
-  return (
-    <div className="flex flex-col gap-2">
-      {skipped && onUndoSkip && (
-        <Alert tone="neutral" className="flex flex-wrap items-center gap-2" data-skipped>
-          <SkipForward className="size-4 shrink-0" aria-hidden />
-          <span className="flex-1">{t("skippedForm")}</span>
-          <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={onUndoSkip}>
-            <Undo2 className="size-3.5" aria-hidden />
-            {t("undoSkip")}
-          </Button>
-        </Alert>
-      )}
-      {error && <Alert tone="danger">{error === "invalid" ? t("invalidForm") : tErrors("generic", { message: error })}</Alert>}
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" disabled={pending} onClick={onContinue}>
-          <ArrowRight className="size-3.5" aria-hidden />
-          {t("saveContinue")}
-        </Button>
-        {onSave && (
-          <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={onSave}>
-            {t("save")}
-          </Button>
-        )}
-        {onSkip && !skipped && (
-          <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={onSkip}>
-            <SkipForward className="size-3.5" aria-hidden />
-            {t("skip")}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
+  return (path: string, kind = "generic"): string | null => (flags.invalid.includes(path) ? t(`fieldError.${kind}`) : null);
 }
 
-/** Stage 0: language, market, who the user is and how deep to go. Starts the interview (or edits it). */
+/**
+ * Stage 0: language, market, who the user is and how deep to go, asked as one question with the
+ * picks under it. Starts the interview (or, reopened from the step list, changes its choices).
+ */
 export function SetupForm({ interviewId, initial }: { interviewId: number | null; initial: InterviewForm["setup"] }) {
   const t = useTranslations("interview");
   const router = useRouter();
   const [setup, setSetup] = useState(initial);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const saver = useStageSave(interviewId ?? 0);
   const begin = () =>
     start(async () => {
-      const result = await startInterviewAction(setup);
+      const result = interviewId === null ? await startInterviewAction(setup) : await saveStageFormAction(interviewId, "setup", setup, true);
       if (!result.ok) setError(result.error);
       else {
         router.push("/profile/interview");
@@ -153,50 +147,60 @@ export function SetupForm({ interviewId, initial }: { interviewId: number | null
       }
     });
   return (
-    <StageCard title={t("setup.title")} description={t("setup.description")}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("setup.language")}>
-          {(id) => (
-            <Select id={id} value={setup.language} onChange={(e) => setSetup({ ...setup, language: e.target.value as typeof setup.language })}>
-              {CV_LANGUAGES.map((l) => (
-                <option key={l} value={l}>
-                  {t(`languageName.${l}`)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <Field label={t("setup.country")} hint={t("setup.countryHint")}>
-          {(id) => <CountrySelect id={id} value={setup.country} onChange={(country) => country && setSetup({ ...setup, country })} />}
-        </Field>
+    <Card className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1" data-role="assistant">
+        <h2 className="text-lg font-semibold">{t("setup.title")}</h2>
+        <p className="text-sm leading-relaxed">{t("setup.ask")}</p>
       </div>
-      <Checks legend={t("setup.personas")} values={INTERVIEW_PERSONAS} selected={setup.personas} label={(v) => t(`persona.${v}`)} onChange={(personas) => setSetup({ ...setup, personas })} />
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-medium">{t("setup.depth")}</legend>
-        {INTERVIEW_DEPTHS.map((d) => (
-          <label key={d} className="flex items-start gap-2 text-sm">
-            <input type="radio" name="depth" className="mt-1" checked={setup.depth === d} onChange={() => setSetup({ ...setup, depth: d })} />
-            <span>
-              <span className="font-medium">{t(`depth.${d}`)}</span> <span className="text-muted">{t(`depthHint.${d}`)}</span>
-            </span>
-          </label>
-        ))}
-        <FieldHint>{t("setup.costHint")}</FieldHint>
-      </fieldset>
-      {interviewId === null ? (
-        <div className="flex flex-col gap-2">
-          {error && <Alert tone="danger">{t("invalidForm")}</Alert>}
-          <div>
-            <Button type="button" disabled={pending} onClick={begin}>
-              <ArrowRight className="size-4" aria-hidden />
-              {t("setup.start")}
-            </Button>
-          </div>
+      <div className="flex flex-col gap-5 rounded-md border border-border p-3" role="group" aria-label={t("setup.title")}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t("setup.language")}>
+            {(id) => (
+              <Select
+                id={id}
+                className="h-10"
+                value={setup.language}
+                onChange={(e) =>
+                  setSetup({
+                    ...setup,
+                    language: e.target.value as typeof setup.language,
+                  })
+                }
+              >
+                {CV_LANGUAGES.map((l) => (
+                  <option key={l} value={l}>
+                    {t(`languageName.${l}`)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label={t("setup.country")} hint={t("setup.countryHint")}>
+            {(id) => <CountrySelect id={id} className="h-10" value={setup.country} onChange={(country) => country && setSetup({ ...setup, country })} />}
+          </Field>
         </div>
-      ) : (
-        <Actions pending={saver.pending} error={saver.error} onContinue={() => saver.save("setup", setup, true)} />
-      )}
-    </StageCard>
+        <Checks legend={t("setup.personas")} values={INTERVIEW_PERSONAS} selected={setup.personas} label={(v) => t(`persona.${v}`)} onChange={(personas) => setSetup({ ...setup, personas })} />
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 text-sm font-medium">{t("setup.depth")}</legend>
+          {INTERVIEW_DEPTHS.map((d) => (
+            <label key={d} className="flex items-start gap-2 text-sm">
+              <input type="radio" name="depth" className="mt-1" checked={setup.depth === d} onChange={() => setSetup({ ...setup, depth: d })} />
+              <span>
+                <span className="font-medium">{t(`depth.${d}`)}</span> <span className="text-muted">{t(`depthHint.${d}`)}</span>
+              </span>
+            </label>
+          ))}
+          <FieldHint>{t("setup.costHint")}</FieldHint>
+        </fieldset>
+        {error && <Alert tone="danger">{t("invalidForm")}</Alert>}
+        <div>
+          <Button type="button" disabled={pending} onClick={begin}>
+            <ArrowRight className="size-4" aria-hidden />
+            {interviewId === null ? t("setup.start") : t("continue")}
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -210,12 +214,21 @@ function WorkRightSelect({ country, value, onChange }: { country: string; value:
     const rest = value.filter((w) => w.country !== country);
     if (!optionId) return onChange(rest);
     const option = pack.workRightOptions.find((o) => o.id === optionId);
-    onChange([...rest, { country, status: optionId === "unknown" ? "unknown" : (option?.status ?? "unknown"), option: optionId === "unknown" ? null : optionId, expires: null, note: null }]);
+    onChange([
+      ...rest,
+      {
+        country,
+        status: optionId === "unknown" ? "unknown" : (option?.status ?? "unknown"),
+        option: optionId === "unknown" ? null : optionId,
+        expires: null,
+        note: null,
+      },
+    ]);
   };
   return (
     <Field label={t("target.workRights")}>
       {(id) => (
-        <Select id={id} value={selected} onChange={(e) => set(e.target.value)}>
+        <Select id={id} className="h-10" value={selected} onChange={(e) => set(e.target.value)}>
           <option value="">{t("notSet")}</option>
           {pack.workRightOptions.map((o) => (
             <option key={o.id} value={o.id}>
@@ -229,46 +242,54 @@ function WorkRightSelect({ country, value, onChange }: { country: string; value:
   );
 }
 
-/** Stage 1: the job they're after, in the target market. */
-export function TargetForm({ interviewId, initial, country }: { interviewId: number; initial: InterviewForm["target"]; country: string }) {
+type Target = FormCardValue<"target">;
+
+/** The job they're after, in the target market. */
+export function TargetFields({ value: target, onChange, country, flags = NO_FLAGS }: { value: Target; onChange: (next: Target) => void; country: string; flags?: FieldFlags }) {
   const t = useTranslations("interview");
   const tPrefs = useTranslations("preferences");
   const tProfile = useTranslations("profile");
-  const [target, setTarget] = useState(initial);
-  const { pending, error, save } = useStageSave(interviewId);
+  const error = useFieldError(flags);
   const removeLabel = (tag: string) => tProfile("removeItem", { item: tag });
   const levels = marketPack(country).clearanceLevels;
   const clearance = target.clearances.find((c) => c.country === country)?.level ?? "";
+  const checked = (path: string) => flags.inferred.includes(path);
+  // The card stays short: the job titles, where, and the right to work. The rest opens on request,
+  // or by itself when something in it was read from the candidate's words and needs a look.
+  const more = ["seniority", "workplace", "employmentTypes"].some(checked) || target.industries.length > 0 || !!target.availability;
   return (
-    <StageCard title={t("target.title")} description={t("target.description")}>
-      <Field label={tPrefs("targetTitles")} hint={tPrefs("targetTitlesHint")}>
-        {(id) => <TagInput id={id} value={target.titles} removeLabel={removeLabel} placeholder={tPrefs("targetTitlesPlaceholder")} onChange={(titles) => setTarget({ ...target, titles })} />}
+    <div className="flex flex-col gap-5">
+      <Field label={tPrefs("targetTitles")} hint={tPrefs("targetTitlesHint")} error={error("titles", "targetTitle")}>
+        {(id) => <TagInput id={id} value={target.titles} removeLabel={removeLabel} placeholder={tPrefs("targetTitlesPlaceholder")} onChange={(titles) => onChange({ ...target, titles })} />}
       </Field>
-      <Checks legend={tPrefs("seniority")} values={SENIORITY_LEVELS} selected={target.seniority} label={(v) => tPrefs(`seniorityValue.${v}`)} onChange={(seniority) => setTarget({ ...target, seniority })} />
-      <Field label={t("target.industries")}>{(id) => <TagInput id={id} value={target.industries} removeLabel={removeLabel} onChange={(industries) => setTarget({ ...target, industries })} />}</Field>
       <Field label={tPrefs("cities")} hint={tPrefs("citiesHint")}>
-        {(id) => <TagInput id={id} value={target.cities} removeLabel={removeLabel} suggestions={marketPack(country).suggestedCities} onChange={(cities) => setTarget({ ...target, cities })} />}
+        {(id) => <TagInput id={id} value={target.cities} removeLabel={removeLabel} suggestions={marketPack(country).suggestedCities} onChange={(cities) => onChange({ ...target, cities })} />}
       </Field>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={target.remoteOk} onChange={(e) => setTarget({ ...target, remoteOk: e.target.checked })} />
-        {tPrefs("remoteOk")}
-      </label>
-      <Checks legend={tPrefs("workplace")} values={WORKPLACE_TYPES} selected={target.workplace} label={(v) => tPrefs(`workplaceType.${v}`)} onChange={(workplace) => setTarget({ ...target, workplace })} />
-      <Checks legend={tPrefs("employmentTypes")} values={EMPLOYMENT_TYPES} selected={target.employmentTypes} label={(v) => tPrefs(`employmentType.${v}`)} onChange={(employmentTypes) => setTarget({ ...target, employmentTypes })} />
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={target.willingToRelocate} onChange={(e) => setTarget({ ...target, willingToRelocate: e.target.checked })} />
-        {tPrefs("willingToRelocate")}
-      </label>
       <div className="grid gap-4 sm:grid-cols-2">
-        <WorkRightSelect country={country} value={target.workRights} onChange={(workRights) => setTarget({ ...target, workRights })} />
+        <WorkRightSelect country={country} value={target.workRights} onChange={(workRights) => onChange({ ...target, workRights })} />
         {levels.length > 0 && (
           <Field label={t("target.clearance")}>
             {(id) => (
               <Select
                 id={id}
+                className="h-10"
                 value={clearance}
                 onChange={(e) =>
-                  setTarget({ ...target, clearances: [...target.clearances.filter((c) => c.country !== country), ...(e.target.value ? [{ country, level: e.target.value, status: "active" as const }] : [])] })
+                  onChange({
+                    ...target,
+                    clearances: [
+                      ...target.clearances.filter((c) => c.country !== country),
+                      ...(e.target.value
+                        ? [
+                            {
+                              country,
+                              level: e.target.value,
+                              status: "active" as const,
+                            },
+                          ]
+                        : []),
+                    ],
+                  })
                 }
               >
                 <option value="">{t("notSet")}</option>
@@ -281,278 +302,429 @@ export function TargetForm({ interviewId, initial, country }: { interviewId: num
             )}
           </Field>
         )}
-        <Field label={t("target.availability")} hint={t("target.availabilityHint")}>
-          {(id) => <Input id={id} value={target.availability} maxLength={200} onChange={(e) => setTarget({ ...target, availability: e.target.value })} />}
-        </Field>
       </div>
-      <Actions pending={pending} error={error} onContinue={() => save("target", target, true)} />
-    </StageCard>
+      <details className="rounded-md border border-border" open={more || undefined}>
+        <summary className="flex min-h-10 cursor-pointer items-center px-3 text-sm font-medium">{t("target.more")}</summary>
+        <div className="flex flex-col gap-5 p-3 pt-1">
+          <Checks
+            legend={tPrefs("seniority")}
+            values={SENIORITY_LEVELS}
+            selected={target.seniority}
+            label={(v) => tPrefs(`seniorityValue.${v}`)}
+            check={checked("seniority")}
+            onChange={(seniority) => onChange({ ...target, seniority })}
+          />
+          <Field label={t("target.industries")}>
+            {(id) => <TagInput id={id} value={target.industries} removeLabel={removeLabel} onChange={(industries) => onChange({ ...target, industries })} />}
+          </Field>
+          <label className="flex min-h-8 items-center gap-2 text-sm">
+            <input type="checkbox" checked={target.remoteOk} onChange={(e) => onChange({ ...target, remoteOk: e.target.checked })} />
+            {tPrefs("remoteOk")}
+          </label>
+          <Checks
+            legend={tPrefs("workplace")}
+            values={WORKPLACE_TYPES}
+            selected={target.workplace}
+            label={(v) => tPrefs(`workplaceType.${v}`)}
+            check={checked("workplace")}
+            onChange={(workplace) => onChange({ ...target, workplace })}
+          />
+          <Checks
+            legend={tPrefs("employmentTypes")}
+            values={EMPLOYMENT_TYPES}
+            selected={target.employmentTypes}
+            label={(v) => tPrefs(`employmentType.${v}`)}
+            check={checked("employmentTypes")}
+            onChange={(employmentTypes) => onChange({ ...target, employmentTypes })}
+          />
+          <label className="flex min-h-8 items-center gap-2 text-sm">
+            <input type="checkbox" checked={target.willingToRelocate} onChange={(e) => onChange({ ...target, willingToRelocate: e.target.checked })} />
+            {tPrefs("willingToRelocate")}
+          </label>
+          <Field label={t("target.availability")} hint={t("target.availabilityHint")}>
+            {(id) => <Input id={id} className="h-10" value={target.availability} maxLength={200} onChange={(e) => onChange({ ...target, availability: e.target.value })} />}
+          </Field>
+        </div>
+      </details>
+    </div>
   );
 }
 
-/** Stage 2 (form part): where they are now. The chat about it follows on the same page. */
-export function CurrentForm({ interviewId, initial }: { interviewId: number; initial: InterviewForm["current"] }) {
+type Current = FormCardValue<"current">;
+
+/** Where they are now: status, job, employer and when it started. */
+export function CurrentFields({ value: current, onChange, flags = NO_FLAGS }: { value: Current; onChange: (next: Current) => void; flags?: FieldFlags }) {
   const t = useTranslations("interview");
-  const [current, setCurrent] = useState(initial);
-  const { pending, error, save } = useStageSave(interviewId);
+  const scope = useContext(FieldScope);
+  const error = useFieldError(flags);
   const working = current.status === "employed" || current.status === "self_employed";
   return (
-    <StageCard title={t("current.title")} description={t("current.description")}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("current.status")}>
-          {(id) => (
-            <Select id={id} value={current.status} onChange={(e) => setCurrent({ ...current, status: e.target.value as typeof current.status })}>
-              {CURRENT_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {t(`currentStatus.${s}`)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <Field label={working ? t("current.titleNow") : t("current.titleLast")}>{(id) => <Input id={id} value={current.title} maxLength={120} onChange={(e) => setCurrent({ ...current, title: e.target.value })} />}</Field>
-        <Field label={t("roles.company")}>{(id) => <Input id={id} value={current.company} maxLength={120} onChange={(e) => setCurrent({ ...current, company: e.target.value })} />}</Field>
-        <Field label={t("roles.start")} hint={t("dateHint")}>{(id) => <Input id={id} value={current.start} placeholder="2021-03" onChange={(e) => setCurrent({ ...current, start: e.target.value.trim() })} />}</Field>
-        <Field label={t("roles.country")}>{(id) => <CountrySelect id={id} value={current.country || null} emptyLabel={t("notSet")} onChange={(country) => setCurrent({ ...current, country: country ?? "" })} />}</Field>
-      </div>
-      <div className="flex flex-col gap-2">
-        {error && <Alert tone="danger">{t("invalidForm")}</Alert>}
-        <div>
-          <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => save("current", current, false)}>
-            {t("save")}
-          </Button>
-        </div>
-      </div>
-    </StageCard>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label={t("current.status")} check={flags.inferred.includes("status")}>
+        {(id, aria) => (
+          <Select
+            id={id}
+            className="h-10"
+            {...aria}
+            value={current.status}
+            onChange={(e) =>
+              onChange({
+                ...current,
+                status: e.target.value as Current["status"],
+              })
+            }
+          >
+            {CURRENT_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {t(`currentStatus.${s}`)}
+              </option>
+            ))}
+          </Select>
+        )}
+      </Field>
+      <Field label={working ? t("current.titleNow") : t("current.titleLast")} error={error("title", "title")}>
+        {(id, aria) => <Input id={id} className="h-10" {...aria} value={current.title} maxLength={120} onChange={(e) => onChange({ ...current, title: e.target.value })} />}
+      </Field>
+      <Field label={t("roles.company")}>{(id) => <Input id={id} className="h-10" value={current.company} maxLength={120} onChange={(e) => onChange({ ...current, company: e.target.value })} />}</Field>
+      <MonthField legend={t("roles.start")} idPrefix={`${scope}current-start`} value={current.start} invalid={flags.invalid.includes("start")} onChange={(start) => onChange({ ...current, start })} />
+      <Field label={t("roles.country")}>
+        {(id) => <CountrySelect id={id} className="h-10" value={current.country || null} emptyLabel={t("notSet")} onChange={(country) => onChange({ ...current, country: country ?? "" })} />}
+      </Field>
+    </div>
   );
 }
 
 /** A placeholder id for a row added here; the server gives it its real "exp-N" on save. */
-const newRowId = (roles: RoleForm[]) => `new-${roles.length}${Date.now().toString(36)}`;
+const newRowId = (roles: RoleCard[]) => `new-${roles.length}${Date.now().toString(36)}`;
 
-/** Stage 3: every role, as a table. Ids stay fixed so answers stay with their role. */
-export function RolesForm({ interviewId, initial, quick }: { interviewId: number; initial: RoleForm[]; quick: boolean }) {
+/** Roles, one group of fields each. Ids stay fixed so answers stay with their role. */
+export function RoleRows({ value: roles, onChange, quick, flags = NO_FLAGS }: { value: RoleCard[]; onChange: (next: RoleCard[]) => void; quick: boolean; flags?: FieldFlags }) {
   const t = useTranslations("interview");
   const tPrefs = useTranslations("preferences");
-  const [roles, setRoles] = useState<RoleForm[]>(initial);
-  const { pending, error, save } = useStageSave(interviewId);
-  const set = (i: number, patch: Partial<RoleForm>) => setRoles(roles.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const scope = useContext(FieldScope);
+  const error = useFieldError(flags);
+  const set = (i: number, patch: Partial<RoleCard>) => onChange(roles.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const add = () =>
-    setRoles([
+    onChange([
       ...roles,
-      { id: newRowId(roles), title: "", company: "", industry: "", location: "", country: "", start: "", end: "", employmentType: "full_time", seniority: null, depth: quick && roles.length ? "brief" : "deep" },
+      {
+        id: newRowId(roles),
+        title: "",
+        company: "",
+        industry: "",
+        location: "",
+        country: "",
+        start: "",
+        end: "",
+        current: false,
+        employmentType: "full_time",
+        seniority: null,
+        depth: quick && roles.length ? "brief" : "deep",
+      },
     ]);
   return (
-    <StageCard title={t("roles.title")} description={t("roles.description")}>
+    <div className="flex flex-col gap-4">
       <ol className="flex flex-col gap-4">
-        {roles.map((r, i) => (
-          <li key={r.id} className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-3" data-role-row={r.id}>
-            <Field label={t("roles.roleTitle", { n: i + 1 })}>{(id) => <Input id={id} value={r.title} maxLength={120} onChange={(e) => set(i, { title: e.target.value })} />}</Field>
-            <Field label={t("roles.companyN", { n: i + 1 })}>{(id) => <Input id={id} value={r.company} maxLength={120} onChange={(e) => set(i, { company: e.target.value })} />}</Field>
-            <Field label={t("roles.industry")} uid={r.id}>{(id) => <Input id={id} value={r.industry} maxLength={80} onChange={(e) => set(i, { industry: e.target.value })} />}</Field>
-            <Field label={t("roles.location")} uid={r.id}>{(id) => <Input id={id} value={r.location} maxLength={80} onChange={(e) => set(i, { location: e.target.value })} />}</Field>
-            <Field label={t("roles.startN", { n: i + 1 })} hint={t("dateHint")}>{(id) => <Input id={id} value={r.start} placeholder="2021-03" onChange={(e) => set(i, { start: e.target.value.trim() })} />}</Field>
-            <Field label={t("roles.endN", { n: i + 1 })} hint={t("endHint")}>{(id) => <Input id={id} value={r.end} placeholder="2023-06" onChange={(e) => set(i, { end: e.target.value.trim() })} />}</Field>
-            <Field label={tPrefs("employmentTypes")} uid={r.id}>
-              {(id) => (
-                <Select id={id} value={r.employmentType} onChange={(e) => set(i, { employmentType: e.target.value as RoleForm["employmentType"] })}>
-                  {EMPLOYMENT_TYPES.map((v) => (
-                    <option key={v} value={v}>
-                      {tPrefs(`employmentType.${v}`)}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <Field label={t("roles.depth")} uid={r.id}>
-              {(id) => (
-                <Select id={id} value={r.depth} onChange={(e) => set(i, { depth: e.target.value as RoleForm["depth"] })}>
-                  {ROLE_DEPTHS.map((v) => (
-                    <option key={v} value={v}>
-                      {t(`roleDepth.${v}`)}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <div className="flex items-end">
-              <Button type="button" size="sm" variant="ghost" onClick={() => setRoles(roles.filter((_, j) => j !== i))}>
-                <Trash2 className="size-3.5" aria-hidden />
-                {t("roles.remove", { n: i + 1 })}
-              </Button>
-            </div>
-          </li>
-        ))}
+        {roles.map((r, i) => {
+          const n = i + 1;
+          const at = (name: string) => `roles.${i}.${name}`;
+          const endError = flags.invalid.includes(at("order")) ? t("fieldError.order") : flags.invalid.includes(at("end")) ? t("fieldError.end") : null;
+          return (
+            <li key={r.id} data-role-row={r.id}>
+              <fieldset className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+                <legend className="px-1 text-sm font-medium">{t("roles.rowLegend", { n })}</legend>
+                <Field label={t("roles.roleTitle", { n })} error={error(at("title"), "title")}>
+                  {(id, aria) => <Input id={id} className="h-10" {...aria} aria-required value={r.title} maxLength={120} onChange={(e) => set(i, { title: e.target.value })} />}
+                </Field>
+                <Field label={t("roles.companyN", { n })}>{(id) => <Input id={id} className="h-10" value={r.company} maxLength={120} onChange={(e) => set(i, { company: e.target.value })} />}</Field>
+                <div className="flex flex-col gap-1.5">
+                  <MonthField
+                    legend={t("roles.startN", { n })}
+                    idPrefix={`${scope}${r.id}-start`}
+                    required
+                    value={r.start}
+                    invalid={flags.invalid.includes(at("start"))}
+                    describedBy={flags.invalid.includes(at("start")) ? `${scope}${r.id}-start-error` : undefined}
+                    onChange={(start) => set(i, { start })}
+                  />
+                  {flags.invalid.includes(at("start")) && (
+                    <p id={`${scope}${r.id}-start-error`} className="text-xs text-danger">
+                      {t("fieldError.start")}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <MonthField
+                    legend={t("roles.endN", { n })}
+                    idPrefix={`${scope}${r.id}-end`}
+                    value={r.end}
+                    disabled={r.current}
+                    invalid={!!endError}
+                    describedBy={endError ? `${scope}${r.id}-end-error` : undefined}
+                    onChange={(end) => set(i, { end })}
+                  />
+                  <label className="flex min-h-8 items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={r.current}
+                      aria-label={t("roles.stillThereN", { n })}
+                      onChange={(e) => set(i, e.target.checked ? { current: true, end: "" } : { current: false })}
+                    />
+                    {t("roles.stillThere")}
+                  </label>
+                  {endError && (
+                    <p id={`${scope}${r.id}-end-error`} className="text-xs text-danger">
+                      {endError}
+                    </p>
+                  )}
+                </div>
+                <details className="rounded-md border border-border sm:col-span-2" open={!!(r.industry || r.location || r.country) || flags.inferred.includes(at("employmentType")) || undefined}>
+                  <summary className="flex min-h-10 cursor-pointer items-center px-3 text-sm font-medium">{t("roles.more", { n })}</summary>
+                  <div className="grid gap-3 p-3 pt-1 sm:grid-cols-2">
+                    <Field label={t("roles.industry")} uid={r.id}>
+                      {(id) => <Input id={id} className="h-10" value={r.industry} maxLength={80} onChange={(e) => set(i, { industry: e.target.value })} />}
+                    </Field>
+                    <Field label={t("roles.location")} uid={r.id}>
+                      {(id) => <Input id={id} className="h-10" value={r.location} maxLength={80} onChange={(e) => set(i, { location: e.target.value })} />}
+                    </Field>
+                    <Field label={t("roles.country")} uid={r.id}>
+                      {(id) => <CountrySelect id={id} className="h-10" value={r.country || null} emptyLabel={t("notSet")} onChange={(country) => set(i, { country: country ?? "" })} />}
+                    </Field>
+                    <Field label={tPrefs("employmentTypes")} uid={r.id} check={flags.inferred.includes(at("employmentType"))}>
+                      {(id, aria) => (
+                        <Select
+                          id={id}
+                          className="h-10"
+                          {...aria}
+                          value={r.employmentType}
+                          onChange={(e) =>
+                            set(i, {
+                              employmentType: e.target.value as RoleCard["employmentType"],
+                            })
+                          }
+                        >
+                          {EMPLOYMENT_TYPES.map((v) => (
+                            <option key={v} value={v}>
+                              {tPrefs(`employmentType.${v}`)}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                    </Field>
+                    <Field label={t("roles.depth")} uid={r.id}>
+                      {(id) => (
+                        <Select
+                          id={id}
+                          className="h-10"
+                          value={r.depth}
+                          onChange={(e) =>
+                            set(i, {
+                              depth: e.target.value as RoleCard["depth"],
+                            })
+                          }
+                        >
+                          {ROLE_DEPTHS.map((v) => (
+                            <option key={v} value={v}>
+                              {t(`roleDepth.${v}`)}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                    </Field>
+                  </div>
+                </details>
+                <div className="flex items-end">
+                  <Button type="button" size="sm" variant="ghost" className="h-10" onClick={() => onChange(roles.filter((_, j) => j !== i))}>
+                    <Trash2 className="size-3.5" aria-hidden />
+                    {t("roles.remove", { n })}
+                  </Button>
+                </div>
+              </fieldset>
+            </li>
+          );
+        })}
       </ol>
       <div>
-        <Button type="button" size="sm" variant="secondary" onClick={add}>
+        <Button type="button" size="sm" variant="secondary" className="h-10" onClick={add}>
           <Plus className="size-3.5" aria-hidden />
           {t("roles.add")}
         </Button>
       </div>
-      <FieldHint>{t("roles.hint")}</FieldHint>
-      <Actions pending={pending} error={error} onContinue={() => save("roles", roles, true)} />
-    </StageCard>
+    </div>
   );
 }
 
-/** Stage 6: education and certifications (facts only; no chat in this version). */
-export function EducationForm({ interviewId, initial, status = "pending" }: { interviewId: number; initial: Pick<InterviewForm, "education" | "certifications">; status?: StageStatus }) {
+type Education = FormCardValue<"education">;
+
+/** Education and certifications, as facts. */
+export function EducationRows({ value, onChange }: { value: Education; onChange: (next: Education) => void }) {
   const t = useTranslations("interview");
-  const tProfile = useTranslations("profile");
-  const [education, setEducation] = useState(initial.education);
-  const [certifications, setCertifications] = useState(initial.certifications);
-  const { pending, error, save, skip, undoSkip } = useStageSave(interviewId);
+  const { education, certifications } = value;
+  const setEducation = (next: Education["education"]) => onChange({ ...value, education: next });
+  const setCertifications = (next: Education["certifications"]) => onChange({ ...value, certifications: next });
   const nullable = (v: string) => (v.trim() ? v : null);
+  const year = (v: string) => nullable(v.replace(/[^\d-]/g, "").slice(0, 7));
   return (
-    <StageCard title={t("education.title")} description={t("education.description")}>
+    <div className="flex flex-col gap-4">
       <ol className="flex flex-col gap-3">
-        {education.map((e, i) => (
-          <li key={e.id} className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-3">
-            <Field label={t("education.institution", { n: i + 1 })}>{(id) => <Input id={id} value={e.institution} onChange={(ev) => setEducation(education.map((x, j) => (j === i ? { ...x, institution: ev.target.value } : x)))} />}</Field>
-            <Field label={t("education.degree", { n: i + 1 })}>{(id) => <Input id={id} value={e.degree ?? ""} onChange={(ev) => setEducation(education.map((x, j) => (j === i ? { ...x, degree: nullable(ev.target.value) } : x)))} />}</Field>
-            <Field label={t("education.field", { n: i + 1 })}>{(id) => <Input id={id} value={e.field ?? ""} onChange={(ev) => setEducation(education.map((x, j) => (j === i ? { ...x, field: nullable(ev.target.value) } : x)))} />}</Field>
-            <Field label={t("education.start", { n: i + 1 })}>{(id) => <Input id={id} value={e.start ?? ""} placeholder="2012" onChange={(ev) => setEducation(education.map((x, j) => (j === i ? { ...x, start: nullable(ev.target.value) } : x)))} />}</Field>
-            <Field label={t("education.end", { n: i + 1 })}>{(id) => <Input id={id} value={e.end ?? ""} placeholder="2015" onChange={(ev) => setEducation(education.map((x, j) => (j === i ? { ...x, end: nullable(ev.target.value) } : x)))} />}</Field>
-            <div className="flex items-end">
-              <Button type="button" size="sm" variant="ghost" onClick={() => setEducation(education.filter((_, j) => j !== i))}>
-                <Trash2 className="size-3.5" aria-hidden />
-                {tProfile("remove")}
-              </Button>
-            </div>
-          </li>
-        ))}
+        {education.map((e, i) => {
+          const n = i + 1;
+          const set = (patch: Partial<Education["education"][number]>) => setEducation(education.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+          return (
+            <li key={e.id}>
+              <fieldset className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+                <legend className="px-1 text-sm font-medium">{t("education.rowLegend", { n })}</legend>
+                <Field label={t("education.institution", { n })}>
+                  {(id) => <Input id={id} className="h-10" aria-required value={e.institution} onChange={(ev) => set({ institution: ev.target.value })} />}
+                </Field>
+                <Field label={t("education.degree", { n })}>{(id) => <Input id={id} className="h-10" value={e.degree ?? ""} onChange={(ev) => set({ degree: nullable(ev.target.value) })} />}</Field>
+                <Field label={t("education.field", { n })}>{(id) => <Input id={id} className="h-10" value={e.field ?? ""} onChange={(ev) => set({ field: nullable(ev.target.value) })} />}</Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label={t("education.start", { n })}>
+                    {(id) => <Input id={id} className="h-10" inputMode="numeric" value={e.start ?? ""} placeholder="2012" onChange={(ev) => set({ start: year(ev.target.value) })} />}
+                  </Field>
+                  <Field label={t("education.end", { n })}>
+                    {(id) => <Input id={id} className="h-10" inputMode="numeric" value={e.end ?? ""} placeholder="2015" onChange={(ev) => set({ end: year(ev.target.value) })} />}
+                  </Field>
+                </div>
+                <div className="flex items-end">
+                  <Button type="button" size="sm" variant="ghost" className="h-10" onClick={() => setEducation(education.filter((_, j) => j !== i))}>
+                    <Trash2 className="size-3.5" aria-hidden />
+                    {t("education.remove", { n })}
+                  </Button>
+                </div>
+              </fieldset>
+            </li>
+          );
+        })}
       </ol>
       <div>
-        <Button type="button" size="sm" variant="secondary" onClick={() => setEducation([...education, { id: `edu-${Date.now().toString(36)}`, institution: "", degree: null, field: null, country: null, start: null, end: null }])}>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-10"
+          onClick={() =>
+            setEducation([
+              ...education,
+              {
+                id: `edu-${Date.now().toString(36)}`,
+                institution: "",
+                degree: null,
+                field: null,
+                country: null,
+                start: null,
+                end: null,
+              },
+            ])
+          }
+        >
           <Plus className="size-3.5" aria-hidden />
           {t("education.add")}
         </Button>
       </div>
       <ol className="flex flex-col gap-3">
-        {certifications.map((c, i) => (
-          <li key={i} className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-3">
-            <Field label={t("education.certName", { n: i + 1 })}>{(id) => <Input id={id} value={c.name} onChange={(ev) => setCertifications(certifications.map((x, j) => (j === i ? { ...x, name: ev.target.value } : x)))} />}</Field>
-            <Field label={t("education.issuer", { n: i + 1 })}>{(id) => <Input id={id} value={c.issuer ?? ""} onChange={(ev) => setCertifications(certifications.map((x, j) => (j === i ? { ...x, issuer: nullable(ev.target.value) } : x)))} />}</Field>
-            <Field label={t("education.year", { n: i + 1 })}>{(id) => <Input id={id} value={c.year ?? ""} onChange={(ev) => setCertifications(certifications.map((x, j) => (j === i ? { ...x, year: nullable(ev.target.value) } : x)))} />}</Field>
-          </li>
-        ))}
+        {certifications.map((c, i) => {
+          const n = i + 1;
+          const set = (patch: Partial<Education["certifications"][number]>) => setCertifications(certifications.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+          return (
+            <li key={i}>
+              <fieldset className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+                <legend className="px-1 text-sm font-medium">{t("education.certLegend", { n })}</legend>
+                <Field label={t("education.certName", { n })}>{(id) => <Input id={id} className="h-10" aria-required value={c.name} onChange={(ev) => set({ name: ev.target.value })} />}</Field>
+                <Field label={t("education.issuer", { n })}>{(id) => <Input id={id} className="h-10" value={c.issuer ?? ""} onChange={(ev) => set({ issuer: nullable(ev.target.value) })} />}</Field>
+                <Field label={t("education.year", { n })}>
+                  {(id) => <Input id={id} className="h-10" inputMode="numeric" value={c.year ?? ""} onChange={(ev) => set({ year: year(ev.target.value) })} />}
+                </Field>
+                <div className="flex items-end">
+                  <Button type="button" size="sm" variant="ghost" className="h-10" onClick={() => setCertifications(certifications.filter((_, j) => j !== i))}>
+                    <Trash2 className="size-3.5" aria-hidden />
+                    {t("education.removeCert", { n })}
+                  </Button>
+                </div>
+              </fieldset>
+            </li>
+          );
+        })}
       </ol>
       <div>
-        <Button type="button" size="sm" variant="secondary" onClick={() => setCertifications([...certifications, { name: "", issuer: null, year: null }])}>
+        <Button type="button" size="sm" variant="secondary" className="h-10" onClick={() => setCertifications([...certifications, { name: "", issuer: null, year: null }])}>
           <Plus className="size-3.5" aria-hidden />
           {t("education.addCert")}
         </Button>
       </div>
-      <Actions
-        pending={pending}
-        error={error}
-        onContinue={() => save("education", { education: education.filter((e) => e.institution.trim()), certifications: certifications.filter((c) => c.name.trim()) }, true)}
-        onSkip={() => skip("education")}
-        skipped={status === "skipped"}
-        onUndoSkip={() => undoSkip("education")}
-      />
-    </StageCard>
+    </div>
   );
 }
 
-/** Stage 9: languages and levels. */
-export function LanguagesForm({
-  interviewId,
-  initial,
+type Languages = FormCardValue<"languages">["languages"];
+
+/** Languages and levels. A level nobody typed starts empty and has to be picked. */
+export function LanguageRows({
+  value: languages,
+  onChange,
   cvLanguage,
-  status = "pending",
+  flags = NO_FLAGS,
 }: {
-  interviewId: number;
-  initial: InterviewForm["languages"];
+  value: Languages;
+  onChange: (next: Languages) => void;
   /** Language names are written in the CV's language. */
   cvLanguage: string;
-  status?: StageStatus;
+  flags?: FieldFlags;
 }) {
   const t = useTranslations("interview");
   const tProfile = useTranslations("profile");
-  const [languages, setLanguages] = useState(initial);
-  const { pending, error, save, skip, undoSkip } = useStageSave(interviewId);
+  const error = useFieldError(flags);
+  const set = (i: number, patch: Partial<Languages[number]>) => onChange(languages.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   return (
-    <StageCard title={t("languages.title")} description={t("languages.description")}>
+    <div className="flex flex-col gap-4">
       <ol className="flex flex-col gap-3">
-        {languages.map((l, i) => (
-          <li key={i} className="grid gap-3 sm:grid-cols-3">
-            <Field label={t("languages.language", { n: i + 1 })}>
-              {(id) => <LanguageCombobox id={id} labelId={`${id}-label`} value={l.language} listLocale={cvLanguage} onChange={(language) => setLanguages(languages.map((x, j) => (j === i ? { ...x, language } : x)))} />}
-            </Field>
-            <Field label={t("languages.level", { n: i + 1 })}>
-              {(id) => (
-                <Select id={id} value={l.level} onChange={(e) => setLanguages(languages.map((x, j) => (j === i ? { ...x, level: e.target.value as typeof l.level } : x)))}>
-                  {LANGUAGE_LEVELS.map((v) => (
-                    <option key={v} value={v}>
-                      {tProfile(`languageLevel.${v}`)}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <div className="flex items-end">
-              <Button type="button" size="sm" variant="ghost" onClick={() => setLanguages(languages.filter((_, j) => j !== i))}>
-                <Trash2 className="size-3.5" aria-hidden />
-                {tProfile("remove")}
-              </Button>
-            </div>
-          </li>
-        ))}
+        {languages.map((l, i) => {
+          const n = i + 1;
+          return (
+            <li key={i} className="grid gap-3 sm:grid-cols-3">
+              <Field label={t("languages.language", { n })}>
+                {(id) => <LanguageCombobox id={id} labelId={`${id}-label`} value={l.language} listLocale={cvLanguage} onChange={(language) => set(i, { language })} />}
+              </Field>
+              <Field label={t("languages.level", { n })} check={flags.inferred.includes(`languages.${i}.level`)} error={error(`languages.${i}.level`, "level")}>
+                {(id, aria) => (
+                  <Select
+                    id={id}
+                    className="h-10"
+                    {...aria}
+                    aria-required
+                    value={l.level}
+                    onChange={(e) =>
+                      set(i, {
+                        level: e.target.value as Languages[number]["level"],
+                      })
+                    }
+                  >
+                    {!l.level && <option value="">{t("languages.pickLevel")}</option>}
+                    {LANGUAGE_LEVELS.map((v) => (
+                      <option key={v} value={v}>
+                        {tProfile(`languageLevel.${v}`)}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+              <div className="flex items-end">
+                <Button type="button" size="sm" variant="ghost" className="h-10" onClick={() => onChange(languages.filter((_, j) => j !== i))}>
+                  <Trash2 className="size-3.5" aria-hidden />
+                  {t("languages.remove", { n })}
+                </Button>
+              </div>
+            </li>
+          );
+        })}
       </ol>
       <div>
-        <Button type="button" size="sm" variant="secondary" onClick={() => setLanguages([...languages, { language: "", level: "professional" }])}>
+        <Button type="button" size="sm" variant="secondary" className="h-10" onClick={() => onChange([...languages, { language: "", level: "" }])}>
           <Plus className="size-3.5" aria-hidden />
           {t("languages.add")}
         </Button>
       </div>
-      <Actions
-        pending={pending}
-        error={error}
-        onContinue={() => save("languages", languages.filter((l) => l.language.trim()), true)}
-        onSkip={() => skip("languages")}
-        skipped={status === "skipped"}
-        onUndoSkip={() => undoSkip("languages")}
-      />
-    </StageCard>
-  );
-}
-
-/** Stage 12: how they appear on the CV. Contact details never enter the Career record. */
-export function ContactForm({ interviewId, initial }: { interviewId: number; initial: InterviewForm["contact"] }) {
-  const t = useTranslations("interview");
-  const tProfile = useTranslations("profile");
-  const [contact, setContact] = useState(initial);
-  const { pending, error, save } = useStageSave(interviewId);
-  const text = (key: keyof typeof contact, label: string, max: number) => (
-    <Field label={label}>{(id) => <Input id={id} value={String(contact[key] ?? "")} maxLength={max} onChange={(e) => setContact({ ...contact, [key]: e.target.value })} />}</Field>
-  );
-  return (
-    <StageCard title={t("contact.title")} description={t("contact.description")}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {text("name", tProfile("name"), 120)}
-        {text("headline", tProfile("headline"), 160)}
-        {text("email", tProfile("email"), 200)}
-        {text("phone", tProfile("phone"), 60)}
-        {text("city", tProfile("city"), 80)}
-        <Field label={tProfile("country")}>{(id) => <CountrySelect id={id} value={contact.country || null} emptyLabel={t("notSet")} onChange={(country) => setContact({ ...contact, country: country ?? "" })} />}</Field>
-        <Field label={tProfile("links")} className="sm:col-span-2">
-          {(id) => <TagInput id={id} value={contact.links} removeLabel={(tag) => tProfile("removeItem", { item: tag })} onChange={(links) => setContact({ ...contact, links })} />}
-        </Field>
-        <Field label={t("contact.cvLanguage")}>
-          {(id) => (
-            <Select id={id} value={contact.cvLanguage} onChange={(e) => setContact({ ...contact, cvLanguage: e.target.value as typeof contact.cvLanguage })}>
-              {CV_LANGUAGES.map((l) => (
-                <option key={l} value={l}>
-                  {t(`languageName.${l}`)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-      </div>
-      <Actions pending={pending} error={error} onContinue={() => save("contact", contact, true)} />
-    </StageCard>
+    </div>
   );
 }

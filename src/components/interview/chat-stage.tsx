@@ -3,13 +3,14 @@
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { ArrowRight, Check, RotateCcw, SkipForward, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import { goToStageAction, reopenStageAction, skipStageAction } from "@/app/profile/interview/actions";
 import type { StageStatus } from "@/shared/schemas/interview";
+import { useNeedLabel } from "./data-stage";
 
 /** The role tabs above the per-role chat: one conversation per role, each done, skipped or to do. */
 export function RoleTabs({ roles, selected }: { roles: Array<{ id: string; label: string; status: StageStatus }>; selected: string }) {
@@ -61,17 +62,23 @@ export function ChatStageControls({
 }) {
   const t = useTranslations("interview");
   const router = useRouter();
+  const tErrors = useTranslations("errors");
+  const need = useNeedLabel();
   const [pending, start] = useTransition();
-  // Continue is the user's own "this part is done", whether or not the interviewer wrapped up.
+  const [problem, setProblem] = useState<string | null>(null);
+  // Continue is the user's own "this part is done", whether or not the interviewer wrapped up. It is
+  // refused (and says why) while the step still needs something or a card is waiting.
   const next = () =>
     start(async () => {
-      if (nextRole) {
-        await goToStageAction(interviewId, stage, [statusKey]);
-        router.push(`/profile/interview?role=${nextRole}`);
-      } else {
-        await goToStageAction(interviewId, nextStage, stage === "role_deep" ? [statusKey, stage] : [statusKey]);
-        router.push("/profile/interview");
+      setProblem(null);
+      const result = nextRole ? await goToStageAction(interviewId, stage, [statusKey]) : await goToStageAction(interviewId, nextStage, stage === "role_deep" ? [statusKey, stage] : [statusKey]);
+      if (!result.ok) {
+        setProblem(
+          result.error === "stage_incomplete" ? t("stillNeeded", { items: (result.fields ?? []).map(need).join(", ") }) : result.error === "card_pending" ? t("cardPending") : tErrors("generic", { message: result.error }),
+        );
+        return;
       }
+      router.push(nextRole ? `/profile/interview?role=${nextRole}` : "/profile/interview");
       router.refresh();
     });
   const reopen = () =>
@@ -95,6 +102,11 @@ export function ChatStageControls({
             <Undo2 className="size-3.5" aria-hidden />
             {t("undoSkip")}
           </Button>
+        </Alert>
+      )}
+      {problem && (
+        <Alert tone="danger" role="alert">
+          {problem}
         </Alert>
       )}
       <div className="flex flex-wrap gap-2">
