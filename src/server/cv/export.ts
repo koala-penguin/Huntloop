@@ -24,7 +24,7 @@ const filePart = (s: string | null | undefined) =>
     .slice(0, 40);
 
 /**
- * A tailored CV (or the base CV from the interview) as a Word or PDF file. Refused while any line still has a blocking flag — nothing
+ * A tailored CV (or the base CV from the CV builder) as a Word or PDF file. Refused while any line still has a blocking flag — nothing
  * unverified leaves Huntloop without the user having dealt with it.
  */
 export async function exportCv(db: Db, userId: number, docId: number, format: CvExportFormat): Promise<{ bytes: Buffer; mime: string; fileName: string }> {

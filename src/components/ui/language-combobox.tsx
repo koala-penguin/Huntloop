@@ -55,7 +55,7 @@ export function LanguageCombobox({
   labelId?: string;
   "aria-label"?: string;
 }) {
-  const t = useTranslations("interview.languages");
+  const t = useTranslations("cvBuilder.languages");
   const uiLocale = useLocale();
   const locale = listLocale ?? uiLocale;
   const listId = useId();

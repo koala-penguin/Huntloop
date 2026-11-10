@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   cacheComponents: false,
   // Drives the user's Chrome for SEEK/LinkedIn; must stay a plain Node dependency.
   serverExternalPackages: ["playwright-core", "@modelcontextprotocol/sdk", "chrome-devtools-mcp", "undici"],
+  // The CV builder used to live at these addresses; bookmarks and open tabs keep working.
+  async redirects() {
+    return [
+      { source: "/profile/interview", destination: "/profile/cv-builder", permanent: true },
+      { source: "/api/cv-interview/:id/chat", destination: "/api/cv-builder/:id/chat", permanent: true },
+    ];
+  },
   turbopack: {
     rules: {
       "*.css": {

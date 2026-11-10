@@ -34,7 +34,7 @@ export function MonthField({
   describedBy?: string;
   className?: string;
 }) {
-  const t = useTranslations("interview.month");
+  const t = useTranslations("cvBuilder.month");
   const locale = useLocale();
   const months = useMemo(() => {
     const format = new Intl.DateTimeFormat(locale, { month: "long", timeZone: "UTC" });

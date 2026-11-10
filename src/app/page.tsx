@@ -64,8 +64,8 @@ export default async function DashboardPage() {
                 ) : (
                   <>
                     {t("stepProfileBody")}{" "}
-                    <Link href="/profile/interview" className="underline">
-                      {t("stepProfileInterview")}
+                    <Link href="/profile/cv-builder" className="underline">
+                      {t("stepProfileCvBuilder")}
                     </Link>
                   </>
                 )

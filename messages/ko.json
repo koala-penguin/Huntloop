@@ -67,7 +67,7 @@
     "bestBetsInPipeline": "평가할 새 공고가 없습니다. 진행 중인 지원 {count}건은 지원 현황에 있습니다.",
     "openPipeline": "지원 현황 열기",
     "spendDetails": "어디에 썼는지 보기",
-    "stepProfileInterview": "CV가 없나요? CV 작성 인터뷰로 만드세요."
+    "stepProfileCvBuilder": "CV가 없나요? CV 작성 인터뷰로 만드세요."
   },
   "settings": {
     "title": "설정",
@@ -293,7 +293,7 @@
       "name": "코치",
       "description": "구직 활동 전체에 대한 대화입니다."
     },
-    "cvInterview": {
+    "cvBuilder": {
       "name": "CV 작성 인터뷰",
       "description": "경력에 대해 묻고 답을 그대로 기록합니다 (프로필 → CV 작성 인터뷰). Sonnet 5.5로 바꾸면 비용이 절반입니다."
     },
@@ -337,7 +337,7 @@
     "model_unavailable": "현재 플랜에서는 이 모델을 쓸 수 없습니다. 설정에서 이 작업의 모델을 바꾸세요.",
     "interrupted": "작업이 끝나기 전에 Huntloop가 종료되었습니다. 다시 시도하세요.",
     "cancelled": "끝나기 전에 중단되었습니다.",
-    "interview_too_short": "CV를 쓰려면 CV 작성 인터뷰 답변이 조금 더 필요합니다.",
+    "cv_builder_too_short": "CV를 쓰려면 CV 작성 인터뷰 답변이 조금 더 필요합니다.",
     "task_running": "다른 작업이 프로필을 바꾸는 중입니다. 끝난 뒤 다시 시도하세요."
   },
   "profile": {
@@ -430,7 +430,7 @@
       "cv": "CV에서",
       "user": "직접 추가",
       "chat": "대화에서",
-      "interview": "CV 작성 인터뷰에서"
+      "cv_builder": "CV 작성 인터뷰에서"
     },
     "newFact": "사실 추가",
     "newFactPlaceholder": "예: 1년간 엔지니어 4명으로 구성된 팀을 이끎",
@@ -444,11 +444,11 @@
     "tabLinkedin": "LinkedIn",
     "careerRecordTitle": "경력 기록",
     "careerRecordDescription": "CV 작성 인터뷰 답변을 그대로 모은 글입니다. 평가와 CV의 모든 인용은 이 글과 대조합니다.",
-    "interviewTitle": "CV가 없나요? CV 작성 인터뷰로 프로필 만들기",
-    "interviewDescription": "역할, 범위, 성과에 대한 질문에 답하면 Huntloop가 내 말 그대로 프로필과 기본 CV를 만듭니다.",
-    "interviewDescriptionExisting": "CV 대신 CV 작성 인터뷰로 프로필을 다시 만듭니다. CV가 오래됐거나 내용이 부족할 때 좋습니다.",
-    "interviewStart": "CV 작성 인터뷰",
-    "interviewResume": "CV 작성 인터뷰 이어 하기"
+    "cvBuilderTitle": "CV가 없나요? CV 작성 인터뷰로 프로필 만들기",
+    "cvBuilderDescription": "역할, 범위, 성과에 대한 질문에 답하면 Huntloop가 내 말 그대로 프로필과 기본 CV를 만듭니다.",
+    "cvBuilderDescriptionExisting": "CV 대신 CV 작성 인터뷰로 프로필을 다시 만듭니다. CV가 오래됐거나 내용이 부족할 때 좋습니다.",
+    "cvBuilderStart": "CV 작성 인터뷰",
+    "cvBuilderResume": "CV 작성 인터뷰 이어 하기"
   },
   "preferences": {
     "rolesTitle": "원하는 직무",
@@ -1047,7 +1047,7 @@
       "api": "대화 연결: API 키",
       "subscription": "대화 연결: Claude 구독"
     },
-    "interview": {
+    "cvBuilder": {
       "placeholder": "답을 입력하세요… (Enter로 전송, Shift+Enter로 줄바꿈)",
       "hint": "답은 입력한 그대로 기록되고, 다듬은 문장은 수락할 때만 쓰입니다. 숫자는 숫자로 적어 주세요.",
       "suggestionsLabel": "참고할 예시",
@@ -1630,7 +1630,7 @@
     "jobLinks": "{site}: 공고 링크 {count}개",
     "read": "{site}: {total}개 중 {done}개 읽음"
   },
-  "interview": {
+  "cvBuilder": {
     "title": "CV 작성 인터뷰",
     "subtitle": "CV가 없거나 오래됐나요? 일에 대한 질문에 답하면 Huntloop가 내 말 그대로 프로필과 CV를 만듭니다. CV의 모든 줄은 내가 직접 쓴 답으로 거슬러 올라갑니다. CV를 쓰기 위한 인터뷰이며, 면접 연습이 아닙니다.",
     "back": "← 프로필",

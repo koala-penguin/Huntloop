@@ -3,21 +3,21 @@ import { z } from "zod";
 import type { Db } from "../../db/database";
 import { tasks } from "../../db/schema";
 import { blockingCount } from "@/shared/schemas/cv";
-import { generateBaseCv } from "../../cv/interview-build";
-import { getInterview } from "../../repo/interviews";
+import { generateBaseCv } from "../../cv/cv-builder-build";
+import { getCvBuilder } from "../../repo/cv-builder";
 import { UserFacingError } from "../../errors";
 import { enqueueTask, registerTaskHandler, type TaskContext } from "../runner";
 import { EXTRACT_PROFILE_TASK } from "./extract-profile";
 
 export const BUILD_BASE_CV_TASK = "build-base-cv";
 
-const payloadSchema = z.object({ interviewId: z.number().int() });
+const payloadSchema = z.object({ cvBuilderId: z.number().int() });
 
-/** CV builder → Generate: profile version from the interview, then the base CV, then its checks. */
+/** CV builder → Generate: profile version from the CV-builder session, then the base CV, then its checks. */
 export async function runBuildBaseCv(ctx: TaskContext): Promise<{ docId: number; version: number; blocking: number }> {
-  const { interviewId } = payloadSchema.parse(ctx.payload);
+  const { cvBuilderId } = payloadSchema.parse(ctx.payload);
   ctx.progress({ stage: "building" });
-  const doc = await generateBaseCv({ db: ctx.db, userId: ctx.userId, signal: ctx.signal }, interviewId, { onStage: (stage) => ctx.progress({ stage }) });
+  const doc = await generateBaseCv({ db: ctx.db, userId: ctx.userId, signal: ctx.signal }, cvBuilderId, { onStage: (stage) => ctx.progress({ stage }) });
   return { docId: doc.id, version: doc.version, blocking: blockingCount(doc.flags) };
 }
 
@@ -42,10 +42,10 @@ export function runningBuildBaseCv(db: Db, userId: number): number | null {
  * Queues Generate (or returns the run already in progress). Refused while a CV upload is being read:
  * both write a new profile version.
  */
-export function startBuildBaseCv(db: Db, userId: number, interviewId: number): number {
-  if (!getInterview(db, userId, interviewId)) throw new UserFacingError("not_found");
+export function startBuildBaseCv(db: Db, userId: number, cvBuilderId: number): number {
+  if (!getCvBuilder(db, userId, cvBuilderId)) throw new UserFacingError("not_found");
   const running = activeTask(db, userId, BUILD_BASE_CV_TASK);
   if (running) return running;
   if (activeTask(db, userId, EXTRACT_PROFILE_TASK)) throw new UserFacingError("task_running");
-  return enqueueTask(db, userId, BUILD_BASE_CV_TASK, { interviewId }).id;
+  return enqueueTask(db, userId, BUILD_BASE_CV_TASK, { cvBuilderId }).id;
 }

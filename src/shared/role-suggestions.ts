@@ -1,14 +1,14 @@
-import type { ChatOpening, ChatStage, InterviewTopic } from "./schemas/interview";
+import type { ChatOpening, ChatStage, CvBuilderTopic } from "./schemas/cv-builder";
 
 /**
- * Example prompts for the interview, by kind of role: what people in that kind of job typically
+ * Example prompts for the CV-builder session, by kind of role: what people in that kind of job typically
  * own, achieve and use. They help the candidate start an answer; they are never evidence (only what
  * the candidate sends is). No digits anywhere, so a chip sent unedited can't put a figure on a CV.
  */
 
 export type RoleFamily = "data_leadership" | "data" | "engineering" | "product" | "design" | "sales_marketing" | "operations" | "finance" | "people" | "generic";
 type Lang = "en" | "ko";
-type Topics = Partial<Record<InterviewTopic, string[]>>;
+type Topics = Partial<Record<CvBuilderTopic, string[]>>;
 
 const FAMILY_RULES: Array<[RoleFamily, RegExp]> = [
   ["data_leadership", /head of (data|analytics|bi\b|insights)|chief data|\bcdo\b|(data|analytics|insights|bi) (director|lead|manager)|director of (data|analytics)|데이터.*(팀장|책임자|본부장|이사|리드)|(팀장|책임자|본부장|이사|리드).*데이터/i],
@@ -170,7 +170,7 @@ export const EARLIER_ROLES: Record<RoleFamily, Record<Lang, string[]>> = {
 };
 
 /** Example prompts for one topic and kind of role (3–6 short phrases). */
-export function suggestionsFor(family: RoleFamily, topic: InterviewTopic, language: string): string[] {
+export function suggestionsFor(family: RoleFamily, topic: CvBuilderTopic, language: string): string[] {
   const lang: Lang = language === "ko" ? "ko" : "en";
   const own = (lang === "ko" ? KO : EN)[family][topic] ?? (lang === "ko" ? KO : EN).generic[topic];
   return own ?? COMMON[lang][topic] ?? COMMON[lang].extra!;

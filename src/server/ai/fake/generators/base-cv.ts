@@ -3,7 +3,7 @@ import { between, json } from "./jobs";
 import { context, DEMO_UNSUPPORTED_BULLET, roleLine } from "./tailoring";
 
 /**
- * Demo-mode base CV (from the CV builder interview). Bullets are the candidate's own interview
+ * Demo-mode base CV (from the CV builder). Bullets are the candidate's own CV-builder session
  * answers, plus — like the tailored-CV demo — one deliberately unsupported bullet on the first role,
  * so the flag cards and the locked download are visible without an API key.
  */

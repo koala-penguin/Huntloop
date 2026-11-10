@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { BANNED_PHRASES, styleViolations } from "@/shared/cv-style";
 import { roleFamily, suggestionsFor, openingFor, type RoleFamily } from "@/shared/role-suggestions";
-import { INTERVIEW_TOPICS } from "@/shared/schemas/interview";
+import { CV_BUILDER_TOPICS } from "@/shared/schemas/cv-builder";
 import { polishGate } from "@/server/cv/polish";
-import { fakePolish } from "@/server/ai/fake/generators/interview";
-import { ANSWERS } from "../helpers/interview";
+import { fakePolish } from "@/server/ai/fake/generators/cv-builder";
+import { ANSWERS } from "../helpers/cv-builder";
 
 describe("style rules", () => {
   it("finds every banned phrase, an em dash, a long line and an opening I", () => {
@@ -149,7 +149,7 @@ describe("example prompts by kind of role", () => {
   it("has examples for every topic, none with a digit", () => {
     const families: RoleFamily[] = ["data_leadership", "data", "engineering", "product", "design", "sales_marketing", "operations", "finance", "people", "generic"];
     for (const family of families)
-      for (const topic of INTERVIEW_TOPICS)
+      for (const topic of CV_BUILDER_TOPICS)
         for (const lang of ["en", "ko"]) {
           const options = suggestionsFor(family, topic, lang);
           expect(options.length).toBeGreaterThanOrEqual(3);

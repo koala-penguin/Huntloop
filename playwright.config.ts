@@ -26,7 +26,7 @@ export default defineConfig({
   // The profile flow starts from an empty profile; the other flows build on the profile it creates.
   projects: [
     { name: "profile", testMatch: /profile\.spec\.ts/ },
-    { name: "app", testIgnore: [/profile\.spec\.ts/, /bulk-delete\.spec\.ts/, /swipe-delete\.spec\.ts/, /interview\.spec\.ts/], dependencies: ["profile"] },
+    { name: "app", testIgnore: [/profile\.spec\.ts/, /bulk-delete\.spec\.ts/, /swipe-delete\.spec\.ts/, /cv-builder\.spec\.ts/], dependencies: ["profile"] },
     // Leaving a job page and coming back while a task runs, and swiping search results away, on iPhone Safari
     // (WebKit), as the owner uses it.
     {
@@ -40,7 +40,7 @@ export default defineConfig({
     // Deletes every job the other specs created, so it must run last.
     { name: "cleanup", testMatch: /bulk-delete\.spec\.ts/, dependencies: ["app", "iphone", "touch-chromium"] },
     // The CV builder replaces the shared profile, so it runs after everything else.
-    { name: "interview", testMatch: /interview\.spec\.ts/, dependencies: ["cleanup"] },
+    { name: "cv-builder", testMatch: /cv-builder\.spec\.ts/, dependencies: ["cleanup"] },
   ],
   webServer: [
     {

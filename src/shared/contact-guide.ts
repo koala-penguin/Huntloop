@@ -1,4 +1,4 @@
-import { validEmail, type InterviewForm } from "./schemas/interview";
+import { validEmail, type CvBuilderForm } from "./schemas/cv-builder";
 
 /**
  * The contact step is asked by Huntloop itself, one thing at a time, and never sent to the AI:
@@ -9,7 +9,7 @@ export const CONTACT_ORDER = ["name", "email", "phone", "city", "links"] as cons
 export type ContactField = (typeof CONTACT_ORDER)[number];
 export const REQUIRED_CONTACT: readonly ContactField[] = ["name", "email"];
 
-type Contact = InterviewForm["contact"];
+type Contact = CvBuilderForm["contact"];
 
 const answered = (contact: Contact, field: ContactField) => (field === "links" ? contact.links.length > 0 : field === "email" ? validEmail(contact.email) : !!contact[field].trim());
 

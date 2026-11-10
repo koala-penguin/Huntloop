@@ -117,7 +117,7 @@ export function linkedinPanelData(db: Db, userId: number, labels: { headline: st
   };
 }
 
-/** The base CV from the interview: preview, flag cards and export state (no plan, no job). */
+/** The base CV from the CV-builder session: preview, flag cards and export state (no plan, no job). */
 export function baseCvData(db: Db, userId: number, options: { summaryLabel: string }): { doc: CvDocView; previewHtml: string } | null {
   const doc: StoredBaseCv | null = latestCvDocument(db, userId, "base", null);
   if (!doc) return null;

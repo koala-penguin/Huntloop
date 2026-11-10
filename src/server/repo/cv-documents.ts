@@ -37,7 +37,7 @@ export interface StoredLinkedin extends StoredBase {
   content: LinkedinDocument;
 }
 
-/** The base CV from the CV builder interview: no job, no plan, checked against the profile alone. */
+/** The base CV from the CV builder: no job, no plan, checked against the profile alone. */
 export interface StoredBaseCv extends StoredBase {
   kind: "base";
   plan: null;

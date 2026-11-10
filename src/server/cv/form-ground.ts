@@ -1,5 +1,5 @@
-import { dateMentions, enumGrounded, hasPresentWord, type EnumKind } from "@/shared/interview-dates";
-import type { FormCardStage, FormCardValue, InterviewForm, RoleCard } from "@/shared/schemas/interview";
+import { dateMentions, enumGrounded, hasPresentWord, type EnumKind } from "@/shared/cv-builder-dates";
+import type { FormCardStage, FormCardValue, CvBuilderForm, RoleCard } from "@/shared/schemas/cv-builder";
 
 /**
  * The gate between what the interviewer proposes for a data step and what the candidate is shown.
@@ -164,7 +164,7 @@ export function groundProposal(
   stage: FormCardStage,
   input: ProposalInput,
   messages: TypedMessage[],
-  form: InterviewForm,
+  form: CvBuilderForm,
   options: { pending?: PendingCard | null; toolUseId?: string } = {},
 ): GroundedProposal {
   const texts = messages.map((m) => m.text);
@@ -211,7 +211,7 @@ export function groundProposal(
     case "setup": {
       // Who they are, read from how they describe their situation: a description is kept only when
       // one of its words is in what they typed. The picks (language, country, depth) are never the model's.
-      const value = structuredClone((pending?.value as InterviewForm["setup"] | undefined) ?? form.setup);
+      const value = structuredClone((pending?.value as CvBuilderForm["setup"] | undefined) ?? form.setup);
       for (const persona of input.personas ?? []) {
         if (!picked("persona", persona, "personas")) continue;
         found++;
@@ -221,7 +221,7 @@ export function groundProposal(
     }
     case "target": {
       // Nothing on file is removed by a proposal: grounded items are added to what is there.
-      const value = structuredClone((pending?.value as InterviewForm["target"] | undefined) ?? form.target);
+      const value = structuredClone((pending?.value as CvBuilderForm["target"] | undefined) ?? form.target);
       for (const key of ["titles", "industries", "cities"] as const) {
         for (const item of input[key] ?? []) {
           const hit = text(item, key);
@@ -247,7 +247,7 @@ export function groundProposal(
     }
 
     case "current": {
-      const value = { ...((pending?.value as InterviewForm["current"] | undefined) ?? form.current) };
+      const value = { ...((pending?.value as CvBuilderForm["current"] | undefined) ?? form.current) };
       const title = text(input.title, "title");
       const company = text(input.company, "company");
       const start = date(input.start, "start");
@@ -256,7 +256,7 @@ export function groundProposal(
       if (start) value.start = start;
       // "I'm studying" has no job title and must still produce a card.
       if (input.status !== value.status && picked("currentStatus", input.status, "status")) {
-        value.status = input.status as InterviewForm["current"]["status"];
+        value.status = input.status as CvBuilderForm["current"]["status"];
         found++;
       }
       return finish(value, []);

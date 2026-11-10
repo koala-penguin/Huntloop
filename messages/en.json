@@ -67,7 +67,7 @@
     "bestBetsInPipeline": "No new jobs to rank. {count, plural, one {The job you're working on is} other {The # jobs you're working on are}} in your pipeline.",
     "openPipeline": "Open the pipeline",
     "spendDetails": "See where it went",
-    "stepProfileInterview": "No CV? Build one with the CV-building interview."
+    "stepProfileCvBuilder": "No CV? Build one with the CV-building interview."
   },
   "settings": {
     "title": "Settings",
@@ -293,7 +293,7 @@
       "name": "Coach",
       "description": "The conversation across your whole job hunt."
     },
-    "cvInterview": {
+    "cvBuilder": {
       "name": "CV-building interview",
       "description": "Asks about your roles and records your answers word for word (Profile → CV-building interview). Sonnet 5.5 halves the cost."
     },
@@ -337,7 +337,7 @@
     "model_unavailable": "That model isn't available on your plan. Choose another model for this task in Settings.",
     "interrupted": "Huntloop was closed before this finished. Try again.",
     "cancelled": "This was stopped before it finished.",
-    "interview_too_short": "The CV-building interview needs a few more answers before a CV can be written.",
+    "cv_builder_too_short": "The CV-building interview needs a few more answers before a CV can be written.",
     "task_running": "Another task is updating your profile. Try again when it has finished."
   },
   "profile": {
@@ -430,7 +430,7 @@
       "cv": "From CV",
       "user": "Added by you",
       "chat": "From a chat",
-      "interview": "From your CV-building interview"
+      "cv_builder": "From your CV-building interview"
     },
     "newFact": "Add a fact",
     "newFactPlaceholder": "e.g. Led a team of 4 engineers for 1 year",
@@ -444,11 +444,11 @@
     "tabLinkedin": "LinkedIn",
     "careerRecordTitle": "Career record",
     "careerRecordDescription": "Your CV-building interview answers, word for word. Every quote in your assessments and CVs is checked against this text.",
-    "interviewTitle": "No CV? Build your profile with the CV-building interview",
-    "interviewDescription": "Answer questions about your roles, scope and achievements; Huntloop turns your own words into a profile and a base CV.",
-    "interviewDescriptionExisting": "Rebuild your profile with the CV-building interview instead of a CV: useful when your CV is old or thin.",
-    "interviewStart": "CV-building interview",
-    "interviewResume": "Resume the CV-building interview"
+    "cvBuilderTitle": "No CV? Build your profile with the CV-building interview",
+    "cvBuilderDescription": "Answer questions about your roles, scope and achievements; Huntloop turns your own words into a profile and a base CV.",
+    "cvBuilderDescriptionExisting": "Rebuild your profile with the CV-building interview instead of a CV: useful when your CV is old or thin.",
+    "cvBuilderStart": "CV-building interview",
+    "cvBuilderResume": "Resume the CV-building interview"
   },
   "preferences": {
     "rolesTitle": "Roles you want",
@@ -1047,7 +1047,7 @@
       "api": "Conversation on: API key",
       "subscription": "Conversation on: Claude subscription"
     },
-    "interview": {
+    "cvBuilder": {
       "placeholder": "Type your answer… (Enter to send, Shift+Enter for a new line)",
       "hint": "Your answers are recorded as you type them; a cleaner version is used only if you accept it. Type numbers as digits.",
       "suggestionsLabel": "Examples to start from",
@@ -1630,7 +1630,7 @@
     "jobLinks": "{site}: {count} job links",
     "read": "{site}: read {done} of {total}"
   },
-  "interview": {
+  "cvBuilder": {
     "title": "CV-building interview",
     "subtitle": "No CV, or an old one? Answer questions about your work and Huntloop turns your own words into a profile and a CV. Every line of the CV traces back to something you typed. This is for writing your CV; it is not practice for a job interview.",
     "back": "← Profile",

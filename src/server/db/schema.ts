@@ -464,7 +464,7 @@ export const cvDocuments = sqliteTable(
       .notNull()
       .references(() => users.id),
     jobId: integer("job_id").references(() => jobs.id, { onDelete: "cascade" }),
-    /** "cv" | "linkedin" | "base" (the base CV from the interview; jobId null) */
+    /** "cv" | "linkedin" | "base" (the base CV from the CV-builder session; jobId null) */
     kind: text("kind").notNull(),
     version: integer("version").notNull(),
     profileVersion: integer("profile_version").notNull(),
@@ -544,11 +544,11 @@ export const boardOpenings = sqliteTable(
 export type BoardOpeningRow = typeof boardOpenings.$inferSelect;
 
 /**
- * The guided CV builder: one interview per run. Form answers live in `form`; chat answers in
- * interview_answers. Generating saves a profile version and a base CV (cv_documents kind "base").
+ * The guided CV builder: one CV-builder session per run. Form answers live in `form`; chat answers in
+ * cv_builder_answers. Generating saves a profile version and a base CV (cv_documents kind "base").
  */
-export const cvInterviews = sqliteTable(
-  "cv_interviews",
+export const cvBuilders = sqliteTable(
+  "cv_builders",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     userId: integer("user_id")
@@ -561,11 +561,11 @@ export const cvInterviews = sqliteTable(
     personas: text("personas", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
     targetCountry: text("target_country"),
     language: text("language").notNull().default("en"),
-    /** The stage the user is on (INTERVIEW_STAGES). */
+    /** The stage the user is on (CV_BUILDER_STAGES). */
     stage: text("stage").notNull().default("setup"),
     /** Per stage (and "role:<exp-N>"): pending | done | skipped. */
     stages: text("stages", { mode: "json" }).$type<Record<string, string>>().notNull().default(sql`'{}'`),
-    /** The form stages' data (interviewFormSchema). */
+    /** The form stages' data (cvBuilderFormSchema). */
     form: text("form", { mode: "json" }).notNull().default(sql`'{}'`),
     /** Set once generated: the profile version and base CV it produced. */
     profileVersion: integer("profile_version"),
@@ -576,39 +576,39 @@ export const cvInterviews = sqliteTable(
       .default(sql`(unixepoch('subsec') * 1000)`),
     completedAt: integer("completed_at", { mode: "timestamp_ms" }),
   },
-  (t) => [index("cv_interviews_user_status").on(t.userId, t.status)],
+  (t) => [index("cv_builders_user_status").on(t.userId, t.status)],
 );
-export type CvInterviewRow = typeof cvInterviews.$inferSelect;
+export type CvBuilderRow = typeof cvBuilders.$inferSelect;
 
-/** Which interview, stage and role a chat conversation (kind "cv_interview") belongs to. */
-export const interviewConversations = sqliteTable(
-  "interview_conversations",
+/** Which CV-builder session, stage and role a chat conversation (kind "cv_builder") belongs to. */
+export const cvBuilderConversations = sqliteTable(
+  "cv_builder_conversations",
   {
     conversationId: integer("conversation_id")
       .primaryKey()
       .references(() => conversations.id, { onDelete: "cascade" }),
-    interviewId: integer("interview_id")
+    cvBuilderId: integer("cv_builder_id")
       .notNull()
-      .references(() => cvInterviews.id, { onDelete: "cascade" }),
+      .references(() => cvBuilders.id, { onDelete: "cascade" }),
     stage: text("stage").notNull(),
     /** The role ("exp-N") a role_deep conversation is about; null otherwise. */
     experienceRef: text("experience_ref"),
   },
-  (t) => [index("interview_conversations_interview").on(t.interviewId)],
+  (t) => [index("cv_builder_conversations_builder").on(t.cvBuilderId)],
 );
-export type InterviewConversationRow = typeof interviewConversations.$inferSelect;
+export type CvBuilderConversationRow = typeof cvBuilderConversations.$inferSelect;
 
 /**
- * What the interview recorded: the candidate's own words, verbatim. Chat answers point at the
+ * What the CV-builder session recorded: the candidate's own words, verbatim. Chat answers point at the
  * assistant message that recorded them, so a rolled-back turn takes its answers with it.
  */
-export const interviewAnswers = sqliteTable(
-  "interview_answers",
+export const cvBuilderAnswers = sqliteTable(
+  "cv_builder_answers",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    interviewId: integer("interview_id")
+    cvBuilderId: integer("cv_builder_id")
       .notNull()
-      .references(() => cvInterviews.id, { onDelete: "cascade" }),
+      .references(() => cvBuilders.id, { onDelete: "cascade" }),
     stage: text("stage").notNull(),
     /** scope | responsibility | achievement | tool | skill | context | gap | extra | other */
     topic: text("topic").notNull(),
@@ -629,6 +629,6 @@ export const interviewAnswers = sqliteTable(
     supersededBy: integer("superseded_by"),
     createdAt: createdAt(),
   },
-  (t) => [index("interview_answers_interview").on(t.interviewId)],
+  (t) => [index("cv_builder_answers_builder").on(t.cvBuilderId)],
 );
-export type InterviewAnswerRow = typeof interviewAnswers.$inferSelect;
+export type CvBuilderAnswerRow = typeof cvBuilderAnswers.$inferSelect;
