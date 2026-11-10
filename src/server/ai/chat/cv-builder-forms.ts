@@ -328,6 +328,16 @@ export function continueBlockers(db: Db, builder: CvBuilder, stage: "current" | 
   return { ok: true };
 }
 
+/**
+ * What stops a move to another stage that also finishes parts (`completed`): finishing the
+ * current-situation chat needs the job on file and no card left waiting. A plain jump from the
+ * step list finishes nothing and is never blocked.
+ */
+export function goToStageBlockers(db: Db, builder: CvBuilder, completed: string[]): StepResult {
+  if (!completed.includes("current") || builder.status !== "in_progress") return { ok: true };
+  return continueBlockers(db, builder, "current");
+}
+
 /** Continue on a data step: on to the next stage, unless something blocks it. */
 export function continueDataStage(db: Db, builder: CvBuilder, stage: DataChatStage): StepResult {
   const blocked = continueBlockers(db, builder, stage);
@@ -338,6 +348,10 @@ export function continueDataStage(db: Db, builder: CvBuilder, stage: DataChatSta
 
 /** Saves a step's data from the "On file" editor: the whole section as edited, so a removed row stays removed. */
 export function saveOnFile(db: Db, builder: CvBuilder, stage: FormCardStage, value: unknown): StepResult {
+  // A waiting card carries the whole section as it was when proposed: using it after an edit here
+  // would bring back what the edit removed. So the card is dealt with first.
+  const link = stageConversation(db, builder.id, stage, null);
+  if (link && pendingFormCard(db, link.conversationId)) return { ok: false, error: "card_pending" };
   const parsed = FORM_CARD_SCHEMAS[stage].safeParse(value);
   if (!parsed.success) return { ok: false, error: "invalid", fields: [...new Set(parsed.error.issues.map((i) => i.path.join(".")))] };
   const card = parsed.data as FormCardValue;

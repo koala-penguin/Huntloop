@@ -63,6 +63,10 @@ describe("dates the candidate typed", () => {
     expect(enumGrounded("languageLevel", "fluent", ["Korean"])).toBe(false);
     expect(enumGrounded("currentStatus", "studying", ["I'm studying"])).toBe(true);
     expect(enumGrounded("seniority", "senior", ["Frontend Engineer"])).toBe(false);
+    // A curly apostrophe (what a phone types) reads like a straight one; a name that isn't in the list is just not grounded.
+    expect(enumGrounded("persona", "no_cv", ["I don’t have a CV"])).toBe(true);
+    expect(enumGrounded("persona", "constructor", ["constructor"])).toBe(false);
+    expect(enumGrounded("seniority", "director", ["서울로 이사했어요"])).toBe(false);
   });
 });
 
@@ -233,6 +237,29 @@ describe("grounding a proposal", () => {
     expect(said.value).toEqual({ languages: [{ language: "Korean", level: "native" }] });
     expect(said.inferred).toEqual(["languages.0.level"]);
     expect(said.unresolved).toEqual([]);
+  });
+
+  it("takes a level only for the language it was typed next to", () => {
+    const { builder } = started();
+    const ground = (text: string, languages: Array<{ language: string; level: string }>) => {
+      const result = groundProposal("languages", { languages }, typed(text), builder.form);
+      if (result.empty) throw new Error("expected a card");
+      return (result.value as FormCardValue<"languages">).languages;
+    };
+    // "native" was said of English; Korean stays open.
+    expect(ground("English native, Korean", [{ language: "English", level: "native" }, { language: "Korean", level: "native" }])).toEqual([
+      { language: "English", level: "native" },
+      { language: "Korean", level: "" },
+    ]);
+    expect(ground("Korean, native", [{ language: "Korean", level: "native" }])).toEqual([{ language: "Korean", level: "native" }]);
+    expect(ground("한국어 원어민, 영어 유창", [{ language: "한국어", level: "native" }, { language: "영어", level: "fluent" }])).toEqual([
+      { language: "한국어", level: "native" },
+      { language: "영어", level: "fluent" },
+    ]);
+    expect(ground("I speak fluent Korean and basic Japanese", [{ language: "Korean", level: "fluent" }, { language: "Japanese", level: "fluent" }])).toEqual([
+      { language: "Korean", level: "fluent" },
+      { language: "Japanese", level: "" },
+    ]);
   });
 
   it("makes a card from a status alone, and from education and certifications", () => {

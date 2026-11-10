@@ -8,6 +8,7 @@ import { budgetStatus } from "@/server/ai/client";
 import { listChatActions, listChatMessages } from "@/server/ai/chat/harness";
 import { MIN_TOOLSET, conversationOpening, cvBuilderOpening } from "@/server/ai/chat/cv-builder";
 import { transcript } from "@/server/ai/chat/render";
+import { pendingFormCard } from "@/server/ai/chat/cv-builder-forms";
 import { getLatestCvBuilder, listAnswers, stageConversation, type CvBuilder } from "@/server/repo/cv-builder";
 import { getCurrentProfile, getPreferences } from "@/server/repo/profile";
 import { cvBuilderReadiness } from "@/server/cv/cv-builder-build";
@@ -121,11 +122,16 @@ export default async function CvBuilderPage({ searchParams }: PageProps<"/profil
       />
     );
   };
+  /** Whether a card is waiting in a step's chat ("On file" is then edited after the card is used or dismissed). */
+  const cardWaiting = (cardStage: ConversationStage) => {
+    const link = stageConversation(db, builder.id, cardStage, null);
+    return !!link && !!pendingFormCard(db, link.conversationId);
+  };
   /** A story chat: the current situation (with what is on file about the job under it), or one role. */
   const chat = (chatStage: ChatStage, ref: string | null, status: StageStatus, nextRole: string | null, next: CvBuilderStage) => (
     <Card className="flex flex-col gap-4">
       {panel(chatStage, ref, status)}
-      {chatStage === "current" && <OnFile cvBuilderId={builder.id} stage="current" value={cardValueOf(form, "current")} context={card} editable={inProgress} />}
+      {chatStage === "current" && <OnFile cvBuilderId={builder.id} stage="current" value={cardValueOf(form, "current")} context={card} editable={inProgress} cardWaiting={cardWaiting("current")} />}
       {inProgress && <ChatStageControls cvBuilderId={builder.id} stage={chatStage} statusKey={chatStage === "role_deep" ? roleStageKey(ref!) : "current"} status={status} nextRole={nextRole} nextStage={next} />}
     </Card>
   );
@@ -139,7 +145,7 @@ export default async function CvBuilderPage({ searchParams }: PageProps<"/profil
           <p className="text-sm text-muted">{t(`${dataStage}.description`)}</p>
         </div>
         {panel(dataStage, null, status)}
-        <OnFile cvBuilderId={builder.id} stage={dataStage} value={cardValueOf(form, dataStage)} context={card} editable={inProgress} />
+        <OnFile cvBuilderId={builder.id} stage={dataStage} value={cardValueOf(form, dataStage)} context={card} editable={inProgress} cardWaiting={cardWaiting(dataStage)} />
         {inProgress && <DataStageControls cvBuilderId={builder.id} stage={dataStage} status={status} skippable={skippable} />}
       </Card>
     );

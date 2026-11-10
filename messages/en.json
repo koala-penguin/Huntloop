@@ -1894,7 +1894,8 @@
       "save": "Save",
       "cancel": "Cancel",
       "since": "since {start}",
-      "present": "present"
+      "present": "present",
+      "cardFirst": "A card for this step is waiting above. Use or dismiss it before editing here."
     },
     "need": {
       "target": {

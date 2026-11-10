@@ -1894,7 +1894,8 @@
       "save": "저장",
       "cancel": "취소",
       "since": "{start}부터",
-      "present": "현재"
+      "present": "현재",
+      "cardFirst": "이 단계의 카드가 위에서 기다리고 있습니다. 카드를 사용하거나 닫은 뒤에 여기서 수정할 수 있습니다."
     },
     "need": {
       "target": {

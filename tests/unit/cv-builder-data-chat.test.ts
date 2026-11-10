@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { chatActions, chatMessages, conversations } from "@/server/db/schema";
 import { listChatMessages, runChatTurn, type ChatEvent } from "@/server/ai/chat/harness";
 import { CV_BUILDER_TOOLSET_VERSION, conversationOpening, ensureCvBuilderConversation, cvBuilderOpening, cvBuilderTools } from "@/server/ai/chat/cv-builder";
-import { acceptFormCard, continueBlockers, continueDataStage, saveOnFile } from "@/server/ai/chat/cv-builder-forms";
+import { acceptFormCard, continueBlockers, continueDataStage, goToStageBlockers, saveOnFile } from "@/server/ai/chat/cv-builder-forms";
 import { resolveChatAction } from "@/server/ai/chat/actions";
 import { getFakeGenerator, registerFakeGenerator, type FakeGenerator, type FakeRequest } from "@/server/ai/fake/transport";
 import { parseCurrent, parseEducation, parseLanguages, parseRoles, parseSetup, parseTarget, splitList } from "@/server/ai/fake/generators/cv-builder-data";
@@ -308,6 +308,39 @@ describe("data chat — the candidate's situation", () => {
     expect(ensureCvBuilderConversation(ctx, builder.id, "current", null).system).toContain("New to this market");
   });
 
+  it("reads a phone's curly apostrophe like a straight one", async () => {
+    const { db, ctx, builder } = fresh();
+    const conversation = ensureCvBuilderConversation(ctx, builder.id, "setup", null);
+    override = propose("propose_setup", { personas: ["no_cv"] });
+    await turn(ctx, conversation.id, "I don’t have a CV");
+    expect(cards(db, conversation.id)[0].payload.value).toMatchObject({ personas: ["no_cv"] });
+    expect(parseSetup("I don’t have a CV")).toEqual({ personas: ["no_cv"] });
+    expect(parseSetup("I don't have a CV")).toEqual({ personas: ["no_cv"] });
+  });
+
+  it("a word that only looks like a description ticks nothing", async () => {
+    // Moving house is not being a director; a degree from 2005 is not recent; a new team is not a new market.
+    expect(parseSetup("호주로 이사 왔어요")).toEqual({ personas: ["migrant"] });
+    expect(parseSetup("I graduated in 2005 and have twenty years in finance")).toEqual({ personas: [] });
+    expect(parseSetup("I moved to a new team last year")).toEqual({ personas: [] });
+    expect(parseSetup("대표적인 프로젝트는 결제 시스템이었어요")).toEqual({ personas: [] });
+    expect(parseSetup("이사 준비로 바빴어요")).toEqual({ personas: [] });
+    // …and the real ones still do.
+    expect(parseSetup("작년에 이민 왔어요")).toEqual({ personas: ["migrant"] });
+    expect(parseSetup("I moved to Australia last year")).toEqual({ personas: ["migrant"] });
+    expect(parseSetup("I recently graduated")).toEqual({ personas: ["graduate"] });
+    expect(parseSetup("I just finished uni")).toEqual({ personas: ["graduate"] });
+    expect(parseSetup("막 졸업했어요")).toEqual({ personas: ["graduate"] });
+    for (const text of ["임원으로 일했습니다", "I was in a C-level role", "I'm a director at a bank", "대표이사였습니다"]) expect(parseSetup(text), text).toEqual({ personas: ["senior_exec"] });
+
+    // The same through the gate, whatever the model proposes.
+    const { db, ctx, builder } = fresh();
+    const conversation = ensureCvBuilderConversation(ctx, builder.id, "setup", null);
+    override = propose("propose_setup", { personas: ["senior_exec", "migrant", "graduate"] });
+    await turn(ctx, conversation.id, "호주로 이사 왔어요. I graduated in 2005 and moved to a new team last year.");
+    expect(cards(db, conversation.id)[0].payload.value).toMatchObject({ personas: ["migrant"] });
+  });
+
   it("a card with something that isn't one of the descriptions is refused, and nothing ticked is fine too", async () => {
     const { db, userId, ctx, builder } = fresh();
     const conversation = ensureCvBuilderConversation(ctx, builder.id, "setup", null);
@@ -338,6 +371,73 @@ describe("data chat — the candidate's situation", () => {
   });
 });
 
+describe("data chat — guards around waiting cards", () => {
+  it("dismissing the newest card closes the older ones still waiting", async () => {
+    const { db, userId, ctx, builder } = started();
+    const conversation = ensureCvBuilderConversation(ctx, builder.id, "roles", null);
+    override = propose("propose_roles", { roles: [role({ title: "Barista", company: "Bean There", start: "2015", end: "2016" })] });
+    await turn(ctx, conversation.id, "Barista at Bean There 2015-2016");
+    override = propose("propose_roles", { roles: [role({ title: "Waiter", company: "Cafe Uno", start: "2014", end: "2015" })] });
+    await turn(ctx, conversation.id, "Waiter at Cafe Uno 2014-2015");
+    const [first, second] = cards(db, conversation.id);
+    resolveChatAction(ctx, second.id, "dismiss");
+    expect(cards(db, conversation.id).map((c) => [c.id, c.status, !!c.payload.replaced])).toEqual([
+      [first.id, "dismissed", true],
+      [second.id, "dismissed", false],
+    ]);
+    expect(reload(db, userId, builder).form.roles.length).toBe(1);
+    expect(continueDataStage(db, reload(db, userId, builder), "roles")).toEqual({ ok: true });
+  });
+
+  it("the current-situation chat can't be finished, by the interviewer or by Continue, while a card waits", async () => {
+    const { db, userId, ctx, builder } = fresh();
+    const conversation = ensureCvBuilderConversation(ctx, builder.id, "current", null);
+    await turn(ctx, conversation.id, DATA_ANSWERS.current);
+    resolveChatAction(ctx, cards(db, conversation.id)[0].id, "accept");
+    // The job is on file now. A correction puts a second card up.
+    override = propose("propose_current", { status: "employed", title: "Lead Frontend Engineer", company: "", start: "" });
+    await turn(ctx, conversation.id, "Actually my title is Lead Frontend Engineer");
+    const waiting = cards(db, conversation.id)[1];
+    expect(waiting.status).toBe("pending");
+    expect(continueBlockers(db, reload(db, userId, builder), "current")).toEqual({ ok: false, error: "card_pending" });
+
+    override = null;
+    await turn(ctx, conversation.id, "That's all");
+    expect(toolResults().filter((r) => r.is_error).at(-1)?.content).toBe("Not finished: a card is waiting for the candidate. Ask them to use it or dismiss it first.");
+    expect(reload(db, userId, builder).stages.current).toBeUndefined();
+
+    resolveChatAction(ctx, waiting.id, "dismiss");
+    await turn(ctx, conversation.id, "That's all");
+    expect(reload(db, userId, builder).stages.current).toBe("done");
+  });
+
+  it("Continue after the current-situation chat is checked; a jump from the step list is not", async () => {
+    const { db, userId, ctx, builder } = fresh();
+    // No job on file: finishing the chat is refused, moving elsewhere is not.
+    expect(goToStageBlockers(db, builder, ["current"])).toEqual({ ok: false, error: "stage_incomplete", fields: ["current.title"] });
+    expect(goToStageBlockers(db, builder, [])).toEqual({ ok: true });
+    expect(goToStageBlockers(db, builder, ["role:exp-1", "role_deep"])).toEqual({ ok: true });
+    const conversation = ensureCvBuilderConversation(ctx, builder.id, "current", null);
+    await turn(ctx, conversation.id, DATA_ANSWERS.current);
+    expect(goToStageBlockers(db, reload(db, userId, builder), ["current"])).toMatchObject({ ok: false });
+    resolveChatAction(ctx, cards(db, conversation.id)[0].id, "accept");
+    expect(goToStageBlockers(db, reload(db, userId, builder), ["current"])).toEqual({ ok: true });
+    // A finished session is not held to it (its steps are locked).
+    expect(goToStageBlockers(db, { ...builder, status: "completed" }, ["current"])).toEqual({ ok: true });
+  });
+
+  it("a follow-up that names only the job title updates that role instead of adding another", async () => {
+    const { db, ctx, builder } = started();
+    const conversation = ensureCvBuilderConversation(ctx, builder.id, "roles", null);
+    override = propose("propose_roles", { roles: [role({ title: "Barista", company: "Bean There" })] });
+    await turn(ctx, conversation.id, "Barista at Bean There");
+    override = propose("propose_roles", { roles: [role({ title: "Barista", start: "2015", end: "2016" })] });
+    await turn(ctx, conversation.id, "that was 2015 to 2016");
+    const rows = (cards(db, conversation.id)[1].payload.value as FormCardValue<"roles">).roles;
+    expect(rows.map((r) => [r.title, r.company, r.start, r.end])).toEqual([["Barista", "Bean There", "2015", "2016"]]);
+  });
+});
+
 describe("data chat — Continue, On file and readiness", () => {
   it("Continue waits for what is required and for a waiting card", async () => {
     const { db, userId } = testDb();
@@ -355,7 +455,9 @@ describe("data chat — Continue, On file and readiness", () => {
     // The title is only on the card: still missing. Once one is saved by other means, the card itself blocks
     // (and, being a card for the whole section, its titles are what is saved when it is used).
     expect(continueDataStage(db, reload(db, userId, builder), "target")).toMatchObject({ error: "stage_incomplete" });
-    expect(saveOnFile(db, builder, "target", { ...builder.form.target, titles: ["Principal Engineer"] })).toEqual({ ok: true });
+    // (Not through "On file": while a card waits it can't be edited, or using the card would undo the edit.)
+    expect(saveOnFile(db, builder, "target", { ...builder.form.target, titles: ["Principal Engineer"] })).toEqual({ ok: false, error: "card_pending" });
+    saveStageForm(db, reload(db, userId, builder), "target", { ...builder.form.target, titles: ["Principal Engineer"] });
     expect(continueDataStage(db, reload(db, userId, builder), "target")).toEqual({ ok: false, error: "card_pending" });
     expect(reload(db, userId, builder).stage).toBe("setup");
     resolveChatAction(ctx, card.id, "accept");

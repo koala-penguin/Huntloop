@@ -1,4 +1,4 @@
-import { dateMentions, enumGrounded, hasPresentWord, type EnumKind } from "@/shared/cv-builder-dates";
+import { dateMentions, enumGrounded, enumIn, hasPresentWord, type EnumKind } from "@/shared/cv-builder-dates";
 import type { FormCardStage, FormCardValue, CvBuilderForm, RoleCard } from "@/shared/schemas/cv-builder";
 
 /**
@@ -125,6 +125,29 @@ export type GroundedProposal =
   | { empty: true; dropped: string[] };
 
 const same = (a: string | null | undefined, b: string | null | undefined) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+
+/** The distinct roles (by id) with this job title. */
+function titled<T extends { id: string; title: string }>(rows: T[], title: string): T[] {
+  return rows.filter((r, i) => same(r.title, title) && rows.findIndex((x) => x.id === r.id) === i);
+}
+
+/**
+ * Whether the candidate gave this level for this language: the level's word has to be in the same
+ * part of a message as the language ("English native, Korean" says nothing about Korean). Parts
+ * are split at commas, semicolons, "and" and line breaks; a part that is only a level ("Korean,
+ * native") belongs to the language before it.
+ */
+function levelSaidFor(language: string, level: string, messages: TypedMessage[]): boolean {
+  return messages.some((message) => {
+    const parts: string[] = [];
+    for (const token of message.text.split(/[,;\n]|\s+and\s+|\s*및\s*|\s*그리고\s*/i)) {
+      const levelOnly = enumIn("languageLevel", token) !== null && token.trim().split(/\s+/).length <= 2 && !groundText(language, [{ id: 0, text: token }]);
+      if (levelOnly && parts.length && enumIn("languageLevel", parts[parts.length - 1]) === null) parts[parts.length - 1] += `, ${token}`;
+      else parts.push(token);
+    }
+    return parts.some((part) => groundText(language, [{ id: 0, text: part }]) !== null && enumGrounded("languageLevel", level, [part]));
+  });
+}
 
 const FIELD_WORDS: Record<string, string> = {
   titles: "job title",
@@ -297,7 +320,10 @@ export function groundProposal(
         const known = [...rows, ...form.roles.map((r) => ({ ...r, current: !r.end }))];
         const existing =
           known.find((r) => /^exp-\d+$/.test(proposed.id) && r.id === proposed.id && form.roles.some((f) => f.id === r.id)) ??
-          known.find((r) => title !== null && company !== null && same(r.title, title) && same(r.company, company));
+          known.find((r) => title !== null && company !== null && same(r.title, title) && same(r.company, company)) ??
+          // A follow-up that names only the job title ("as Barista, that was 2015 to 2016") is about
+          // the one role with that title, when there is exactly one.
+          (title !== null && !proposed.company.trim() && titled(known, title).length === 1 ? titled(known, title)[0] : undefined);
         const row: RoleCard = existing
           ? { ...existing }
           : {
@@ -406,7 +432,7 @@ export function groundProposal(
           delete sources[`languages.${n}.language`];
         }
         // A level nobody typed is never pre-selected: the candidate picks it on the card.
-        if (enumGrounded("languageLevel", proposed.level, texts)) {
+        if (levelSaidFor(language, proposed.level, messages)) {
           row.level = proposed.level as Row["level"];
           if (!inferred.includes(`languages.${at}.level`)) inferred.push(`languages.${at}.level`);
         }

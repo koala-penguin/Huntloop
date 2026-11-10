@@ -1,5 +1,5 @@
 import { CONTROL, type FormCardStage, type CvBuilderTopic } from "@/shared/schemas/cv-builder";
-import { ENUM_WORDS, dateMentions, enumIn, hasPresentWord } from "@/shared/cv-builder-dates";
+import { ENUM_WORDS, dateMentions, enumIn, hasPresentWord, plainText } from "@/shared/cv-builder-dates";
 import { isNoneReply } from "@/shared/cv-builder-openings";
 import { containsHangul, type FakeRequest } from "../transport";
 
@@ -180,7 +180,7 @@ export function parseTarget(text: string, step: number): typeof empty {
 
 /** The descriptions whose words are in the reply ("I'm changing careers and I just graduated"). */
 export function parseSetup(text: string): { personas: string[] } {
-  return { personas: Object.entries(ENUM_WORDS.persona).filter(([, words]) => words.test(text.normalize("NFKC"))).map(([persona]) => persona) };
+  return { personas: Object.entries(ENUM_WORDS.persona).filter(([, words]) => words.test(plainText(text))).map(([persona]) => persona) };
 }
 
 const count = (value: unknown): number => (Array.isArray(value) ? value.length : value && typeof value === "object" ? Object.values(value).reduce<number>((n, v) => n + count(v), 0) : value ? 1 : 0);

@@ -471,6 +471,8 @@ export function RoleRows({ value: roles, onChange, quick, flags = NO_FLAGS }: { 
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <MonthField
+                    // Unticking "I still work here" starts the end date empty again.
+                    key={r.current ? "current" : "ended"}
                     legend={t("roles.endN", { n })}
                     idPrefix={`${scope}${r.id}-end`}
                     value={r.end}

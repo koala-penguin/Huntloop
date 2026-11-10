@@ -23,7 +23,22 @@ export function useNeedLabel() {
  * What is saved for a step, under its chat: a short read-back with Edit. The way to correct or
  * remove something, and to fill a step in by hand when the interviewer can't be reached.
  */
-export function OnFile({ cvBuilderId, stage, value, context, editable }: { cvBuilderId: number; stage: FormCardStage; value: FormCardValue; context: CardContext; editable: boolean }) {
+export function OnFile({
+  cvBuilderId,
+  stage,
+  value,
+  context,
+  editable,
+  cardWaiting = false,
+}: {
+  cvBuilderId: number;
+  stage: FormCardStage;
+  value: FormCardValue;
+  context: CardContext;
+  editable: boolean;
+  /** A card for this step is waiting in the chat: it is used or dismissed before anything is edited here. */
+  cardWaiting?: boolean;
+}) {
   const t = useTranslations("cvBuilder");
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -47,9 +62,10 @@ export function OnFile({ cvBuilderId, stage, value, context, editable }: { cvBui
     });
   return (
     <section className="flex flex-col gap-2 rounded-md border border-border p-3" data-onfile={stage} aria-label={t("onFile.title")}>
+      {editable && cardWaiting && !editing && <p className="order-last text-xs text-muted">{t("onFile.cardFirst")}</p>}
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-medium">{t("onFile.title")}</h3>
-        {editable && !editing && (
+        {editable && !editing && !cardWaiting && (
           <Button
             type="button"
             size="sm"

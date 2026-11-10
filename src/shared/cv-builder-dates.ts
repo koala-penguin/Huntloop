@@ -58,7 +58,15 @@ export function dateMentions(text: string): DateMention[] {
 
 /** "I still work there", in the words people use for it. Not bare 재직: 재직했습니다 is past tense. */
 export function hasPresentWord(text: string): boolean {
-  return /\b(present|current(ly)?|now|still|ongoing|to date|today)\b|현재|지금|재직\s*중|근무\s*중|다니고\s*있/i.test(text.normalize("NFKC"));
+  return /\b(present|current(ly)?|now|still|ongoing|to date|today)\b|현재|지금|재직\s*중|근무\s*중|다니고\s*있/i.test(plainText(text));
+}
+
+/**
+ * A typed text as the word lists read it: full-width forms folded, and curly apostrophes made
+ * straight (a phone types "don’t", the lists say "don't").
+ */
+export function plainText(text: string): string {
+  return text.normalize("NFKC").replace(/[’‘ʼ]/g, "'");
 }
 
 /**
@@ -88,17 +96,20 @@ export const ENUM_WORDS = {
     lead: /\blead\b|리드|팀장/i,
     principal: /\bprincipal\b|\bstaff\b|수석/i,
     manager: /\bmanager\b|매니저|관리자/i,
-    director: /\bdirector\b|\bhead of\b|디렉터|이사|본부장/i,
-    executive: /\bexecutive\b|\bc-level\b|\bchief\b|\bvp\b|vice president|임원|경영진|대표/i,
+    // Not bare 이사 or 대표: they also mean "moving house" and "typical".
+    director: /\bdirector\b|\bhead of\b|디렉터|이사님|등기이사|본부장/i,
+    executive: /\bexecutive\b|\bc-level\b|\bchief\b|\bvp\b|vice president|임원|경영진|대표이사/i,
   },
   /** Who the candidate is, from how they describe their situation. */
   persona: {
     no_cv: /\bno (cv|resume|résumé)\b|(don'?t|do not|never) (have|had|made|written) an? (cv|resume|résumé)|without an? (cv|resume|résumé)|(이력서|cv)(가|는|도)?\s*(없|처음)/i,
     career_changer: /chang(e|ing) (my )?(career|field|industr)|career change|switch(ing)? (career|field|industr)|mov(e|ing) into (a )?(new|different)|transition(ing)? (in)?to|\bpivot|전직|이직.*다른|직무\s*전환|커리어\s*전환|업종\s*(변경|전환)|분야를?\s*바꾸|다른 분야/i,
     returning: /return(ing)? to work|back (to|into) work|career break|after a break|time (off|out)|parental leave|maternity|raising (my )?(kids|children|family)|stay[- ]at[- ]home|복직|재취업|경력\s*단절|육아|쉬다가|쉬었/i,
-    migrant: /new to (this country|the country|australia|new zealand|nz|singapore|the us|america|the market|this market)|(just|recently) (moved|arrived|immigrated|migrated)|moved (here|to )|immigra|\bmigrant|이민|이주|해외에서 (왔|일)|한국에서 (왔|일)|새로 왔/i,
-    graduate: /graduat|just finished (uni|university|college|school|my degree|my studies)|fresh out of|new grad|first (real |proper )?job|졸업|신입|첫 직장|취업 준비|취준/i,
-    senior_exec: /\bexecutive\b|\bdirector\b|\bc-level\b|\bc-suite\b|\b(ceo|cto|cfo|coo|cio|cdo)\b|\bvp\b|vice president|\bhead of\b|general manager|senior leader|임원|대표|본부장|상무|전무|이사/i,
+    // Moving to a country or "here", never just "moved to" (a new team is not a new market).
+    migrant: /new to (this country|the country|australia|new zealand|nz|singapore|the us|the usa|america|canada|the uk|korea|(the|this) (job )?market)|(just|recently) (arrived|immigrated|migrated)|moved (here|to (this country|the country|australia|new zealand|nz|singapore|the us|the usa|america|canada|the uk|korea))\b|relocated (here|to (this country|the country|australia|new zealand|nz|singapore|the us|the usa|america|canada|the uk|korea))\b|immigra|\bmigrant|이민|이주해|이주했|(으)?로 이사\s*(왔|와서|와)|해외에서 (왔|일)|한국에서 (왔|일)|새로 왔/i,
+    // Recent forms only: "I graduated in 2005" is not a recent graduate.
+    graduate: /\b(just|recently|newly) graduated\b|\b(recent|new|fresh) grad(uate)?\b|graduat(e|ing) (this|next) (year|month|semester|summer)|about to graduate|just finished (uni|university|college|school|my degree|my studies)|fresh out of|first (real |proper )?job|막 졸업|갓 졸업|최근(에)? 졸업|올해 졸업|졸업 예정|졸업을 앞|신입|첫 직장|취업 준비|취준/i,
+    senior_exec: /\bexecutive\b|\bdirector\b|\bc-level\b|\bc-suite\b|\b(ceo|cto|cfo|coo|cio|cdo)\b|\bvp\b|vice president|\bhead of\b|general manager|senior leader|임원|대표이사|이사님|등기이사|본부장|상무|전무/i,
   },
   workplace: {
     onsite: /\bon[- ]?site\b|in the office|in[- ]person|출근|사무실/i,
@@ -118,12 +129,13 @@ export type EnumKind = keyof typeof ENUM_WORDS;
 
 /** Whether one of the value's words is in a message the candidate typed. */
 export function enumGrounded(kind: EnumKind, value: string, messages: string[]): boolean {
-  const words = (ENUM_WORDS[kind] as Record<string, RegExp>)[value];
-  return !!words && messages.some((m) => words.test(m.normalize("NFKC")));
+  const list = ENUM_WORDS[kind] as Record<string, RegExp>;
+  if (!Object.hasOwn(list, value)) return false;
+  return messages.some((m) => list[value].test(plainText(m)));
 }
 
 /** The first value of a list whose word is in the text (used by the demo interviewer). */
 export function enumIn<K extends EnumKind>(kind: K, text: string): keyof (typeof ENUM_WORDS)[K] | null {
-  const hit = Object.entries(ENUM_WORDS[kind] as Record<string, RegExp>).find(([, words]) => words.test(text.normalize("NFKC")));
+  const hit = Object.entries(ENUM_WORDS[kind] as Record<string, RegExp>).find(([, words]) => words.test(plainText(text)));
   return (hit?.[0] as keyof (typeof ENUM_WORDS)[K] | undefined) ?? null;
 }

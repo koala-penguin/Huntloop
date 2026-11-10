@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { acceptEditedPolish } from "@/server/ai/chat/actions";
-import { acceptFormCard, continueBlockers, continueDataStage, saveOnFile } from "@/server/ai/chat/cv-builder-forms";
+import { acceptFormCard, continueDataStage, goToStageBlockers, saveOnFile } from "@/server/ai/chat/cv-builder-forms";
 import { appContext } from "@/server/context";
 import { errorCodeOf, UserFacingError } from "@/server/errors";
 import { isConversationBusy } from "@/server/ai/chat/harness";
@@ -22,7 +22,6 @@ import {
   stageConversation,
   stageHasAnswers,
   updateCvBuilder,
-  type FormStage,
   type CvBuilder,
 } from "@/server/repo/cv-builder";
 import { startBuildBaseCv } from "@/server/tasks/handlers/build-base-cv";
@@ -32,7 +31,6 @@ import {
   CONVERSATION_STAGES,
   DATA_CHAT_STAGES,
   FORM_CARD_STAGES,
-  FORM_SECTIONS,
   CV_BUILDER_STAGES,
   contactFormSchema,
   cvBuilderSkillSchema,
@@ -68,7 +66,8 @@ function own(cvBuilderId: number): { db: ReturnType<typeof appContext>["db"]; bu
 export type StageResult = { ok: true; value: null } | { ok: false; error: string; fields?: string[] };
 
 const stageSchema = z.enum(CV_BUILDER_STAGES);
-const formStageSchema = z.enum(Object.keys(FORM_SECTIONS) as [FormStage, ...FormStage[]]);
+/** The steps still saved as a whole form: the contact step, and the setup picks. Every other step saves through a card or "On file", with their checks. */
+const formStageSchema = z.enum(["setup", "contact"]);
 
 /** The stage after `stage` in the CV builder's order. */
 function nextStage(stage: CvBuilderStage): CvBuilderStage {
@@ -211,10 +210,8 @@ export async function goToStageAction(cvBuilderId: number, stage: string, comple
     const { db, builder } = own(cvBuilderId);
     let current = builder;
     // Continue after the current-situation chat needs the job on file, and no card left waiting.
-    if (keys.includes("current") && builder.status === "in_progress") {
-      const blocked = continueBlockers(db, builder, "current");
-      if (!blocked.ok) return blocked;
-    }
+    const blocked = goToStageBlockers(db, builder, keys);
+    if (!blocked.ok) return blocked;
     // A part skipped and then answered anyway counts as done; skipped and empty stays skipped.
     for (const key of keys) current = completeChatStage(db, current, key, key === "role_deep" ? true : stageHasAnswers(db, current, key));
     setCurrentStage(db, current, parsed.data);
