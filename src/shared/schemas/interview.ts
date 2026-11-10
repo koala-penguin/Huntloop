@@ -13,9 +13,21 @@ import { CV_LANGUAGES } from "./cv";
 export const INTERVIEW_STAGES = ["setup", "target", "current", "roles", "role_deep", "education", "languages", "contact", "review"] as const;
 export type InterviewStage = (typeof INTERVIEW_STAGES)[number];
 
-/** Stages that have a chat (the others are forms). */
+/** Stages whose chat collects stories (answers recorded as evidence). */
 export const CHAT_STAGES = ["current", "role_deep"] as const satisfies readonly InterviewStage[];
 export type ChatStage = (typeof CHAT_STAGES)[number];
+
+/** Stages whose chat collects data (job titles, employers, dates) onto a card the candidate checks. */
+export const DATA_CHAT_STAGES = ["target", "roles", "education", "languages"] as const satisfies readonly InterviewStage[];
+export type DataChatStage = (typeof DATA_CHAT_STAGES)[number];
+
+/** Every stage that has a conversation. */
+export const CONVERSATION_STAGES = [...CHAT_STAGES, ...DATA_CHAT_STAGES] as const;
+export type ConversationStage = (typeof CONVERSATION_STAGES)[number];
+
+/** Stages whose data can arrive on a card from the chat. */
+export const FORM_CARD_STAGES = ["target", "current", "roles", "education", "languages"] as const satisfies readonly InterviewStage[];
+export type FormCardStage = (typeof FORM_CARD_STAGES)[number];
 
 export const INTERVIEW_TOPICS = ["scope", "responsibility", "achievement", "tool", "skill", "context", "gap", "extra", "other"] as const;
 export type InterviewTopic = (typeof INTERVIEW_TOPICS)[number];
@@ -140,6 +152,99 @@ export const interviewFormSchema = z.object({
   skills: z.array(interviewSkillSchema).max(100).default([]),
 });
 export type InterviewForm = z.infer<typeof interviewFormSchema>;
+
+/**
+ * What a card (and the "On file" editor) carries for each stage. A role says whether it is the
+ * current one; a language level may still be open ("") until the candidate picks one.
+ */
+const VALID_MONTH = /^\d{4}(-(0[1-9]|1[0-2]))?$/;
+const cardMonth = z.union([z.literal(""), z.string().regex(VALID_MONTH)]).default("");
+export const roleCardSchema = roleFormSchema.extend({ start: cardMonth, end: cardMonth, current: z.boolean().default(false) });
+export type RoleCard = z.infer<typeof roleCardSchema>;
+export const languageCardSchema = z.object({ language: z.string().max(80), level: z.union([languageSchema.shape.level, z.literal("")]) });
+export const FORM_CARD_SCHEMAS = {
+  target: targetFormSchema,
+  current: currentFormSchema.extend({ start: cardMonth }),
+  roles: z.object({ roles: z.array(roleCardSchema).max(30) }),
+  education: z.object({ education: z.array(educationSchema).max(20).default([]), certifications: z.array(certificationSchema).max(30).default([]) }),
+  languages: z.object({ languages: z.array(languageCardSchema).max(20) }),
+} as const;
+export type FormCardValue<S extends FormCardStage = FormCardStage> = z.infer<(typeof FORM_CARD_SCHEMAS)[S]>;
+
+/** The saved part of the form for a stage, in the shape a card carries. */
+export function cardValueOf<S extends FormCardStage>(form: InterviewForm, stage: S): FormCardValue<S> {
+  const values: { [K in FormCardStage]: FormCardValue<K> } = {
+    target: form.target,
+    current: form.current,
+    roles: { roles: form.roles.map((r) => ({ ...r, current: !r.end })) },
+    education: { education: form.education, certifications: form.certifications },
+    languages: { languages: form.languages },
+  };
+  return values[stage];
+}
+
+export const validEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+/** end before start: by year, and by month only when both have one. */
+function endsBeforeStart(start: string, end: string): boolean {
+  if (!VALID_MONTH.test(start) || !VALID_MONTH.test(end)) return false;
+  const [sy, sm] = start.split("-").map(Number);
+  const [ey, em] = end.split("-").map(Number);
+  return ey < sy || (ey === sy && !!sm && !!em && em < sm);
+}
+
+type RoleRow = { title: string; start: string; end: string; current?: boolean };
+
+function roleCodes(rows: RoleRow[], card: boolean): string[] {
+  const codes: string[] = [];
+  rows.forEach((r, i) => {
+    if (!r.title.trim()) codes.push(`roles.${i}.title`);
+    if (!VALID_MONTH.test(r.start)) codes.push(`roles.${i}.start`);
+    // In the form an empty end means "still there"; on a card that has to be said.
+    if (r.end ? !VALID_MONTH.test(r.end) : card && !r.current) codes.push(`roles.${i}.end`);
+    if (r.end && endsBeforeStart(r.start, r.end)) codes.push(`roles.${i}.order`);
+  });
+  return codes;
+}
+
+/**
+ * What a stage still needs before the candidate can continue (and before Generate), as field
+ * codes: "target.title", "roles.none", "roles.<i>.start", "contact.email"… Empty when nothing is missing.
+ */
+export function stageRequirements(stage: InterviewStage, form: InterviewForm): string[] {
+  switch (stage) {
+    case "target":
+      return form.target.titles.some((t) => t.trim()) ? [] : ["target.title"];
+    case "current":
+      return ["employed", "self_employed"].includes(form.current.status) && !form.current.title.trim() ? ["current.title"] : [];
+    case "roles":
+      return form.roles.length ? roleCodes(form.roles, false) : ["roles.none"];
+    case "contact":
+      return [...(form.contact.name.trim() ? [] : ["contact.name"]), ...(validEmail(form.contact.email) ? [] : ["contact.email"])];
+    default:
+      return [];
+  }
+}
+
+/** Row-level problems in a card-shaped value: what stops this card (or "On file" edit) from being saved. */
+export function rowIssues(stage: string, value: unknown): string[] {
+  const v = (value ?? {}) as { roles?: RoleRow[]; languages?: Array<{ level: string }> };
+  if (stage === "roles") return roleCodes(v.roles ?? [], true);
+  if (stage === "languages") return (v.languages ?? []).flatMap((l, i) => (l.level ? [] : [`languages.${i}.level`]));
+  return [];
+}
+
+/** Format problems in a value about to be saved: a malformed email or phone, a start date after its end. */
+export function stageFormIssues(stage: string, value: unknown): string[] {
+  const v = (value ?? {}) as { email?: string; phone?: string; roles?: RoleRow[] };
+  if (stage === "contact") {
+    const email = (v.email ?? "").trim();
+    const phone = (v.phone ?? "").trim();
+    return [...(email && !validEmail(email) ? ["contact.email"] : []), ...(phone && phone.replace(/\D/g, "").length < 6 ? ["contact.phone"] : [])];
+  }
+  if (stage === "roles") return (v.roles ?? []).flatMap((r, i) => (r.end && endsBeforeStart(r.start, r.end) ? [`roles.${i}.order`] : []));
+  return [];
+}
 
 /** The form stages and the part of the form each one saves. */
 export const FORM_SECTIONS = {

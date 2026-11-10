@@ -14,7 +14,7 @@ import { buildProvenanceContext, validateCv } from "./provenance";
 import { emptyProfile, type Fact, type ProfileData } from "@/shared/schemas/profile";
 import type { Preferences } from "@/shared/schemas/preferences";
 import type { CvChecks, TailoringPlan } from "@/shared/schemas/cv";
-import { answerRole, currentRole, roleStageKey, rolesInOrder, targetFormSchema, type InterviewForm, type RoleForm, type StageStatus } from "@/shared/schemas/interview";
+import { answerRole, currentRole, roleStageKey, rolesInOrder, stageRequirements, targetFormSchema, type InterviewForm, type RoleForm, type StageStatus } from "@/shared/schemas/interview";
 
 /**
  * From interview to profile and base CV. The interview's answers are the candidate's own typed words; they
@@ -190,15 +190,28 @@ export function mergePreferences(saved: Preferences, built: BuiltProfile["prefer
 
 export type MissingStage = "target" | "roles" | "role_deep" | "contact";
 
-/** What generating needs: a target, at least one role, the current role's chat done, and a name. */
-export function interviewReady(source: Pick<InterviewSource, "form" | "stages">): { ok: true } | { ok: false; missing: MissingStage[] } {
+/**
+ * What generating needs. An interview in progress: everything Continue asks for on the target,
+ * roles and contact steps (a job title; at least one role, each with a title and dates; a name and
+ * an email), and the current role's chat done. Generating a finished interview again asks only for
+ * what it always did (a target, a role, that chat and a name): its steps are locked, so there
+ * would be no way to add an email.
+ */
+export function interviewReady(source: Pick<InterviewSource, "form" | "stages">, options: { regenerate?: boolean } = {}): { ok: true } | { ok: false; missing: MissingStage[] } {
   const { form, stages } = source;
   const missing: MissingStage[] = [];
-  if (!form.target.titles.some((t) => t.trim())) missing.push("target");
   const current = currentRole(form);
-  if (!current) missing.push("roles");
-  else if (stages[roleStageKey(current.id)] !== "done") missing.push("role_deep");
-  if (!form.contact.name.trim()) missing.push("contact");
+  if (options.regenerate) {
+    if (!form.target.titles.some((t) => t.trim())) missing.push("target");
+    if (!current) missing.push("roles");
+    else if (stages[roleStageKey(current.id)] !== "done") missing.push("role_deep");
+    if (!form.contact.name.trim()) missing.push("contact");
+    return missing.length ? { ok: false, missing } : { ok: true };
+  }
+  if (stageRequirements("target", form).length) missing.push("target");
+  if (stageRequirements("roles", form).length) missing.push("roles");
+  if (current && stages[roleStageKey(current.id)] !== "done") missing.push("role_deep");
+  if (stageRequirements("contact", form).length) missing.push("contact");
   return missing.length ? { ok: false, missing } : { ok: true };
 }
 
@@ -249,7 +262,7 @@ export async function generateBaseCv(ctx: AiContext, interviewId: number, option
   const { db, userId } = ctx;
   const interview = getInterview(db, userId, interviewId);
   if (!interview) throw new UserFacingError("not_found");
-  if (!interviewReady(interview).ok) throw new UserFacingError("interview_too_short");
+  if (!interviewReady(interview, { regenerate: interview.status === "completed" }).ok) throw new UserFacingError("interview_too_short");
 
   options.onStage?.("building");
   const previous = getCurrentProfile(db, userId);

@@ -4,9 +4,13 @@ import { conversations, cvInterviews, interviewAnswers, interviewConversations, 
 import { UserFacingError } from "../errors";
 import {
   FORM_SECTIONS,
+  INTERVIEW_STAGES,
   interviewFormSchema,
   parseInterviewForm,
   roleFormSchema,
+  type DataChatStage,
+  type FormCardStage,
+  type FormCardValue,
   type InterviewForm,
   type InterviewStage,
   type InterviewTopic,
@@ -100,6 +104,76 @@ export function saveStageForm(db: Db, interview: Interview, stage: FormStage, va
   const columns = stage === "setup" ? { depth: form.setup.depth, personas: form.setup.personas, targetCountry: form.setup.country, language: form.setup.language } : {};
   updateInterview(db, interview.id, { form, ...columns });
   return { ...interview, ...columns, form };
+}
+
+/** Rows of `card` take the place of the saved rows with the same key; the rest are added at the end. */
+function upsert<T>(saved: T[], card: T[], key: (row: T) => string): T[] {
+  const incoming = new Map(card.map((row) => [key(row), row]));
+  const keys = new Set(saved.map(key));
+  return [...saved.map((row) => incoming.get(key(row)) ?? row), ...card.filter((row) => !keys.has(key(row)))];
+}
+
+/**
+ * Turns a card's value into what saveStageForm takes for that stage. By default the card is merged
+ * into what is saved (its rows update or add, nothing is removed); with `replace` (the "On file"
+ * editor) the card is the whole section, so a removed row stays removed. A role marked current
+ * loses its end date; rows without their key field (institution, certification name, language) are left out.
+ */
+export function mergeStagePatch(interview: Interview, stage: FormCardStage, value: FormCardValue, options: { replace?: boolean } = {}): unknown {
+  const { form } = interview;
+  switch (stage) {
+    case "target":
+      return options.replace ? value : { ...form.target, ...(value as FormCardValue<"target">) };
+    case "current":
+      return options.replace ? value : { ...form.current, ...(value as FormCardValue<"current">) };
+    case "roles": {
+      const rows = (value as FormCardValue<"roles">).roles.map(({ current, ...role }) => ({ ...role, end: current ? "" : role.end }));
+      return options.replace ? rows : upsert(form.roles, rows, (r) => r.id);
+    }
+    case "education": {
+      const card = value as FormCardValue<"education">;
+      const education = card.education.filter((e) => e.institution.trim());
+      const certifications = card.certifications.filter((c) => c.name.trim());
+      return options.replace
+        ? { education, certifications }
+        : { education: upsert(form.education, education, (e) => e.id), certifications: upsert(form.certifications, certifications, (c) => c.name.trim().toLowerCase()) };
+    }
+    case "languages": {
+      const rows = (value as FormCardValue<"languages">).languages.filter((l) => l.language.trim() && l.level) as InterviewForm["languages"];
+      return options.replace ? rows : upsert(form.languages, rows, (l) => l.language.trim().toLowerCase());
+    }
+  }
+}
+
+/** Whether a data step has anything saved. */
+export function stageHasData(interview: Interview, stage: InterviewStage): boolean {
+  const { form } = interview;
+  switch (stage) {
+    case "target":
+      return form.target.titles.some((t) => t.trim());
+    case "current":
+      return !!form.current.title.trim() || form.current.status !== "employed";
+    case "roles":
+      return form.roles.length > 0;
+    case "education":
+      return form.education.length > 0 || form.certifications.length > 0;
+    case "languages":
+      return form.languages.length > 0;
+    case "contact":
+      return !!form.contact.name.trim() || !!form.contact.email.trim();
+    default:
+      return false;
+  }
+}
+
+/**
+ * Continue after a data step's chat: on to the next stage. A step skipped and then filled in
+ * anyway counts as done; skipped and still empty stays skipped; anything else is done.
+ */
+export function completeDataStage(db: Db, interview: Interview, stage: DataChatStage): Interview {
+  const next = INTERVIEW_STAGES[Math.min(INTERVIEW_STAGES.indexOf(stage) + 1, INTERVIEW_STAGES.length - 1)];
+  if (interview.stages[stage] === "skipped" && !stageHasData(interview, stage)) return setCurrentStage(db, interview, next);
+  return setStageStatus(db, interview, stage, "done", next);
 }
 
 /** One more than every role number the interview has ever used (form, answers, chats, stage status). */

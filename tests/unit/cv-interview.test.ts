@@ -404,6 +404,10 @@ describe("CV interview — building the profile", () => {
     expect(interviewReady({ ...source, stages: {} })).toEqual({ ok: false, missing: ["role_deep"] });
     const empty = interviewFormSchema.parse({});
     expect(interviewReady({ form: empty, stages: {} })).toEqual({ ok: false, missing: ["target", "roles", "contact"] });
+    // An email is needed too, except when a finished interview is generated again.
+    const noEmail = { ...source, form: { ...source.form, contact: { ...source.form.contact, email: "" } } };
+    expect(interviewReady(noEmail)).toEqual({ ok: false, missing: ["contact"] });
+    expect(interviewReady(noEmail, { regenerate: true })).toEqual({ ok: true });
   });
 });
 

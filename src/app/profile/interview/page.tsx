@@ -151,7 +151,7 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
       main = <ContactForm interviewId={interview.id} initial={form.contact} />;
       break;
     case "review": {
-      const ready = interviewReady(interview);
+      const ready = interviewReady(interview, { regenerate: interview.status === "completed" });
       main = (
         <>
           <SkillsCard interviewId={interview.id} skills={form.skills} />
