@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { chatActions, chatMessages, conversations } from "@/server/db/schema";
 import { listChatMessages, runChatTurn, type ChatEvent } from "@/server/ai/chat/harness";
 import { CV_BUILDER_TOOLSET_VERSION, conversationOpening, ensureCvBuilderConversation, cvBuilderOpening, cvBuilderTools } from "@/server/ai/chat/cv-builder";
-import { acceptFormCard, continueBlockers, continueDataStage, goToStageBlockers, saveOnFile } from "@/server/ai/chat/cv-builder-forms";
+import { acceptFormCard, continueBlockers, continueDataStage, goToStage, goToStageBlockers, saveOnFile } from "@/server/ai/chat/cv-builder-forms";
 import { resolveChatAction } from "@/server/ai/chat/actions";
 import { getFakeGenerator, registerFakeGenerator, type FakeGenerator, type FakeRequest } from "@/server/ai/fake/transport";
 import { parseCurrent, parseEducation, parseLanguages, parseRoles, parseSetup, parseTarget, splitList } from "@/server/ai/fake/generators/cv-builder-data";
@@ -333,6 +333,16 @@ describe("data chat — the candidate's situation", () => {
     expect(parseSetup("막 졸업했어요")).toEqual({ personas: ["graduate"] });
     for (const text of ["임원으로 일했습니다", "I was in a C-level role", "I'm a director at a bank", "대표이사였습니다"]) expect(parseSetup(text), text).toEqual({ personas: ["senior_exec"] });
 
+    // Someone else's title, a first job long ago, training new staff, and "not returning" say nothing either.
+    for (const text of ["I report to the director", "I worked with the head of sales", "my first job was in 2001", "신입사원 교육을 담당했습니다", "I'm not returning to work", "이사회 보고를 맡았습니다", "작년에 서울로 이사했어요"]) {
+      expect(parseSetup(text), text).toEqual({ personas: [] });
+    }
+    // 이사 and 대표 as a title they hold count again.
+    for (const text of ["저는 이사입니다", "이사로 재직 중입니다", "회사 대표입니다", "I'm head of data at a bank", "I was an executive at a retailer"]) expect(parseSetup(text), text).toEqual({ personas: ["senior_exec"] });
+    expect(parseSetup("I'm returning to work after a break")).toEqual({ personas: ["returning"] });
+    expect(parseSetup("I'm looking for my first job")).toEqual({ personas: ["graduate"] });
+    expect(parseSetup("신입으로 지원하려고 해요")).toEqual({ personas: ["graduate"] });
+
     // The same through the gate, whatever the model proposes.
     const { db, ctx, builder } = fresh();
     const conversation = ensureCvBuilderConversation(ctx, builder.id, "setup", null);
@@ -422,6 +432,14 @@ describe("data chat — guards around waiting cards", () => {
     expect(goToStageBlockers(db, reload(db, userId, builder), ["current"])).toMatchObject({ ok: false });
     resolveChatAction(ctx, cards(db, conversation.id)[0].id, "accept");
     expect(goToStageBlockers(db, reload(db, userId, builder), ["current"])).toEqual({ ok: true });
+    // The move itself: refused with nothing changed while blocked, done once the job is on file.
+    const other = fresh();
+    expect(goToStage(other.db, other.builder, "roles", ["current"])).toEqual({ ok: false, error: "stage_incomplete", fields: ["current.title"] });
+    expect(reload(other.db, other.userId, other.builder)).toMatchObject({ stage: "setup", stages: {} });
+    expect(goToStage(other.db, other.builder, "roles", [])).toEqual({ ok: true });
+    expect(reload(other.db, other.userId, other.builder)).toMatchObject({ stage: "roles", stages: {} });
+    expect(goToStage(db, reload(db, userId, builder), "roles", ["current"])).toEqual({ ok: true });
+    expect(reload(db, userId, builder)).toMatchObject({ stage: "roles", stages: { current: "done" } });
     // A finished session is not held to it (its steps are locked).
     expect(goToStageBlockers(db, { ...builder, status: "completed" }, ["current"])).toEqual({ ok: true });
   });
@@ -435,6 +453,24 @@ describe("data chat — guards around waiting cards", () => {
     await turn(ctx, conversation.id, "that was 2015 to 2016");
     const rows = (cards(db, conversation.id)[1].payload.value as FormCardValue<"roles">).roles;
     expect(rows.map((r) => [r.title, r.company, r.start, r.end])).toEqual([["Barista", "Bean There", "2015", "2016"]]);
+  });
+
+  it("an earlier job with the same title as a saved one is a new job, never a change to the saved one", async () => {
+    // On file: Senior Frontend Engineer at Harbour Payments since 2021-03, still there.
+    const { db, userId, ctx, builder } = started();
+    const conversation = ensureCvBuilderConversation(ctx, builder.id, "roles", null);
+    override = propose("propose_roles", { roles: [role({ title: "Senior Frontend Engineer", start: "2015", end: "2017" })] });
+    await turn(ctx, conversation.id, "Before that I was also a Senior Frontend Engineer from 2015 to 2017");
+    const [card] = cards(db, conversation.id);
+    const rows = (card.payload.value as FormCardValue<"roles">).roles;
+    expect(rows.length).toBe(1);
+    expect(rows[0]).toMatchObject({ title: "Senior Frontend Engineer", company: "", start: "2015", end: "2017", current: false });
+    expect(rows[0].id).toMatch(/^new-/);
+    expect(acceptFormCard(ctx, builder, card.id)).toEqual({ ok: true });
+    expect(reload(db, userId, builder).form.roles.map((r) => [r.id, r.company, r.start, r.end])).toEqual([
+      ["exp-1", "Harbour Payments", "2021-03", ""],
+      ["exp-2", "", "2015", "2017"],
+    ]);
   });
 });
 

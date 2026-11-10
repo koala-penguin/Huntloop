@@ -14,6 +14,7 @@ import {
   rowIssues,
   stageFormIssues,
   stageRequirements,
+  type CvBuilderStage,
   type DataChatStage,
   type FormCardStage,
   type FormCardValue,
@@ -24,7 +25,7 @@ import type { Db } from "../../db/database";
 import type { AiContext } from "../client";
 import { UserFacingError } from "../../errors";
 import { describePath, groundProposal, type PendingCard, type ProposalInput, type TypedMessage } from "../../cv/form-ground";
-import { completeDataStage, cvBuilderForConversation, mergeStagePatch, saveStageForm, stageConversation, type CvBuilder } from "../../repo/cv-builder";
+import { completeChatStage, completeDataStage, setCurrentStage, stageHasAnswers, cvBuilderForConversation, mergeStagePatch, saveStageForm, stageConversation, type CvBuilder } from "../../repo/cv-builder";
 import type { ChatEvent } from "./harness";
 
 /**
@@ -336,6 +337,21 @@ export function continueBlockers(db: Db, builder: CvBuilder, stage: "current" | 
 export function goToStageBlockers(db: Db, builder: CvBuilder, completed: string[]): StepResult {
   if (!completed.includes("current") || builder.status !== "in_progress") return { ok: true };
   return continueBlockers(db, builder, "current");
+}
+
+/**
+ * Moves to a stage: from the step list (nothing finished), or Continue after a chat, which finishes
+ * that chat (`completed`: "current", "role:exp-N", "role_deep"). Refused, with nothing changed,
+ * while finishing is blocked. A part skipped and then answered anyway counts as done; skipped and
+ * empty stays skipped.
+ */
+export function goToStage(db: Db, builder: CvBuilder, stage: CvBuilderStage, completed: string[]): StepResult {
+  const blocked = goToStageBlockers(db, builder, completed);
+  if (!blocked.ok) return blocked;
+  let current = builder;
+  for (const key of completed) current = completeChatStage(db, current, key, key === "role_deep" ? true : stageHasAnswers(db, current, key));
+  setCurrentStage(db, current, stage);
+  return { ok: true };
 }
 
 /** Continue on a data step: on to the next stage, unless something blocks it. */

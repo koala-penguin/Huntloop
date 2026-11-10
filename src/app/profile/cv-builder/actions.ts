@@ -3,12 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { acceptEditedPolish } from "@/server/ai/chat/actions";
-import { acceptFormCard, continueDataStage, goToStageBlockers, saveOnFile } from "@/server/ai/chat/cv-builder-forms";
+import { acceptFormCard, continueDataStage, goToStage, saveOnFile } from "@/server/ai/chat/cv-builder-forms";
 import { appContext } from "@/server/context";
 import { errorCodeOf, UserFacingError } from "@/server/errors";
 import { isConversationBusy } from "@/server/ai/chat/harness";
 import {
-  completeChatStage,
   createCvBuilder,
   deleteAnswer,
   discardCvBuilder,
@@ -17,10 +16,8 @@ import {
   getCvBuilder,
   reopenStage,
   saveStageForm,
-  setCurrentStage,
   setStageStatus,
   stageConversation,
-  stageHasAnswers,
   updateCvBuilder,
   type CvBuilder,
 } from "@/server/repo/cv-builder";
@@ -208,14 +205,8 @@ export async function goToStageAction(cvBuilderId: number, stage: string, comple
   if (!parsed.success || !keys.every((k) => typeof k === "string" && (stageSchema.safeParse(k).success || /^role:exp-\d+$/.test(k)))) return { ok: false, error: "invalid" };
   try {
     const { db, builder } = own(cvBuilderId);
-    let current = builder;
-    // Continue after the current-situation chat needs the job on file, and no card left waiting.
-    const blocked = goToStageBlockers(db, builder, keys);
-    if (!blocked.ok) return blocked;
-    // A part skipped and then answered anyway counts as done; skipped and empty stays skipped.
-    for (const key of keys) current = completeChatStage(db, current, key, key === "role_deep" ? true : stageHasAnswers(db, current, key));
-    setCurrentStage(db, current, parsed.data);
-    return done(null);
+    const result = goToStage(db, builder, parsed.data, keys);
+    return result.ok ? done(null) : result;
   } catch (error) {
     return fail(error);
   }

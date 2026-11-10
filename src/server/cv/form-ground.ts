@@ -322,8 +322,9 @@ export function groundProposal(
           known.find((r) => /^exp-\d+$/.test(proposed.id) && r.id === proposed.id && form.roles.some((f) => f.id === r.id)) ??
           known.find((r) => title !== null && company !== null && same(r.title, title) && same(r.company, company)) ??
           // A follow-up that names only the job title ("as Barista, that was 2015 to 2016") is about
-          // the one role with that title, when there is exactly one.
-          (title !== null && !proposed.company.trim() && titled(known, title).length === 1 ? titled(known, title)[0] : undefined);
+          // the one role with that title on the card still waiting. Never a job already saved: an
+          // earlier job with the same title as the current one would rewrite the current one's dates.
+          (title !== null && !proposed.company.trim() && titled(rows, title).length === 1 ? titled(rows, title)[0] : undefined);
         const row: RoleCard = existing
           ? { ...existing }
           : {

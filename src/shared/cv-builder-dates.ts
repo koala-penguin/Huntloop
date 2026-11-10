@@ -104,12 +104,13 @@ export const ENUM_WORDS = {
   persona: {
     no_cv: /\bno (cv|resume|résumé)\b|(don'?t|do not|never) (have|had|made|written) an? (cv|resume|résumé)|without an? (cv|resume|résumé)|(이력서|cv)(가|는|도)?\s*(없|처음)/i,
     career_changer: /chang(e|ing) (my )?(career|field|industr)|career change|switch(ing)? (career|field|industr)|mov(e|ing) into (a )?(new|different)|transition(ing)? (in)?to|\bpivot|전직|이직.*다른|직무\s*전환|커리어\s*전환|업종\s*(변경|전환)|분야를?\s*바꾸|다른 분야/i,
-    returning: /return(ing)? to work|back (to|into) work|career break|after a break|time (off|out)|parental leave|maternity|raising (my )?(kids|children|family)|stay[- ]at[- ]home|복직|재취업|경력\s*단절|육아|쉬다가|쉬었/i,
+    returning: /(?<!not )(?<!n't )return(ing)? to work|back (to|into) work|career break|after a break|time (off|out)|parental leave|maternity|raising (my )?(kids|children|family)|stay[- ]at[- ]home|복직|재취업|경력\s*단절|육아|쉬다가|쉬었/i,
     // Moving to a country or "here", never just "moved to" (a new team is not a new market).
     migrant: /new to (this country|the country|australia|new zealand|nz|singapore|the us|the usa|america|canada|the uk|korea|(the|this) (job )?market)|(just|recently) (arrived|immigrated|migrated)|moved (here|to (this country|the country|australia|new zealand|nz|singapore|the us|the usa|america|canada|the uk|korea))\b|relocated (here|to (this country|the country|australia|new zealand|nz|singapore|the us|the usa|america|canada|the uk|korea))\b|immigra|\bmigrant|이민|이주해|이주했|(으)?로 이사\s*(왔|와서|와)|해외에서 (왔|일)|한국에서 (왔|일)|새로 왔/i,
-    // Recent forms only: "I graduated in 2005" is not a recent graduate.
-    graduate: /\b(just|recently|newly) graduated\b|\b(recent|new|fresh) grad(uate)?\b|graduat(e|ing) (this|next) (year|month|semester|summer)|about to graduate|just finished (uni|university|college|school|my degree|my studies)|fresh out of|first (real |proper )?job|막 졸업|갓 졸업|최근(에)? 졸업|올해 졸업|졸업 예정|졸업을 앞|신입|첫 직장|취업 준비|취준/i,
-    senior_exec: /\bexecutive\b|\bdirector\b|\bc-level\b|\bc-suite\b|\b(ceo|cto|cfo|coo|cio|cdo)\b|\bvp\b|vice president|\bhead of\b|general manager|senior leader|임원|대표이사|이사님|등기이사|본부장|상무|전무/i,
+    // Recent forms only: "I graduated in 2005" is not a recent graduate, and a first job long ago or training new staff (신입사원 교육) says nothing.
+    graduate: /\b(just|recently|newly) graduated\b|\b(recent|new|fresh) grad(uate)?\b|graduat(e|ing) (this|next) (year|month|semester|summer)|about to graduate|just finished (uni|university|college|school|my degree|my studies)|fresh out of|(looking for|seeking|want|need|find(ing)?) (my|a) first (real |proper )?job|막 졸업|갓 졸업|최근(에)? 졸업|올해 졸업|졸업 예정|졸업을 앞|신입(으로|입니다|이에요|이라)|첫 직장을 (구|찾)|취업 준비|취준/i,
+    // Their own title, not someone else's ("I report to the director"). 이사 and 대표 only as a title they hold: alone they also mean "moving house" and "typical".
+    senior_exec: /(?<!\b(?:to|with|for|by|from|under) (?:the|a|an|our|my|their) )\b(executive|director|head of)\b|\bc-level\b|\bc-suite\b|\b(ceo|cto|cfo|coo|cio|cdo)\b|\bvp\b|vice president|general manager|senior leader|임원|대표이사|이사님|등기이사|본부장|상무|전무|(이사|대표)(입니다|로 (재직|근무|일))/i,
   },
   workplace: {
     onsite: /\bon[- ]?site\b|in the office|in[- ]person|출근|사무실/i,

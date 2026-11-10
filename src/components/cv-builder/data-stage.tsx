@@ -44,7 +44,7 @@ export function OnFile({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [invalid, setInvalid] = useState<string[]>([]);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const lines = useSummaryLines()(stage, value);
   const save = () =>
@@ -52,12 +52,12 @@ export function OnFile({
       const result = await saveOnFileAction(cvBuilderId, stage, draft);
       if (!result.ok) {
         setInvalid(result.fields ?? []);
-        setFailed(true);
+        setFailed(result.error === "card_pending" ? t("onFile.cardFirst") : t("invalidForm"));
         return;
       }
       setEditing(false);
       setInvalid([]);
-      setFailed(false);
+      setFailed(null);
       router.refresh();
     });
   return (
@@ -74,7 +74,7 @@ export function OnFile({
             onClick={() => {
               setDraft(value);
               setInvalid([]);
-              setFailed(false);
+              setFailed(null);
               setEditing(true);
             }}
           >
@@ -98,7 +98,7 @@ export function OnFile({
           />
           {failed && (
             <Alert tone="danger" role="alert">
-              {t("invalidForm")}
+              {failed}
             </Alert>
           )}
           <div className="flex flex-wrap gap-2">
