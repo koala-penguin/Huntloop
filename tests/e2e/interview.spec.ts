@@ -33,13 +33,13 @@ test("build a profile and base CV by interview", async ({ page }) => {
   const cvTab = page.getByRole("tab", { name: "CV", exact: true });
   const hadProfile = (await cvTab.count()) > 0;
   if (hadProfile) await cvTab.click();
-  await page.getByRole("link", { name: "Build by interview" }).click();
+  await page.getByRole("link", { name: "CV-building interview" }).click();
 
   // Stage 0: Full depth (the default), Australia.
   await expect(page.getByRole("heading", { name: "Before we start" })).toBeVisible();
   await expect(page.getByLabel("Full")).toBeChecked();
   await page.getByRole("combobox", { name: "Where you want to work" }).selectOption("AU");
-  await page.getByRole("button", { name: "Start the interview" }).click();
+  await page.getByRole("button", { name: "Start the CV-building interview" }).click();
 
   // Their situation, in their own words: only what they said is ticked on the card, and they can change it.
   await expect(page.getByRole("heading", { name: "Your situation" })).toBeVisible();
