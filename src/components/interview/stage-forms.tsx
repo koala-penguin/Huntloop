@@ -17,7 +17,7 @@ import { EMPLOYMENT_TYPES, WORKPLACE_TYPES } from "@/shared/schemas/preferences"
 import { LANGUAGE_LEVELS, SENIORITY_LEVELS, type WorkRight } from "@/shared/schemas/profile";
 import { CV_LANGUAGES } from "@/shared/schemas/cv";
 import { CURRENT_STATUSES, INTERVIEW_DEPTHS, INTERVIEW_PERSONAS, ROLE_DEPTHS, type FormCardValue, type InterviewForm, type RoleCard } from "@/shared/schemas/interview";
-import { saveStageFormAction, startInterviewAction } from "@/app/profile/interview/actions";
+import { startInterviewAction } from "@/app/profile/interview/actions";
 
 /**
  * The fields of the CV builder's steps, as controlled groups: a card in the chat and the "On file"
@@ -127,11 +127,65 @@ function useFieldError(flags: FieldFlags) {
   return (path: string, kind = "generic"): string | null => (flags.invalid.includes(path) ? t(`fieldError.${kind}`) : null);
 }
 
+type Setup = FormCardValue<"setup">;
+
+/** The picks that shape the interview: its language, the market and how deep to go. */
+function SetupPicks({ value: setup, onChange }: { value: Setup; onChange: (next: Setup) => void }) {
+  const t = useTranslations("interview");
+  const scope = useContext(FieldScope);
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={t("setup.language")}>
+          {(id) => (
+            <Select id={id} className="h-10" value={setup.language} onChange={(e) => onChange({ ...setup, language: e.target.value as Setup["language"] })}>
+              {CV_LANGUAGES.map((l) => (
+                <option key={l} value={l}>
+                  {t(`languageName.${l}`)}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <Field label={t("setup.country")} hint={t("setup.countryHint")}>
+          {(id) => <CountrySelect id={id} className="h-10" value={setup.country} onChange={(country) => country && onChange({ ...setup, country })} />}
+        </Field>
+      </div>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 text-sm font-medium">{t("setup.depth")}</legend>
+        {INTERVIEW_DEPTHS.map((d) => (
+          <label key={d} className="flex items-start gap-2 text-sm">
+            <input type="radio" name={`${scope}depth`} className="mt-1" checked={setup.depth === d} onChange={() => onChange({ ...setup, depth: d })} />
+            <span>
+              <span className="font-medium">{t(`depth.${d}`)}</span> <span className="text-muted">{t(`depthHint.${d}`)}</span>
+            </span>
+          </label>
+        ))}
+        <FieldHint>{t("setup.costHint")}</FieldHint>
+      </fieldset>
+    </>
+  );
+}
+
 /**
- * Stage 0: language, market, who the user is and how deep to go, asked as one question with the
- * picks under it. Starts the interview (or, reopened from the step list, changes its choices).
+ * What describes the candidate (any number, or none), and with `picks` the interview's language,
+ * market and depth too. A card from the chat shows only the descriptions; "On file" shows all of it.
  */
-export function SetupForm({ interviewId, initial }: { interviewId: number | null; initial: InterviewForm["setup"] }) {
+export function SetupFields({ value, onChange, flags = NO_FLAGS, picks }: { value: Setup; onChange: (next: Setup) => void; flags?: FieldFlags; picks: boolean }) {
+  const t = useTranslations("interview");
+  return (
+    <div className="flex flex-col gap-5">
+      <Checks legend={t("setup.personas")} values={INTERVIEW_PERSONAS} selected={value.personas} label={(v) => t(`persona.${v}`)} check={flags.inferred.includes("personas")} onChange={(personas) => onChange({ ...value, personas })} />
+      {picks && <SetupPicks value={value} onChange={onChange} />}
+    </div>
+  );
+}
+
+/**
+ * Before the interview exists: its language, the market and how deep to go, asked as one question
+ * with the picks under it. Starting it leads to a short chat about the candidate's situation.
+ */
+export function SetupForm({ initial }: { initial: InterviewForm["setup"] }) {
   const t = useTranslations("interview");
   const router = useRouter();
   const [setup, setSetup] = useState(initial);
@@ -139,7 +193,7 @@ export function SetupForm({ interviewId, initial }: { interviewId: number | null
   const [error, setError] = useState<string | null>(null);
   const begin = () =>
     start(async () => {
-      const result = interviewId === null ? await startInterviewAction(setup) : await saveStageFormAction(interviewId, "setup", setup, true);
+      const result = await startInterviewAction(setup);
       if (!result.ok) setError(result.error);
       else {
         router.push("/profile/interview");
@@ -153,50 +207,12 @@ export function SetupForm({ interviewId, initial }: { interviewId: number | null
         <p className="text-sm leading-relaxed">{t("setup.ask")}</p>
       </div>
       <div className="flex flex-col gap-5 rounded-md border border-border p-3" role="group" aria-label={t("setup.title")}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("setup.language")}>
-            {(id) => (
-              <Select
-                id={id}
-                className="h-10"
-                value={setup.language}
-                onChange={(e) =>
-                  setSetup({
-                    ...setup,
-                    language: e.target.value as typeof setup.language,
-                  })
-                }
-              >
-                {CV_LANGUAGES.map((l) => (
-                  <option key={l} value={l}>
-                    {t(`languageName.${l}`)}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-          <Field label={t("setup.country")} hint={t("setup.countryHint")}>
-            {(id) => <CountrySelect id={id} className="h-10" value={setup.country} onChange={(country) => country && setSetup({ ...setup, country })} />}
-          </Field>
-        </div>
-        <Checks legend={t("setup.personas")} values={INTERVIEW_PERSONAS} selected={setup.personas} label={(v) => t(`persona.${v}`)} onChange={(personas) => setSetup({ ...setup, personas })} />
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-sm font-medium">{t("setup.depth")}</legend>
-          {INTERVIEW_DEPTHS.map((d) => (
-            <label key={d} className="flex items-start gap-2 text-sm">
-              <input type="radio" name="depth" className="mt-1" checked={setup.depth === d} onChange={() => setSetup({ ...setup, depth: d })} />
-              <span>
-                <span className="font-medium">{t(`depth.${d}`)}</span> <span className="text-muted">{t(`depthHint.${d}`)}</span>
-              </span>
-            </label>
-          ))}
-          <FieldHint>{t("setup.costHint")}</FieldHint>
-        </fieldset>
+        <SetupPicks value={setup} onChange={setSetup} />
         {error && <Alert tone="danger">{t("invalidForm")}</Alert>}
         <div>
           <Button type="button" disabled={pending} onClick={begin}>
             <ArrowRight className="size-4" aria-hidden />
-            {interviewId === null ? t("setup.start") : t("continue")}
+            {t("setup.start")}
           </Button>
         </div>
       </div>

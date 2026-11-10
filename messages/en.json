@@ -958,7 +958,8 @@
       "propose_current": "Put your current job on a card",
       "propose_roles": "Put your roles on a card",
       "propose_education": "Put your education on a card",
-      "propose_languages": "Put your languages on a card"
+      "propose_languages": "Put your languages on a card",
+      "propose_setup": "Put your situation on a card"
     },
     "card": {
       "factTitle": "Add this to your profile?",
@@ -984,7 +985,8 @@
         "current": "Where you are now",
         "roles": "Your roles",
         "education": "Education and certifications",
-        "languages": "Languages"
+        "languages": "Languages",
+        "setup": "Your situation"
       },
       "formHint": "This is what I read from your messages. Change anything that's off. Nothing is saved until you press Use this.",
       "formUse": "Use this",
@@ -1650,11 +1652,13 @@
       "language": "Interview language",
       "country": "Where you want to work",
       "countryHint": "Sets the CV conventions (length, referees, work-rights line).",
-      "personas": "Which describes you? (any that apply)",
+      "personas": "Which describes you? (any that apply, or none)",
       "depth": "How deep should we go?",
       "costHint": "With an API key, a full interview costs about US$2–4 on Opus, or about half on Sonnet 5.5 (Settings → models → CV builder interview). With a Claude subscription it uses your plan instead.",
       "start": "Start the interview",
-      "ask": "Before the first question: which language should we talk in, where do you want to work, and how deep should we go? Tick anything that describes you. You can change these later."
+      "ask": "Before the first question: which language should we talk in, where do you want to work, and how deep should we go? You can change these later.",
+      "description": "In your own words. It shapes the questions that follow; you can leave it out.",
+      "noPersona": "Nothing ticked about your situation"
     },
     "persona": {
       "no_cv": "I have no CV",
@@ -1918,6 +1922,9 @@
       "year": "year",
       "none": "Month (optional)",
       "yearPlaceholder": "Year"
+    },
+    "stageTitle": {
+      "setup": "Your situation"
     }
   }
 }

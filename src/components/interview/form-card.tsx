@@ -6,10 +6,11 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, Badge } from "@/components/ui/badge";
+import { useCountryNames } from "@/components/i18n/country-names";
 import { resolveChatActionAction } from "@/app/jobs/[id]/actions";
 import { acceptFormCardAction } from "@/app/profile/interview/actions";
 import type { FormCardStage, FormCardValue } from "@/shared/schemas/interview";
-import { CurrentFields, EducationRows, FieldScope, LanguageRows, RoleRows, TargetFields, type FieldFlags } from "./stage-forms";
+import { CurrentFields, EducationRows, FieldScope, LanguageRows, RoleRows, SetupFields, TargetFields, type FieldFlags } from "./stage-forms";
 
 /** What the editors need to know about the interview: the target market, the CV's language, the depth. */
 export interface CardContext {
@@ -18,11 +19,26 @@ export interface CardContext {
   quick: boolean;
 }
 
-/** The fields of one step, for a card in the chat and for the "On file" editor. */
-export function FormCardEditor({ stage, value, onChange, flags, context }: { stage: FormCardStage; value: FormCardValue; onChange: (next: FormCardValue) => void; flags: FieldFlags; context: CardContext }) {
+/** The fields of one step, for a card in the chat and (`full`: with the picks a chat never sets) for the "On file" editor. */
+export function FormCardEditor({
+  stage,
+  value,
+  onChange,
+  flags,
+  context,
+  full = false,
+}: {
+  stage: FormCardStage;
+  value: FormCardValue;
+  onChange: (next: FormCardValue) => void;
+  flags: FieldFlags;
+  context: CardContext;
+  full?: boolean;
+}) {
   const scope = useId();
   return (
     <FieldScope.Provider value={scope}>
+      {stage === "setup" && <SetupFields value={value as FormCardValue<"setup">} onChange={onChange} flags={flags} picks={full} />}
       {stage === "target" && <TargetFields value={value as FormCardValue<"target">} onChange={onChange} country={context.country} flags={flags} />}
       {stage === "current" && <CurrentFields value={value as FormCardValue<"current">} onChange={onChange} flags={flags} />}
       {stage === "roles" && <RoleRows value={(value as FormCardValue<"roles">).roles} onChange={(roles) => onChange({ roles })} quick={context.quick} flags={flags} />}
@@ -38,8 +54,13 @@ export function useSummaryLines(): (stage: FormCardStage, value: FormCardValue) 
   const tProfile = useTranslations("profile");
   const join = (...parts: Array<string | null | undefined>) => parts.filter((p) => p && p.trim()).join(" · ");
   const both = (a: string | null | undefined, b: string | null | undefined) => [a, b].filter((p) => p && p.trim()).join(", ");
+  const countries = useCountryNames();
   return (stage, value) => {
     switch (stage) {
+      case "setup": {
+        const v = value as FormCardValue<"setup">;
+        return [v.personas.length ? v.personas.map((p) => t(`persona.${p}`)).join(", ") : t("setup.noPersona"), join(t(`languageName.${v.language}`), countries.name(v.country), t(`depth.${v.depth}`))];
+      }
       case "target": {
         const v = value as FormCardValue<"target">;
         return [join(v.titles.join(", "), v.industries.join(", "), v.cities.join(", "), v.availability)].filter(Boolean);

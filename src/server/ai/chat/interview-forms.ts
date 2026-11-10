@@ -8,6 +8,7 @@ import { LANGUAGE_LEVELS, SENIORITY_LEVELS } from "@/shared/schemas/profile";
 import {
   CURRENT_STATUSES,
   FORM_CARD_SCHEMAS,
+  INTERVIEW_PERSONAS,
   cardValueOf,
   interviewFormSchema,
   rowIssues,
@@ -52,6 +53,16 @@ const TAIL =
 const DATE = 'YYYY-MM, or YYYY when they gave no month; "" when they gave no date.';
 
 export const FORM_TOOLS: Record<FormCardStage, Tool> = {
+  setup: strict(
+    "propose_setup",
+    "Put what describes the candidate's situation on a card for them to check. Only what they said in this conversation: Huntloop keeps a description only when it finds words for it in their messages; nothing is saved until they accept. Leave the list empty rather than guess.",
+    {
+      personas: choices(
+        INTERVIEW_PERSONAS,
+        "no_cv = they have no CV; career_changer = moving to a different field; returning = coming back to work after a break; migrant = new to this country's job market; graduate = recently finished study; senior_exec = senior leader or executive. Any that they said apply.",
+      ),
+    },
+  ),
   target: strict("propose_target", `Put the job the candidate is going for on a card for them to check. ${TAIL}`, {
     titles: list("Job titles they named, as they typed them."),
     industries: list("Industries they named."),
@@ -115,6 +126,7 @@ export const FORM_TOOL_STAGE: Record<string, FormCardStage> = Object.fromEntries
 
 const text = (max: number) => z.string().max(max);
 const formInputSchemas: Record<FormCardStage, z.ZodType<ProposalInput>> = {
+  setup: z.object({ personas: z.array(z.enum(INTERVIEW_PERSONAS)).max(INTERVIEW_PERSONAS.length) }),
   target: z.object({
     titles: z.array(text(120)).max(20),
     industries: z.array(text(80)).max(20),
@@ -138,6 +150,8 @@ const formInputSchemas: Record<FormCardStage, z.ZodType<ProposalInput>> = {
 };
 
 const STEP_COLLECTS: Record<Exclude<FormCardStage, "current">, string> = {
+  setup:
+    "the candidate's situation, so the later questions fit them: whether they have no CV, are changing careers, are returning to work after a break, are new to this country's job market, recently finished study, or are a senior leader or executive. Any number of these can apply, or none; never press for one. One or two exchanges is enough. This step is optional",
   target: "the job the candidate is going for next: one or more job titles (required), and, if they bring them up, industries, cities and when they could start",
   roles: "the candidate's jobs, newest first: for each one the job title, the employer, when it started and when it ended (or that they are still there); industry and city if they say. Contracts, self-employment, overseas jobs and long internships count",
   education: "the candidate's education and certifications: the qualification, where, the field and roughly when; for a certification its name, who issued it and the year. This step is optional",

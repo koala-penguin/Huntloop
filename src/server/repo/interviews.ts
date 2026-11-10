@@ -122,6 +122,8 @@ function upsert<T>(saved: T[], card: T[], key: (row: T) => string): T[] {
 export function mergeStagePatch(interview: Interview, stage: FormCardStage, value: FormCardValue, options: { replace?: boolean } = {}): unknown {
   const { form } = interview;
   switch (stage) {
+    case "setup":
+      return options.replace ? value : { ...form.setup, ...(value as FormCardValue<"setup">) };
     case "target":
       return options.replace ? value : { ...form.target, ...(value as FormCardValue<"target">) };
     case "current":
@@ -149,6 +151,8 @@ export function mergeStagePatch(interview: Interview, stage: FormCardStage, valu
 export function stageHasData(interview: Interview, stage: InterviewStage): boolean {
   const { form } = interview;
   switch (stage) {
+    case "setup":
+      return form.setup.personas.length > 0;
     case "target":
       return form.target.titles.some((t) => t.trim());
     case "current":

@@ -67,6 +67,7 @@ const KNOWN_ACTIVITIES = [
   "complete_stage",
   "suggest_options",
   "propose_polish",
+  "propose_setup",
   "propose_target",
   "propose_current",
   "propose_roles",

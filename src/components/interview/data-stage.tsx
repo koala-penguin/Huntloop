@@ -78,6 +78,7 @@ export function OnFile({ interviewId, stage, value, context, editable }: { inter
             }}
             flags={{ inferred: [], invalid }}
             context={context}
+            full
           />
           {failed && (
             <Alert tone="danger" role="alert">

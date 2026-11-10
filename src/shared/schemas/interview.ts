@@ -17,8 +17,11 @@ export type InterviewStage = (typeof INTERVIEW_STAGES)[number];
 export const CHAT_STAGES = ["current", "role_deep"] as const satisfies readonly InterviewStage[];
 export type ChatStage = (typeof CHAT_STAGES)[number];
 
-/** Stages whose chat collects data (job titles, employers, dates) onto a card the candidate checks. */
-export const DATA_CHAT_STAGES = ["target", "roles", "education", "languages"] as const satisfies readonly InterviewStage[];
+/**
+ * Stages whose chat collects data (their situation, job titles, employers, dates) onto a card the
+ * candidate checks.
+ */
+export const DATA_CHAT_STAGES = ["setup", "target", "roles", "education", "languages"] as const satisfies readonly InterviewStage[];
 export type DataChatStage = (typeof DATA_CHAT_STAGES)[number];
 
 /** Every stage that has a conversation. */
@@ -26,7 +29,7 @@ export const CONVERSATION_STAGES = [...CHAT_STAGES, ...DATA_CHAT_STAGES] as cons
 export type ConversationStage = (typeof CONVERSATION_STAGES)[number];
 
 /** Stages whose data can arrive on a card from the chat. */
-export const FORM_CARD_STAGES = ["target", "current", "roles", "education", "languages"] as const satisfies readonly InterviewStage[];
+export const FORM_CARD_STAGES = ["setup", "target", "current", "roles", "education", "languages"] as const satisfies readonly InterviewStage[];
 export type FormCardStage = (typeof FORM_CARD_STAGES)[number];
 
 export const INTERVIEW_TOPICS = ["scope", "responsibility", "achievement", "tool", "skill", "context", "gap", "extra", "other"] as const;
@@ -163,6 +166,7 @@ export const roleCardSchema = roleFormSchema.extend({ start: cardMonth, end: car
 export type RoleCard = z.infer<typeof roleCardSchema>;
 export const languageCardSchema = z.object({ language: z.string().max(80), level: z.union([languageSchema.shape.level, z.literal("")]) });
 export const FORM_CARD_SCHEMAS = {
+  setup: setupFormSchema,
   target: targetFormSchema,
   current: currentFormSchema.extend({ start: cardMonth }),
   roles: z.object({ roles: z.array(roleCardSchema).max(30) }),
@@ -174,6 +178,7 @@ export type FormCardValue<S extends FormCardStage = FormCardStage> = z.infer<(ty
 /** The saved part of the form for a stage, in the shape a card carries. */
 export function cardValueOf<S extends FormCardStage>(form: InterviewForm, stage: S): FormCardValue<S> {
   const values: { [K in FormCardStage]: FormCardValue<K> } = {
+    setup: form.setup,
     target: form.target,
     current: form.current,
     roles: { roles: form.roles.map((r) => ({ ...r, current: !r.end })) },

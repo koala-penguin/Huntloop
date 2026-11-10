@@ -63,7 +63,7 @@ export const INTERVIEW_TOOLSET_VERSION = 3;
  * The oldest interviewer a stage's conversation may have been started with and still be continued.
  * The story chats did not change in version 3, so a chat in progress keeps its transcript.
  */
-export const MIN_TOOLSET: Record<ConversationStage, number> = { current: 2, role_deep: 2, target: 3, roles: 3, education: 3, languages: 3 };
+export const MIN_TOOLSET: Record<ConversationStage, number> = { current: 2, role_deep: 2, setup: 3, target: 3, roles: 3, education: 3, languages: 3 };
 
 const isDataStage = (stage: string): stage is DataChatStage => (DATA_CHAT_STAGES as readonly string[]).includes(stage);
 

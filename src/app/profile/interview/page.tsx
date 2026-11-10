@@ -80,7 +80,7 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
     return (
       <>
         {header}
-        <SetupForm interviewId={null} initial={setup} />
+        <SetupForm initial={setup} />
       </>
     );
   }
@@ -135,7 +135,7 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
     return (
       <Card className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold">{t(`${dataStage}.title`)}</h2>
+          <h2 className="text-lg font-semibold">{dataStage === "setup" ? t("stageTitle.setup") : t(`${dataStage}.title`)}</h2>
           <p className="text-sm text-muted">{t(`${dataStage}.description`)}</p>
         </div>
         {panel(dataStage, null, status)}
@@ -148,7 +148,7 @@ export default async function InterviewPage({ searchParams }: PageProps<"/profil
   let main: ReactNode;
   switch (stage) {
     case "setup":
-      main = <SetupForm interviewId={interview.id} initial={form.setup} />;
+      main = dataChat("setup", false);
       break;
     case "target":
       main = dataChat("target", false);

@@ -178,12 +178,19 @@ export function parseTarget(text: string, step: number): typeof empty {
   return { ...empty, titles: items };
 }
 
+/** The descriptions whose words are in the reply ("I'm changing careers and I just graduated"). */
+export function parseSetup(text: string): { personas: string[] } {
+  return { personas: Object.entries(ENUM_WORDS.persona).filter(([, words]) => words.test(text.normalize("NFKC"))).map(([persona]) => persona) };
+}
+
 const count = (value: unknown): number => (Array.isArray(value) ? value.length : value && typeof value === "object" ? Object.values(value).reduce<number>((n, v) => n + count(v), 0) : value ? 1 : 0);
 
 function parseFor(stage: FormCardStage, text: string, step: number): Record<string, unknown> | null {
   const parsed =
-    stage === "target"
-      ? parseTarget(text, step)
+    stage === "setup"
+      ? parseSetup(text)
+      : stage === "target"
+        ? parseTarget(text, step)
       : stage === "roles"
         ? { roles: parseRoles(text) }
         : stage === "education"
@@ -219,6 +226,7 @@ export function dataInterviewer(req: FakeRequest, conv: DataInfo) {
   // Replay: each reply that gave something usable, a skip or a "nothing to add" moves the plan on.
   let step = 0;
   let over = false;
+  let cards = 0;
   const advance = (stop = false) => {
     step++;
     if (stop || (!repeats && step >= questions)) over = true;
@@ -230,6 +238,7 @@ export function dataInterviewer(req: FakeRequest, conv: DataInfo) {
         const error = failed.get(String(b.id));
         // Something already on file is still an answer to the question.
         if (!error || /already on/.test(error)) advance();
+        if (!error) cards++;
       }
       return;
     }
@@ -240,8 +249,14 @@ export function dataInterviewer(req: FakeRequest, conv: DataInfo) {
     else if (isNoneReply(stage, text)) advance(repeats);
   });
 
-  const exhausted = ko ? "여기서 필요한 내용은 다 받았습니다. 카드를 확인한 뒤 계속하기를 눌러 주세요." : "That's what I need here. Check the card, then press Continue.";
   const ask = (lead = "") => {
+    const exhausted = cards
+      ? ko
+        ? "여기서 필요한 내용은 다 받았습니다. 카드를 확인한 뒤 계속하기를 눌러 주세요."
+        : "That's what I need here. Check the card, then press Continue."
+      : ko
+        ? "여기서 필요한 내용은 다 받았습니다. 준비되면 계속하기를 눌러 주세요."
+        : "That's what I need here. Press Continue when you're ready.";
     if (over) return { content: [{ type: "text", text: `${lead}${exhausted}` }] };
     const opening = step === 0;
     const text = opening ? conv.openingQuestion : ko ? followUp!.ko : followUp!.en;

@@ -41,6 +41,22 @@ test("build a profile and base CV by interview", async ({ page }) => {
   await page.getByRole("combobox", { name: "Where you want to work" }).selectOption("AU");
   await page.getByRole("button", { name: "Start the interview" }).click();
 
+  // Their situation, in their own words: only what they said is ticked on the card, and they can change it.
+  await expect(page.getByRole("heading", { name: "Your situation" })).toBeVisible();
+  await expect(page.getByText(/tell me a bit about your situation/)).toBeVisible();
+  await answer(page, "I'm changing careers from teaching, and I just graduated from a bootcamp.", /That's what I need here/);
+  const situation = formCard(page, "setup");
+  await expect(situation.getByRole("checkbox", { name: "Changing careers" })).toBeChecked();
+  await expect(situation.getByRole("checkbox", { name: "Recent graduate" })).toBeChecked();
+  await expect(situation.getByRole("checkbox", { name: "Senior leader or executive" })).not.toBeChecked();
+  await expect(situation.getByRole("checkbox", { name: "I have no CV" })).not.toBeChecked();
+  await situation.getByRole("checkbox", { name: "I have no CV" }).check();
+  await situation.getByRole("checkbox", { name: "Recent graduate" }).uncheck();
+  await useCard(page, "setup");
+  await expect(page.locator('[data-onfile="setup"]')).toContainText("Changing careers, I have no CV");
+  await expect(page.locator('[data-onfile="setup"]')).toContainText("English · Australia · Full");
+  await page.getByRole("button", { name: "Continue" }).click();
+
   // Stage 1: the target job, as a short chat. What is typed lands on a card; the card is what saves it.
   await expect(page.getByRole("heading", { name: "The job you're after" })).toBeVisible();
   await expect(page.locator('[data-role="assistant"]').first()).toBeVisible();

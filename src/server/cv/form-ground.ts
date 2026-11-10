@@ -89,6 +89,8 @@ export function groundDate(value: string, messages: TypedMessage[]): Grounded | 
 }
 
 export interface ProposalInput {
+  // setup
+  personas?: string[];
   // target
   titles?: string[];
   industries?: string[];
@@ -206,6 +208,17 @@ export function groundProposal(
     found ? { empty: false, value, inferred: [...new Set(inferred)], unresolved, dropped, sources } : { empty: true, dropped };
 
   switch (stage) {
+    case "setup": {
+      // Who they are, read from how they describe their situation: a description is kept only when
+      // one of its words is in what they typed. The picks (language, country, depth) are never the model's.
+      const value = structuredClone((pending?.value as InterviewForm["setup"] | undefined) ?? form.setup);
+      for (const persona of input.personas ?? []) {
+        if (!picked("persona", persona, "personas")) continue;
+        found++;
+        if (!(value.personas as string[]).includes(persona)) (value.personas as string[]).push(persona);
+      }
+      return finish(value, []);
+    }
     case "target": {
       // Nothing on file is removed by a proposal: grounded items are added to what is there.
       const value = structuredClone((pending?.value as InterviewForm["target"] | undefined) ?? form.target);

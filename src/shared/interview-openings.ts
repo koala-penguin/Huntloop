@@ -15,6 +15,7 @@ type Lang = "en" | "ko";
  * The openings offer them as chips; the demo interviewer moves on when it gets one.
  */
 export const NONE_REPLIES: Record<FormCardStage, Record<Lang, string[]>> = {
+  setup: { en: ["None of these really apply"], ko: ["해당하는 것이 없어요"] },
   target: { en: ["Yes, that's still it"], ko: ["네, 그대로예요"] },
   current: { en: ["I'm studying", "I'm taking a break"], ko: ["공부하고 있어요", "쉬고 있어요"] },
   roles: { en: ["That's my only job so far"], ko: ["지금 직장이 첫 직장이에요"] },
@@ -46,6 +47,15 @@ export function dataOpeningFor({ stage, form, language }: DataOpeningInput): Cha
   const opening = (text: string, options: string[]): ChatOpening => ({ text, options: noDigits(options), topic: "other" });
 
   switch (stage) {
+    case "setup":
+      return opening(
+        ko
+          ? `일 이야기를 시작하기 전에, 지금 상황을 편하게 말씀해 주세요. 예를 들어 다른 분야로 옮기려는지, 쉬다가 다시 일하려는지, ${countryName(form.setup.country, lang)} 취업 시장이 처음인지, 막 졸업했는지요. 질문을 상황에 맞추는 데 씁니다.`
+          : `Before we get to your work: tell me a bit about your situation, in your own words. Are you changing careers, coming back after a break, new to the job market in ${countryName(form.setup.country, lang)}, just out of study? I'll fit the questions to it.`,
+        ko
+          ? ["…에서 …(으)로 전직하려고 해요", "육아로 쉬다가 재취업하려고 해요", "이민 와서 이 나라 취업 시장은 처음이에요", "막 졸업했어요", "이력서가 없어요", ...none]
+          : ["I'm changing careers from … to …", "I'm returning to work after a break", "I recently moved here and I'm new to this job market", "I just graduated", "I don't have a CV", ...none],
+      );
     case "target": {
       const titles = form.target.titles.filter((t) => t.trim());
       const cities = form.target.cities.filter((c) => c.trim());

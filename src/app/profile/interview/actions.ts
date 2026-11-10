@@ -84,8 +84,8 @@ export async function startInterviewAction(setup: unknown): Promise<ActionResult
   if (active) return done({ id: active.id });
   let interview = createInterview(db, user.id, parsed.data);
   // The target form starts from the saved search preferences, so Generate doesn't undo them.
+  // The setup step goes on in a short chat about their situation; Continue there moves on to the target.
   interview = saveStageForm(db, interview, "target", targetFromPreferences(getPreferences(db, user.id), parsed.data.country));
-  interview = setStageStatus(db, interview, "setup", "done", "target");
   return done({ id: interview.id });
 }
 

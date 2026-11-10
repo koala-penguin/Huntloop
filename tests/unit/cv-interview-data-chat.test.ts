@@ -9,7 +9,7 @@ import { INTERVIEW_TOOLSET_VERSION, conversationOpening, ensureInterviewConversa
 import { acceptFormCard, continueBlockers, continueDataStage, saveOnFile } from "@/server/ai/chat/interview-forms";
 import { resolveChatAction } from "@/server/ai/chat/actions";
 import { getFakeGenerator, registerFakeGenerator, type FakeGenerator, type FakeRequest } from "@/server/ai/fake/transport";
-import { parseCurrent, parseEducation, parseLanguages, parseRoles, parseTarget, splitList } from "@/server/ai/fake/generators/interview-data";
+import { parseCurrent, parseEducation, parseLanguages, parseRoles, parseSetup, parseTarget, splitList } from "@/server/ai/fake/generators/interview-data";
 import { createInterview, getInterview, listAnswers, saveStageForm, type Interview } from "@/server/repo/interviews";
 import { interviewReadiness } from "@/server/cv/interview-build";
 import { answerRole, cardValueOf, type FormCardValue } from "@/shared/schemas/interview";
@@ -273,6 +273,71 @@ describe("data chat — the card is the only way into the form", () => {
   });
 });
 
+describe("data chat — the candidate's situation", () => {
+  it("ticks only what they said, in English or Korean; a description nobody typed is never ticked", async () => {
+    const { db, userId, ctx, interview } = fresh();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "setup", null);
+    expect((conversation.tools as Array<{ name: string }>).map((t) => t.name)).toEqual(["propose_setup", "suggest_options"]);
+    // The model claims three things; the candidate said one.
+    override = propose("propose_setup", { personas: ["career_changer", "senior_exec", "migrant"] });
+    await turn(ctx, conversation.id, "I've been teaching for ten years and I'm changing careers into data analysis.");
+    const [card] = cards(db, conversation.id);
+    expect(card.payload).toMatchObject({ stage: "setup", value: { personas: ["career_changer"], language: "en", country: "AU", depth: "full" }, inferred: ["personas"] });
+    expect(reload(db, userId, interview).form.setup.personas).toEqual([]);
+    expect(reload(db, userId, interview).personas).toEqual([]);
+
+    // Nothing they said: no card at all.
+    override = propose("propose_setup", { personas: ["senior_exec"] });
+    await turn(ctx, conversation.id, "I mostly want a steadier job.");
+    expect(lastResult()).toMatchObject({ is_error: true });
+    expect(cards(db, conversation.id).length).toBe(1);
+
+    // Korean words count too, and the new card keeps what the waiting one had.
+    override = propose("propose_setup", { personas: ["returning", "migrant"] });
+    await turn(ctx, conversation.id, "육아로 5년 쉬다가 재취업하려고 해요. 작년에 이민 왔어요.");
+    const second = cards(db, conversation.id)[1];
+    expect(second.payload.value).toMatchObject({ personas: ["career_changer", "returning", "migrant"] });
+
+    // Their own pick on the card is theirs to make: unticking one and ticking another is what gets saved.
+    expect(acceptFormCard(ctx, interview, second.id, { ...(second.payload.value as object), personas: ["returning", "migrant", "no_cv"] })).toEqual({ ok: true });
+    const saved = reload(db, userId, interview);
+    expect(saved.form.setup).toMatchObject({ personas: ["returning", "migrant", "no_cv"], language: "en", country: "AU" });
+    expect(saved.personas).toEqual(["returning", "migrant", "no_cv"]);
+    expect(acceptFormCard(ctx, saved, second.id, { personas: ["wizard"] })).toEqual({ ok: true });
+    // The interviews that follow are told who they are talking to.
+    expect(ensureInterviewConversation(ctx, interview.id, "current", null).system).toContain("New to this market");
+  });
+
+  it("a card with something that isn't one of the descriptions is refused, and nothing ticked is fine too", async () => {
+    const { db, userId, ctx, interview } = fresh();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "setup", null);
+    await turn(ctx, conversation.id, "I just graduated and I don't have a CV.");
+    const [card] = cards(db, conversation.id);
+    expect(card.payload.value).toMatchObject({ personas: ["no_cv", "graduate"] });
+    expect(acceptFormCard(ctx, interview, card.id, { ...(card.payload.value as object), personas: ["wizard"] })).toMatchObject({ ok: false, error: "invalid" });
+    expect(acceptFormCard(ctx, interview, card.id, { ...(card.payload.value as object), personas: [] })).toEqual({ ok: true });
+    expect(reload(db, userId, interview).form.setup.personas).toEqual([]);
+    // None is allowed: Continue moves on to the target job.
+    expect(continueDataStage(db, reload(db, userId, interview), "setup")).toEqual({ ok: true });
+    expect(reload(db, userId, interview)).toMatchObject({ stage: "target", stages: { setup: "done" } });
+  });
+
+  it("the demo interviewer reads the situation the same way every time, and takes \"none\" for an answer", async () => {
+    expect(parseSetup("I'm changing careers from teaching, and I just graduated from a bootcamp.")).toEqual({ personas: ["career_changer", "graduate"] });
+    expect(parseSetup("이민 와서 이 나라 취업 시장은 처음이에요. 이력서가 없어요")).toEqual({ personas: ["no_cv", "migrant"] });
+    expect(parseSetup("I was a director of engineering and I'm returning to work after a break")).toEqual({ personas: ["returning", "senior_exec"] });
+    expect(parseSetup("I want a steadier job")).toEqual({ personas: [] });
+    const { db, ctx, interview } = fresh();
+    const conversation = ensureInterviewConversation(ctx, interview.id, "setup", null);
+    await turn(ctx, conversation.id, "None of these really apply");
+    expect(cards(db, conversation.id)).toEqual([]);
+    expect(assistantText(db, conversation.id)).toBe("Got it. That's what I need here. Press Continue when you're ready.");
+    await turn(ctx, conversation.id, "Actually, I'm returning to work after a break");
+    expect(cards(db, conversation.id)[0].payload.value).toMatchObject({ personas: ["returning"] });
+    expect(JSON.stringify(requests)).not.toContain("<recorded_answers>");
+  });
+});
+
 describe("data chat — Continue, On file and readiness", () => {
   it("Continue waits for what is required and for a waiting card", async () => {
     const { db, userId } = testDb();
@@ -459,7 +524,7 @@ describe("demo interviewer — reading what was typed", () => {
     const roles = ensureInterviewConversation(ctx, interview.id, "roles", null);
     await turn(ctx, roles.id, "That's my only job so far");
     expect(cards(db, roles.id)).toEqual([]);
-    expect(assistantText(db, roles.id)).toBe("Got it. That's what I need here. Check the card, then press Continue.");
+    expect(assistantText(db, roles.id)).toBe("Got it. That's what I need here. Press Continue when you're ready.");
     await turn(ctx, roles.id, DATA_ANSWERS.koreanRole);
     expect((cards(db, roles.id)[0].payload.value as FormCardValue<"roles">).roles[0]).toMatchObject({ title: "데이터 분석가", company: "카카오", start: "2021-03", current: true });
 
